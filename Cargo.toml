@@ -1,0 +1,20 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/werkbank-kern",
+    "crates/werkbank-app",
+    "crates/werkbank-lizenz",
+    "crates/werkbank-satz",
+]
+
+[workspace.package]
+version = "1.1.0"
+edition = "2024"
+authors = ["Volker Dähn"]
+license-file = "LIZENZVEREINBARUNG.md"
+publish = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+strip = true

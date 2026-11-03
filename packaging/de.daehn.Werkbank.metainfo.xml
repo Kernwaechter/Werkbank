@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>de.daehn.Werkbank</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-proprietary</project_license>
+  <name>Werkbank</name>
+  <summary>Schreibwerkzeug für technische Bücher</summary>
+  <developer id="de.daehn">
+    <name>Volker Dähn</name>
+  </developer>
+  <description>
+    <p>Die Werkbank ist ein Desktop-Werkzeug für Autoren technischer Bücher. Sie arbeitet mit gewöhnlichen Markdown-Dateien: Dein Buch bleibt ein Ordner voller Dateien, den du auch mit Git und anderen Programmen bearbeiten kannst.</p>
+    <p>Funktionen:</p>
+    <ul>
+      <li>Editor mit Gliederung, Notizen, Suchen und Ersetzen, Schreibmaschinen-Modus und Fokus-Modus</li>
+      <li>Verlustfreies Speichern mit automatischen Sicherungen und Verlauf</li>
+      <li>Rechtschreibung offline (Hunspell) und Grammatik mit LanguageTool</li>
+      <li>Prüfung aller Rust-Beispiele des Buches mit rustc</li>
+      <li>Statistik: Netto-Wörter, Tempo, Serie, Prognose, Lesbarkeit</li>
+      <li>Nativer Buchsatz mit Typst (Druck- und Lese-PDF) und EPUB 3 mit korrekten Seitenzahlen</li>
+      <li>Cover-Designer mit Export als PNG, SVG und PDF</li>
+      <li>Alle Kürzel änderbar, alles per Tastatur erreichbar</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">de.daehn.Werkbank.desktop</launchable>
+  <provides>
+    <binary>werkbank-app</binary>
+  </provides>
+  <categories>
+    <category>Office</category>
+    <category>Publishing</category>
+  </categories>
+  <keywords>
+    <keyword>Buch</keyword>
+    <keyword>Markdown</keyword>
+    <keyword>Schreiben</keyword>
+    <keyword>Typst</keyword>
+    <keyword>EPUB</keyword>
+  </keywords>
+  <content_rating type="oars-1.1"/>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+  <releases>
+    <release version="1.1.0" date="2026-11-03">
+      <description>
+        <p>Deutlich schnellerer Editor: Die Korrekturvorschläge im Rechtschreib-Kasten des Inspektors werden zwischengespeichert, statt bei jedem Tastendruck neu berechnet zu werden.</p>
+      </description>
+    </release>
+    <release version="0.1.0" date="2026-10-29">
+      <description>
+        <p>Erste Fassung.</p>
+      </description>
+    </release>
+  </releases>
+</component>

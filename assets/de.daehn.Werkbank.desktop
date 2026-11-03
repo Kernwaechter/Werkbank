@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Werkbank
+GenericName=Schreibwerkzeug für Bücher
+Comment=Schreiben, prüfen, setzen und veröffentlichen technischer Bücher
+Comment[en]=Write, check, typeset and publish technical books
+Exec=werkbank-app
+Icon=de.daehn.Werkbank
+Terminal=false
+Categories=Office;TextEditor;Publishing;
+Keywords=Buch;Markdown;Schreiben;Lektorat;Rust;Typst;EPUB;
+StartupNotify=true
+StartupWMClass=de.daehn.Werkbank

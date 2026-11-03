@@ -1,0 +1,95 @@
+[package]
+name = "werkbank-app"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license-file.workspace = true
+publish.workspace = true
+description = "Schreibwerkzeug für technische Bücher: Editor, Sprach- und Code-Prüfung, Statistik, nativer Buchsatz und Cover-Designer"
+
+[dependencies]
+werkbank-kern = { path = "../werkbank-kern" }
+werkbank-satz = { path = "../werkbank-satz" }
+iced = { version = "0.14.0", features = ["highlighter", "advanced", "image"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+rfd = "0.17.2"
+ureq = "3.5.0"
+serde_json = "1.0.154"
+serde = { version = "1.0.229", features = ["derive"] }
+spellbook = "0.4.2"
+resvg = "0.49.0"
+iced_core = "0.14.0"
+iced_graphics = "0.14.0"
+
+[build-dependencies]
+winresource = "0.1.34"
+
+[package.metadata.deb]
+name = "werkbank"
+maintainer = "Volker Dähn <volker@daehn.de>"
+section = "editors"
+priority = "optional"
+depends = "$auto, libxkbcommon0, libwayland-client0 | libx11-6"
+recommends = "hunspell-de-de, mesa-vulkan-drivers"
+suggests = "default-jre, rustc, python3, pandoc"
+extended-description = "Schreibwerkzeug für technische Bücher: Markdown-Editor, Sprach- und Code-Prüfung, Statistik, nativer Buchsatz (Typst, EPUB) und Cover-Designer."
+assets = [
+    ["../../target/release/werkbank-app", "usr/bin/", "755"],
+    ["../../assets/de.daehn.Werkbank.desktop", "usr/share/applications/", "644"],
+    ["../../packaging/de.daehn.Werkbank.metainfo.xml", "usr/share/metainfo/", "644"],
+    ["../../assets/icons/hicolor/16x16/apps/de.daehn.Werkbank.png", "usr/share/icons/hicolor/16x16/apps/", "644"],
+    ["../../assets/icons/hicolor/22x22/apps/de.daehn.Werkbank.png", "usr/share/icons/hicolor/22x22/apps/", "644"],
+    ["../../assets/icons/hicolor/24x24/apps/de.daehn.Werkbank.png", "usr/share/icons/hicolor/24x24/apps/", "644"],
+    ["../../assets/icons/hicolor/32x32/apps/de.daehn.Werkbank.png", "usr/share/icons/hicolor/32x32/apps/", "644"],
+    ["../../assets/icons/hicolor/48x48/apps/de.daehn.Werkbank.png", "usr/share/icons/hicolor/48x48/apps/", "644"],
+    ["../../assets/icons/hicolor/64x64/apps/de.daehn.Werkbank.png", "usr/share/icons/hicolor/64x64/apps/", "644"],
+    ["../../assets/icons/hicolor/128x128/apps/de.daehn.Werkbank.png", "usr/share/icons/hicolor/128x128/apps/", "644"],
+    ["../../assets/icons/hicolor/256x256/apps/de.daehn.Werkbank.png", "usr/share/icons/hicolor/256x256/apps/", "644"],
+    ["../../assets/icons/hicolor/512x512/apps/de.daehn.Werkbank.png", "usr/share/icons/hicolor/512x512/apps/", "644"],
+    ["../../assets/icons/hicolor/scalable/apps/de.daehn.Werkbank.svg", "usr/share/icons/hicolor/scalable/apps/", "644"],
+    ["../../README.md", "usr/share/doc/werkbank/README.md", "644"],
+    ["../../LIZENZVEREINBARUNG.md", "usr/share/doc/werkbank/LIZENZVEREINBARUNG.md", "644"],
+]
+
+[package.metadata.generate-rpm]
+name = "werkbank"
+summary = "Schreibwerkzeug für technische Bücher"
+description = "Schreibwerkzeug für technische Bücher: Markdown-Editor, Sprach- und Code-Prüfung, Statistik, nativer Buchsatz (Typst, EPUB) und Cover-Designer."
+license = "Proprietary"
+group = "Applications/Publishing"
+assets = [
+    { source = "../../target/release/werkbank-app", dest = "/usr/bin/werkbank-app", mode = "755" },
+    { source = "../../assets/de.daehn.Werkbank.desktop", dest = "/usr/share/applications/de.daehn.Werkbank.desktop", mode = "644" },
+    { source = "../../packaging/de.daehn.Werkbank.metainfo.xml", dest = "/usr/share/metainfo/de.daehn.Werkbank.metainfo.xml", mode = "644" },
+    { source = "../../assets/icons/hicolor/16x16/apps/de.daehn.Werkbank.png", dest = "/usr/share/icons/hicolor/16x16/apps/de.daehn.Werkbank.png", mode = "644" },
+    { source = "../../assets/icons/hicolor/22x22/apps/de.daehn.Werkbank.png", dest = "/usr/share/icons/hicolor/22x22/apps/de.daehn.Werkbank.png", mode = "644" },
+    { source = "../../assets/icons/hicolor/24x24/apps/de.daehn.Werkbank.png", dest = "/usr/share/icons/hicolor/24x24/apps/de.daehn.Werkbank.png", mode = "644" },
+    { source = "../../assets/icons/hicolor/32x32/apps/de.daehn.Werkbank.png", dest = "/usr/share/icons/hicolor/32x32/apps/de.daehn.Werkbank.png", mode = "644" },
+    { source = "../../assets/icons/hicolor/48x48/apps/de.daehn.Werkbank.png", dest = "/usr/share/icons/hicolor/48x48/apps/de.daehn.Werkbank.png", mode = "644" },
+    { source = "../../assets/icons/hicolor/64x64/apps/de.daehn.Werkbank.png", dest = "/usr/share/icons/hicolor/64x64/apps/de.daehn.Werkbank.png", mode = "644" },
+    { source = "../../assets/icons/hicolor/128x128/apps/de.daehn.Werkbank.png", dest = "/usr/share/icons/hicolor/128x128/apps/de.daehn.Werkbank.png", mode = "644" },
+    { source = "../../assets/icons/hicolor/256x256/apps/de.daehn.Werkbank.png", dest = "/usr/share/icons/hicolor/256x256/apps/de.daehn.Werkbank.png", mode = "644" },
+    { source = "../../assets/icons/hicolor/512x512/apps/de.daehn.Werkbank.png", dest = "/usr/share/icons/hicolor/512x512/apps/de.daehn.Werkbank.png", mode = "644" },
+    { source = "../../assets/icons/hicolor/scalable/apps/de.daehn.Werkbank.svg", dest = "/usr/share/icons/hicolor/scalable/apps/de.daehn.Werkbank.svg", mode = "644" },
+    { source = "../../README.md", dest = "/usr/share/doc/werkbank/README.md", mode = "644", doc = true },
+    { source = "../../LIZENZVEREINBARUNG.md", dest = "/usr/share/doc/werkbank/LIZENZVEREINBARUNG.md", mode = "644", doc = true },
+]
+post_install_script = "gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor 2>/dev/null || :"
+post_uninstall_script = "gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor 2>/dev/null || :"
+
+[package.metadata.generate-rpm.requires]
+libxkbcommon = "*"
+
+[package.metadata.generate-rpm.recommends]
+hunspell-de = "*"
+
+[package.metadata.generate-rpm.suggests]
+java-latest-openjdk = "*"
+rust = "*"
+
+[package.metadata.bundle]
+name = "Werkbank"
+identifier = "de.daehn.Werkbank"
+icon = ["../../assets/icons/werkbank.icns"]
+category = "public.app-category.productivity"
+short_description = "Schreibwerkzeug für technische Bücher"

@@ -1,0 +1,63 @@
+# Flatpak-Manifest der Werkbank. Bauen: packaging/flatpak/bauen.sh (nicht lokal ausgeführt: flatpak-builder fehlte).
+# Die Quellen (path: ..) sind der Ordner packaging/ relativ zu diesem Manifest, also das Projekt.
+app-id: de.daehn.Werkbank
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: werkbank-app
+
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # LanguageTool-Server (lokal oder im Netz)
+  - --share=network
+  # Buchordner liegen irgendwo im Home; Wörterbücher des Systems (Hunspell) nur lesend
+  - --filesystem=home
+  - --filesystem=host-os:ro
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    CARGO_HOME: /run/build/werkbank/cargo
+    CARGO_NET_OFFLINE: 'true'
+
+modules:
+  - name: werkbank
+    buildsystem: simple
+    build-commands:
+      - cargo build --release --offline --locked -p werkbank-app
+      - install -Dm755 target/release/werkbank-app /app/bin/werkbank-app
+      - install -Dm644 assets/de.daehn.Werkbank.desktop -t /app/share/applications
+      - install -Dm644 packaging/de.daehn.Werkbank.metainfo.xml -t /app/share/metainfo
+      - |
+        for g in 16 22 24 32 48 64 128 256 512; do
+          install -Dm644 assets/icons/hicolor/${g}x${g}/apps/de.daehn.Werkbank.png \
+            -t /app/share/icons/hicolor/${g}x${g}/apps
+        done
+      - install -Dm644 assets/icons/hicolor/scalable/apps/de.daehn.Werkbank.svg -t /app/share/icons/hicolor/scalable/apps
+    sources:
+      - type: dir
+        path: ..
+        skip:
+          - target
+          - .git
+          - packaging/flatpak/build
+          - packaging/flatpak/vendor
+          - packaging/flatpak/.flatpak-builder
+      # Abhängigkeiten offline: `cargo vendor` legt vendor/ an (siehe bauen.sh)
+      - type: dir
+        path: flatpak/vendor
+        dest: vendor
+      - type: inline
+        dest: .cargo
+        dest-filename: config.toml
+        contents: |
+          [source.crates-io]
+          replace-with = "vendored-sources"
+
+          [source.vendored-sources]
+          directory = "vendor"

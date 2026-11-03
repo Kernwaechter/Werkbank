@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Werkbank</title>
+<link rel="stylesheet" href="schriften/schriften.css">
+<style>
+/* Layout: eine ruhige Werkstatt-Seite. Links gesetzter Text, rechts das Produkt, dazwischen Schnittzeichnungen
+   des Buchs (Seiten, Cover). Die Seite bleibt Schiefergrau; Stahlblau führt, Bernstein steht nur für "menschlich". */
+:root {
+  --bg: #f2f4f7;
+  --flaeche: #ffffff;
+  --flaeche-2: #e8ecf1;
+  --linie: #cfd6df;
+  --text: #1b2129;
+  --text-leise: #566170;
+  --akzent: #24598a;
+  --akzent-flaeche: #dce8f4;
+  --mensch: #b4691a;
+  --mensch-flaeche: #f6e8d6;
+  --steril: #5d6b7c;
+  --font-anzeige: "Newsreader", "Iowan Old Style", Georgia, serif;
+  --font-text: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-daten: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #171c22; --flaeche: #1f252d; --flaeche-2: #28303a; --linie: #374250;
+    --text: #e4e8ee; --text-leise: #a3adbb; --akzent: #8fb6da; --akzent-flaeche: #26384b;
+    --mensch: #e0a35a; --mensch-flaeche: #3a2e1e; --steril: #8795a8;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #171c22; --flaeche: #1f252d; --flaeche-2: #28303a; --linie: #374250;
+  --text: #e4e8ee; --text-leise: #a3adbb; --akzent: #8fb6da; --akzent-flaeche: #26384b;
+  --mensch: #e0a35a; --mensch-flaeche: #3a2e1e; --steril: #8795a8;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 400 17px/1.6 var(--font-text);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+a { color: var(--akzent); }
+:focus-visible { outline: 2px solid var(--akzent); outline-offset: 3px; border-radius: 3px; }
+.huelle { max-width: 1160px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--font-anzeige); font-weight: 560; line-height: 1.08; text-wrap: balance; margin: 0; letter-spacing: -0.012em; }
+h1 { font-size: clamp(2.6rem, 6.4vw, 5rem); font-weight: 520; }
+h2 { font-size: clamp(1.9rem, 3.8vw, 3rem); }
+h3 { font-size: 1.35rem; line-height: 1.2; }
+p { margin: 0; }
+.marke { font-family: var(--font-daten); font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-leise); }
+.lead { font-size: 1.15rem; color: var(--text-leise); max-width: 62ch; }
+
+/* Kopf */
+.kopf { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 20px; flex-wrap: wrap; }
+.logo { display: flex; align-items: center; gap: 10px; font-family: var(--font-anzeige); font-size: 1.5rem; font-weight: 600; text-decoration: none; color: var(--text); }
+.logo svg { width: 30px; height: 30px; }
+.kopf nav { display: flex; gap: 22px; font-size: 0.92rem; flex-wrap: wrap; }
+.kopf nav a { color: var(--text-leise); text-decoration: none; }
+.kopf nav a:hover { color: var(--text); }
+.knopf { display: inline-block; background: var(--akzent); color: var(--bg); padding: 11px 20px; border-radius: 6px; font-weight: 600; text-decoration: none; font-size: 0.95rem; }
+.knopf.leise { background: transparent; color: var(--text); border: 1px solid var(--linie); }
+
+/* Held */
+.held { padding-block: 56px 28px; display: grid; gap: 28px; }
+.held h1 em { font-style: italic; color: var(--akzent); font-weight: 480; }
+.held-zeile { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+
+/* Produktbild: nachgezeichnete Oberfläche */
+.buehne { margin-top: 20px; }
+.buehne-kopf { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.umschalter { display: inline-flex; border: 1px solid var(--linie); border-radius: 6px; overflow: hidden; }
+.umschalter button { font: 500 0.82rem var(--font-text); padding: 6px 12px; border: 0; background: transparent; color: var(--text-leise); cursor: pointer; }
+.umschalter button[aria-pressed="true"] { background: var(--akzent-flaeche); color: var(--text); }
+.app {
+  --a-bg: #1e2329; --a-panel: #252b33; --a-karte: #2d343d; --a-aktiv: #2f3c4e; --a-linie: #424b58;
+  --a-text: #e2e6ec; --a-leise: #aab1bc; --a-akzent: #87aed0; --a-fuell: #3e688e; --a-code: #181c22;
+  background: var(--a-bg); color: var(--a-text); border: 1px solid var(--a-linie); border-radius: 10px; overflow: hidden;
+  box-shadow: 0 24px 60px -28px rgba(10, 20, 35, 0.55); font: 400 13px/1.5 var(--font-text);
+}
+.app[data-app="hell"] {
+  --a-bg: #fbfaf7; --a-panel: #f3f2ee; --a-karte: #edece8; --a-aktiv: #dfe6ee; --a-linie: #d6d4ce;
+  --a-text: #222428; --a-leise: #5c6068; --a-akzent: #28587f; --a-fuell: #2c5c84; --a-code: #eeede8;
+}
+.app-leiste { display: grid; gap: 6px; padding: 7px 14px 6px; background: var(--a-panel); border-bottom: 1px solid var(--a-linie); font-size: 12px; }
+.leiste-zeile { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.leiste-zeile .rechts { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.app-leiste .titel { font-weight: 600; letter-spacing: 0.06em; color: var(--a-akzent); font-size: 14px; }
+.app-wahl { background: var(--a-karte); border: 1px solid var(--a-linie); border-radius: 4px; padding: 2px 8px; }
+.app-test { border: 1px solid var(--a-linie); border-radius: 4px; padding: 2px 8px; color: #e0a35a; font-size: 11px; }
+.app[data-app="hell"] .app-test { color: #9a5510; }
+.app-reiter { display: flex; gap: 2px; }
+.app-reiter span { padding: 3px 10px; border-radius: 4px; color: var(--a-leise); }
+.app-reiter .an { background: var(--a-aktiv); color: var(--a-text); }
+.app-suche { display: flex; justify-content: space-between; gap: 18px; width: 250px; max-width: 100%; background: var(--a-karte); border: 1px solid var(--a-linie); border-radius: 4px; padding: 3px 10px; color: var(--a-leise); }
+.app-symbole { display: flex; gap: 8px; color: var(--a-leise); font-size: 14px; }
+.app-status { font-size: 11px; color: var(--a-leise); }
+.suchbuehne { padding: 26px 18px; display: grid; place-items: start center; }
+.suchdialog { width: min(100%, 640px); background: var(--a-panel); border: 1px solid var(--a-linie); border-radius: 8px; padding: 16px; display: grid; gap: 9px; box-shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.6); }
+.suchdialog h4 { margin: 0; font: 600 15px var(--font-text); }
+.umfang { display: flex; gap: 4px; }
+.umfang span { padding: 3px 10px; border-radius: 4px; color: var(--a-leise); }
+.umfang .an { background: var(--a-aktiv); color: var(--a-text); }
+.feld { background: var(--a-bg); border: 1px solid var(--a-linie); border-radius: 4px; padding: 6px 10px; font-size: 13px; min-height: 31px; }
+.feld.regex { font-family: var(--font-daten); font-size: 12px; }
+.schalter-zeile { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--a-leise); }
+.schalter-zeile .ein { color: var(--a-text); }
+.schalter-zeile i { display: inline-block; width: 24px; height: 12px; border-radius: 6px; background: var(--a-karte); vertical-align: -2px; margin-right: 6px; position: relative; }
+.schalter-zeile .ein i { background: var(--a-fuell); }
+.schalter-zeile i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 8px; height: 8px; border-radius: 50%; background: var(--a-leise); }
+.schalter-zeile .ein i::after { left: 14px; background: #fff; }
+.status-zeile { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--a-leise); }
+.treffer { display: grid; gap: 2px; }
+.treffer div { background: var(--a-bg); border-radius: 4px; padding: 5px 9px; font-size: 12px; }
+.treffer div.an { background: var(--a-aktiv); }
+.treffer small { display: block; color: var(--a-leise); font-size: 10px; }
+.treffer .neu { color: var(--a-akzent); }
+.bestaetigung { font-size: 11px; color: #e0a35a; }
+.app[data-app="hell"] .bestaetigung { color: #9a5510; }
+.app-btn { background: var(--a-fuell); color: #fff; padding: 3px 10px; border-radius: 4px; font-weight: 600; font-size: 12px; }
+.app-btn.ruhig { background: var(--a-karte); color: var(--a-text); font-weight: 500; }
+.app-rumpf { display: grid; grid-template-columns: 150px 190px minmax(0, 1fr) 232px; min-height: 430px; }
+.spalte { padding: 12px; border-right: 1px solid var(--a-linie); background: var(--a-panel); min-width: 0; }
+.spalte:last-child { border-right: 0; border-left: 1px solid var(--a-linie); }
+.spalte .kopfzeile { font-family: var(--font-daten); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--a-leise); margin-bottom: 10px; }
+.eintrag { padding: 6px 8px; border-radius: 4px; color: var(--a-leise); }
+.eintrag.an { background: var(--a-aktiv); color: var(--a-text); }
+.karte { background: var(--a-karte); border-radius: 5px; padding: 8px 10px; margin-bottom: 7px; }
+.karte.an { background: var(--a-aktiv); outline: 1px solid var(--a-akzent); }
+.karte b { display: block; font-weight: 600; font-size: 12px; }
+.karte small { color: var(--a-leise); font-size: 11px; }
+.editor { background: var(--a-bg); padding: 28px 34px; font-family: "Newsreader", Georgia, serif; font-size: 16px; line-height: 1.7; min-width: 0; }
+.editor .md-h { color: var(--a-akzent); font-weight: 600; font-size: 18px; }
+.editor .md-z { color: var(--a-leise); font-family: var(--font-daten); font-size: 12px; }
+.editor .md-f { font-weight: 700; }
+.editor .md-c { font-family: var(--font-daten); font-size: 13px; background: var(--a-code); padding: 1px 5px; border-radius: 3px; }
+.editor p { margin: 0 0 12px; }
+.welle { text-decoration: underline wavy #d66a5e; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.welle.blau { text-decoration-color: #5c9bd6; }
+.zeile-akt { background: color-mix(in srgb, var(--a-akzent) 12%, transparent); margin-inline: -34px; padding-inline: 34px; }
+.reiter { display: flex; gap: 4px; margin-bottom: 12px; font-size: 11px; }
+.reiter span { padding: 3px 8px; border-radius: 4px; color: var(--a-leise); }
+.reiter .an { background: var(--a-aktiv); color: var(--a-text); }
+.mess { display: grid; gap: 7px; }
+.mess-zeile { display: grid; grid-template-columns: 1fr 70px; gap: 8px; align-items: center; font-size: 11px; color: var(--a-leise); }
+.balken { height: 5px; background: var(--a-karte); border-radius: 3px; overflow: hidden; }
+.balken i { display: block; height: 100%; background: var(--a-akzent); border-radius: 3px; }
+.urteil { margin-top: 12px; padding: 9px 10px; border-radius: 5px; background: var(--a-karte); }
+.urteil strong { color: #e0a35a; font-size: 12px; }
+.app[data-app="hell"] .urteil strong { color: #9a5510; }
+.app-fuss { display: flex; gap: 18px; padding: 6px 14px; background: var(--a-panel); border-top: 1px solid var(--a-linie); font-family: var(--font-daten); font-size: 11px; color: var(--a-leise); flex-wrap: wrap; }
+.bildnotiz { font-size: 0.8rem; color: var(--text-leise); margin-top: 10px; }
+
+/* Abschnitte */
+section { padding-block: 84px 0; }
+.kopf-abschnitt { display: grid; gap: 14px; margin-bottom: 36px; max-width: 760px; }
+.zwei { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 48px; align-items: start; }
+.liste { display: grid; gap: 18px; margin: 22px 0 0; padding: 0; list-style: none; }
+.liste li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; }
+.liste li::before { content: ""; width: 7px; height: 7px; margin: 10px 0 0 6px; background: var(--akzent); border-radius: 1px; }
+.liste b { font-weight: 600; }
+.liste span { color: var(--text-leise); }
+
+/* Das Alleinstellungsmerkmal: Stilprofil */
+.stil { background: var(--flaeche); border: 1px solid var(--linie); border-radius: 10px; padding: 28px; display: grid; gap: 22px; }
+.skala { display: grid; gap: 6px; }
+.skala-bahn { height: 14px; border-radius: 7px; background: linear-gradient(90deg, var(--steril), var(--flaeche-2) 45%, var(--mensch)); position: relative; }
+.skala-marke { position: absolute; top: -5px; width: 4px; height: 24px; background: var(--text); border-radius: 2px; }
+.skala-enden { display: flex; justify-content: space-between; font-family: var(--font-daten); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-leise); }
+.zahl { font-family: var(--font-anzeige); font-size: 4.4rem; line-height: 1; font-weight: 500; color: var(--mensch); font-variant-numeric: tabular-nums; }
+.zahl small { font-family: var(--font-text); font-size: 0.95rem; color: var(--text-leise); margin-left: 8px; }
+.merkmale { display: grid; gap: 9px; font-size: 0.9rem; }
+.merkmal { display: grid; grid-template-columns: 170px 1fr 36px; gap: 12px; align-items: center; }
+.merkmal .balken { height: 8px; background: var(--flaeche-2); }
+.merkmal .balken i { background: var(--mensch); }
+.merkmal .balken i.schwach { background: var(--steril); }
+.merkmal output { font-family: var(--font-daten); font-size: 0.8rem; color: var(--text-leise); text-align: right; font-variant-numeric: tabular-nums; }
+.hinweis { font-size: 0.9rem; color: var(--text-leise); border-top: 1px solid var(--linie); padding-top: 14px; }
+
+/* Buchseiten */
+.heft { display: grid; gap: 22px; }
+.flaeche { background: var(--flaeche); border: 1px solid var(--linie); border-radius: 10px; padding: 26px; }
+.seiten { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 14px 10px; }
+.seite { aspect-ratio: 5 / 7; background: #fff; color: #222; border: 1px solid #c9cfd8; border-radius: 2px; position: relative; font-family: var(--font-anzeige); font-size: 0.7rem; padding: 10px 8px; box-shadow: 0 6px 14px -10px rgba(10, 20, 35, 0.5); display: grid; place-items: center; text-align: center; line-height: 1.2; }
+.seite.leer { background: repeating-linear-gradient(135deg, #f3f4f6 0 5px, #fff 5px 10px); color: #7c8593; }
+.seite .nr { position: absolute; bottom: 5px; font-family: var(--font-daten); font-size: 0.62rem; color: #4a5361; }
+.seite.l .nr { left: 8px; } .seite.r .nr { right: 8px; } .seite.m .nr { left: 50%; transform: translateX(-50%); }
+.seite-unter { margin-top: 5px; font-family: var(--font-daten); font-size: 0.62rem; color: var(--text-leise); text-align: center; letter-spacing: 0.04em; }
+.kette { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font-family: var(--font-daten); font-size: 0.82rem; }
+.kette span { background: var(--flaeche); border: 1px solid var(--linie); border-radius: 5px; padding: 7px 11px; }
+.kette span.ziel { background: var(--akzent); color: var(--bg); border-color: var(--akzent); }
+.kette i { font-style: normal; color: var(--text-leise); }
+
+/* Sicherungen */
+.sicherung { font-family: var(--font-daten); font-size: 0.85rem; background: var(--flaeche); border: 1px solid var(--linie); border-radius: 10px; overflow: hidden; }
+.sicherung header { padding: 12px 18px; background: var(--flaeche-2); display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.sicherung ol { list-style: none; margin: 0; padding: 0; }
+.sicherung li { padding: 10px 18px; border-top: 1px solid var(--linie); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.sicherung li span:last-child { color: var(--text-leise); }
+.sicherung li.neu { color: var(--akzent); }
+
+/* Funktionsraster */
+.raster { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0; border-top: 1px solid var(--linie); }
+.raster > div { padding: 24px 24px 26px 0; border-bottom: 1px solid var(--linie); display: grid; gap: 8px; align-content: start; }
+.raster h3 { font-size: 1.2rem; }
+.raster p { color: var(--text-leise); font-size: 0.95rem; }
+.tastatur { font-family: var(--font-daten); font-size: 0.74rem; border: 1px solid var(--linie); background: var(--flaeche); border-radius: 4px; padding: 1px 6px; color: var(--text); white-space: nowrap; }
+
+/* Cover */
+.umschlaege { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; }
+.umschlag { background: var(--flaeche); border: 1px solid var(--linie); border-radius: 10px; padding: 18px; display: grid; gap: 10px; }
+.umschlag svg { width: 100%; height: auto; display: block; border-radius: 3px; }
+.umschlag.grau svg { filter: grayscale(1) contrast(1.05); }
+
+/* Download */
+.downloads { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.download { border: 1px solid var(--linie); background: var(--flaeche); border-radius: 10px; padding: 22px; display: grid; gap: 10px; align-content: start; }
+.download .marke { color: var(--akzent); }
+.download .knopf { justify-self: start; }
+.download code, .pruef { font-family: var(--font-daten); font-size: 0.78rem; color: var(--text-leise); overflow-wrap: anywhere; }
+.download p { font-size: 0.92rem; color: var(--text-leise); }
+/* Kaufen */
+.kauf { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: center; background: var(--flaeche); border: 1px solid var(--linie); border-radius: 10px; padding: 36px; }
+.preis { font-family: var(--font-anzeige); font-size: clamp(3.6rem, 9vw, 6rem); line-height: 1; font-weight: 500; font-variant-numeric: tabular-nums; }
+.preis small { font-family: var(--font-text); font-size: 1rem; color: var(--text-leise); margin-left: 10px; font-weight: 400; }
+@media (max-width: 760px) { .kauf { grid-template-columns: 1fr; gap: 24px; padding: 24px; } }
+.schluss { margin-top: 90px; padding-block: 56px; border-top: 1px solid var(--linie); display: grid; gap: 22px; }
+.schluss h2 { max-width: 18ch; }
+.fuss { padding-block: 24px 40px; color: var(--text-leise); font-size: 0.85rem; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--linie); }
+
+@media (max-width: 960px) {
+  .app-rumpf { grid-template-columns: 170px minmax(0, 1fr) 200px; }
+  .app-rumpf .spalte:first-child { display: none; }
+  .zwei { grid-template-columns: 1fr; gap: 30px; }
+}
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  section { padding-block: 60px 0; }
+  .app-rumpf { grid-template-columns: minmax(0, 1fr); }
+  .app-rumpf .spalte { display: none; }
+  .editor { padding: 20px 18px; }
+  .zeile-akt { margin-inline: -18px; padding-inline: 18px; }
+  .merkmal { grid-template-columns: 1fr 40px; }
+  .merkmal .balken { grid-column: 1 / -1; grid-row: 2; }
+  .stil { padding: 20px; }
+}
+</style>
+
+</head>
+<body>
+<div class="huelle">
+  <header class="kopf">
+    <a class="logo" href="#top" aria-label="Werkbank, Seitenanfang">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="21" width="26" height="4" rx="1" fill="currentColor"/><rect x="6" y="25" width="3" height="5" fill="currentColor"/><rect x="23" y="25" width="3" height="5" fill="currentColor"/><path d="M8 5h7v14H8zM17 5h7v14h-7z" fill="none" stroke="var(--akzent)" stroke-width="2" stroke-linejoin="round"/></svg>
+      Werkbank
+    </a>
+    <nav aria-label="Abschnitte">
+      <a href="#stil">Stilprofil</a>
+      <a href="#satz">Satz</a>
+      <a href="#sicher">Sicherungen</a>
+      <a href="#schreiben">Schreiben</a>
+      <a href="#suchen">Suchen</a>
+      <a href="#cover">Cover</a>
+      <a href="#daten">Daten</a>
+      <a href="#download">Download</a>
+      <a href="#kaufen">Kaufen</a>
+      <a href="#kontakt">Kontakt</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <div class="held">
+      <p class="marke">Schreibwerkzeug für technische Bücher</p>
+      <h1>Du schreibst das Buch. <em>Die Werkbank</em> macht es druckfertig.</h1>
+      <p class="lead">Markdown-Dateien, ein Editor ohne Ablenkung und ein Satz, der aus deinem Text ein PDF/X-3 und ein EPUB 3 macht. Dazu ein Stilprofil, das zeigt, ob ein Kapitel nach dir klingt oder nach Schablone.</p>
+      <div class="held-zeile">
+        <a class="knopf" href="#schreiben">Funktionen ansehen</a>
+        <a class="knopf leise" href="#stil">Was sie einmalig macht</a>
+      </div>
+    </div>
+
+    <div class="buehne">
+      <div class="buehne-kopf">
+        <span class="marke">So sieht die Arbeitsfläche aus</span>
+        <div class="umschalter" role="group" aria-label="Darstellung der Arbeitsfläche">
+          <button type="button" id="app-dunkel" aria-pressed="true">Dämmerung</button>
+          <button type="button" id="app-hell" aria-pressed="false">Papier</button>
+        </div>
+      </div>
+      <div class="app" id="app" data-app="dunkel" role="img" aria-label="Nachgezeichnete Oberfläche der Werkbank mit Bibliothek, Kapitelliste, Editor und Kapitel-Details">
+        <div class="app-leiste">
+          <div class="leiste-zeile">
+            <span class="titel">WERKBANK</span>
+            <span class="app-wahl">Rust-Werkstatt · Band 1 ▾</span>
+            <span class="app-btn ruhig">Öffnen …</span>
+            <span class="rechts">
+              <span class="app-test">Testversion · noch 24 Tage</span>
+              <span class="app-status">Gespeichert 14:03:12</span>
+              <span class="app-btn">Speichern</span>
+            </span>
+          </div>
+          <div class="leiste-zeile">
+            <span class="app-reiter"><span class="an">Schreiben</span><span>Bauen</span><span>Prüfen</span><span>Zahlen</span><span>Cover</span></span>
+            <span class="rechts">
+              <span class="app-suche"><span>Befehl oder Kapitel suchen …</span><span>Strg+K</span></span>
+              <span class="app-symbole"><span>◧</span><span>◫</span><span>◨</span><span>◎</span><span>⚙</span></span>
+            </span>
+          </div>
+        </div>
+        <div class="app-rumpf">
+          <div class="spalte">
+            <div class="kopfzeile">Bibliothek</div>
+            <div class="eintrag">Vorwort</div>
+            <div class="eintrag">Teil 1 · Grundlagen</div>
+            <div class="eintrag">Teil 2 · Besitz</div>
+            <div class="eintrag an">Teil 3 · Fehler</div>
+            <div class="eintrag">Teil 4 · Nebenläufigkeit</div>
+            <div class="eintrag">Anhang</div>
+          </div>
+          <div class="spalte">
+            <div class="kopfzeile">Kapitel</div>
+            <div class="karte"><b>Result und Option</b><small>1 420 Wörter · fertig</small></div>
+            <div class="karte an"><b>Eigene Fehlertypen</b><small>2 180 Wörter · Entwurf</small></div>
+            <div class="karte"><b>Fehler weiterreichen</b><small>960 Wörter · Entwurf</small></div>
+            <div class="karte"><b>Panic oder Fehler?</b><small>0 Wörter · Idee</small></div>
+          </div>
+          <div class="editor">
+            <p><span class="md-h">## Kapitel [fehlertypen]: Eigene Fehlertypen</span></p>
+            <p class="zeile-akt">Ein Fehler, der nur „fehlgeschlagen“ sagt, hilft niemandem. Wer <span class="md-f">**sauber**</span> modelliert, gibt dem Aufrufer eine <span class="welle blau">Möglichkeit</span>, darauf zu <span class="welle">reagirens</span>.</p>
+            <p>Wie das mit <span class="md-c">`?`</span> zusammenspielt, zeigt @kap:weiterreichen; den Code prüft die Werkbank mit dem echten Compiler.</p>
+            <p class="md-z">```rust&nbsp; fn lesen() -&gt; Result&lt;Konfig, FehlerArt&gt;</p>
+          </div>
+          <div class="spalte">
+            <div class="reiter"><span>Details</span><span>Tempo</span><span class="an">Stil</span><span>Text</span></div>
+            <div class="mess">
+              <div class="mess-zeile"><span>Satzrhythmus</span><div class="balken"><i style="width:86%"></i></div></div>
+              <div class="mess-zeile"><span>Füllformeln</span><div class="balken"><i style="width:92%"></i></div></div>
+              <div class="mess-zeile"><span>Konnektoren</span><div class="balken"><i style="width:71%"></i></div></div>
+              <div class="mess-zeile"><span>Wortschatz</span><div class="balken"><i style="width:78%"></i></div></div>
+              <div class="mess-zeile"><span>Satzanfänge</span><div class="balken"><i style="width:64%"></i></div></div>
+            </div>
+            <div class="urteil"><strong>Menschlich, rund und flüssig</strong><br><span style="color:var(--a-leise)">Wert 84 von 100 · Beispielkapitel</span></div>
+          </div>
+        </div>
+        <div class="app-fuss"><span>Sicherung Nr. 5</span><span>Deutsch (de-DE)</span><span>2 180 Wörter · 11 min Lesezeit</span></div>
+      </div>
+      <p class="bildnotiz">Nachgezeichnet in HTML nach der Oberfläche der Werkbank. Kapitelnamen und Messwerte sind Beispiele.</p>
+    </div>
+  </main>
+
+  <section id="stil">
+    <div class="kopf-abschnitt">
+      <p class="marke">Das Stilprofil</p>
+      <h2>Klingt dieses Kapitel nach dir oder nach Maschine?</h2>
+      <p class="lead">Wer heute als Mensch schreibt, will nicht nach KI klingen. Die Werkbank misst deshalb zu jedem Kapitel, wie abwechslungsreich und lebendig der Text gebaut ist, und sagt es dir in einem Satz.</p>
+    </div>
+    <div class="zwei">
+      <div>
+        <ul class="liste">
+          <li><div><b>Neun Merkmale mit Gewicht.</b> <span>Satzrhythmus, Füllformeln, Konnektoren, Wortschatz-Vielfalt, Satzanfänge, Stimme, Absatzlängen, Gedankenstriche und Dreierreihen.</span></div></li>
+          <li><div><b>Ein Urteil statt einer Tabelle.</b> <span>Von „steril“ bis „menschlich, rund und flüssig“, direkt im Kapitel-Detail neben dem Text.</span></div></li>
+          <li><div><b>Tempo pro Kapitel.</b> <span>Wörter pro Stunde, Schreibzeit und Lesezeit je Kapitel, damit du siehst, wo du flüssig warst und wo du gequält hast.</span></div></li>
+          <li><div><b>Kein KI-Detektor.</b> <span>Das Profil bewertet Schreibmerkmale, die Leserinnen und Leser spüren. Es beweist nichts über die Herkunft eines Textes und lädt nichts hoch.</span></div></li>
+        </ul>
+      </div>
+      <div class="stil" aria-label="Beispiel eines Stilprofils">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div><p class="marke">Beispielkapitel</p><p class="zahl">84<small>von 100</small></p></div>
+          <p style="max-width:24ch;font-family:var(--font-anzeige);font-size:1.3rem;line-height:1.25">Menschlich, rund und flüssig.</p>
+        </div>
+        <div class="skala">
+          <div class="skala-bahn"><span class="skala-marke" style="left:calc(84% - 2px)"></span></div>
+          <div class="skala-enden"><span>steril</span><span>menschlich</span></div>
+        </div>
+        <div class="merkmale">
+          <div class="merkmal"><span>Satzrhythmus</span><div class="balken"><i style="width:86%"></i></div><output>86</output></div>
+          <div class="merkmal"><span>Füllformeln</span><div class="balken"><i style="width:92%"></i></div><output>92</output></div>
+          <div class="merkmal"><span>Konnektoren</span><div class="balken"><i style="width:71%"></i></div><output>71</output></div>
+          <div class="merkmal"><span>Wortschatz</span><div class="balken"><i style="width:78%"></i></div><output>78</output></div>
+          <div class="merkmal"><span>Satzanfänge</span><div class="balken"><i class="schwach" style="width:48%"></i></div><output>48</output></div>
+          <div class="merkmal"><span>Dreierreihen</span><div class="balken"><i style="width:88%"></i></div><output>88</output></div>
+        </div>
+        <p class="hinweis">Die Werkbank zeigt dir auch die Stellen: Satzanfänge wiederholen sich in diesem Beispiel, hier lohnt sich eine Überarbeitung.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="satz">
+    <div class="kopf-abschnitt">
+      <p class="marke">Satz und Export</p>
+      <h2>Vom Markdown zum Buch, mit den Seitenzahlen, die ein Buch hat</h2>
+      <p class="lead">Die Werkbank setzt dein Buch über denselben Weg, den ein Verlag nimmt: Markdown, Pandoc, Typst, PDF/X-3. Das Ergebnis ist ein Druck-PDF, ein Lese-PDF und ein EPUB 3.</p>
+    </div>
+    <div class="heft">
+      <div class="kette" aria-label="Weg vom Text zur Druckdatei">
+        <span>Markdown</span><i>→</i><span>Pandoc</span><i>→</i><span>Typst</span><i>→</i><span>PDF</span><i>→</i><span class="ziel">PDF/X-3 mit ICC-Profil</span>
+      </div>
+      <div class="flaeche">
+        <p class="marke" style="margin-bottom:16px">Buchübliche Zählung, so wie die Werkbank sie setzt</p>
+        <div class="seiten">
+          <div><div class="seite m"><span>Schmutz&shy;titel</span><span class="nr">i</span></div><p class="seite-unter">Titelei</p></div>
+          <div><div class="seite leer"><span>leer</span></div><p class="seite-unter">Leerseite</p></div>
+          <div><div class="seite m"><span><b>Titel</b></span><span class="nr">iii</span></div><p class="seite-unter">Titelei</p></div>
+          <div><div class="seite m"><span>Impressum</span><span class="nr">iv</span></div><p class="seite-unter">Titelei</p></div>
+          <div><div class="seite m"><span>Inhalts&shy;verzeichnis</span><span class="nr">v</span></div><p class="seite-unter">Titelei</p></div>
+          <div><div class="seite r"><span>Kapitel 1</span><span class="nr">1</span></div><p class="seite-unter">rechte Seite</p></div>
+          <div><div class="seite l"><span>Text</span><span class="nr">2</span></div><p class="seite-unter">links, Zahl außen</p></div>
+          <div><div class="seite r"><span>Text</span><span class="nr">3</span></div><p class="seite-unter">rechts, Zahl außen</p></div>
+        </div>
+      </div>
+      <div class="zwei" style="gap:32px">
+        <ul class="liste" style="margin:0">
+          <li><div><b>Römisch in der Titelei, arabisch im Haupttext.</b> <span>Der Haupttext beginnt auf einer rechten Seite mit der Zahl 1.</span></div></li>
+          <li><div><b>Seitenzahlen nach Wahl.</b> <span>Mittig auf jeder Seite oder wie im Roman abwechselnd außen.</span></div></li>
+          <li><div><b>Schmutztitel, Leerseiten, Teiltitelseiten.</b> <span>Leerseiten bleiben ohne Zahl, Kapitel beginnen rechts, am Ende schließt eine Leerseite den Bogen.</span></div></li>
+        </ul>
+        <ul class="liste" style="margin:0">
+          <li><div><b>Inhaltsverzeichnis mit stimmenden Seitenzahlen.</b> <span>Der Satz läuft so oft, bis sich nichts mehr verschiebt. Schafft er das nicht, meldet er einen Fehler statt falscher Zahlen.</span></div></li>
+          <li><div><b>Live-Vorschau neben dem Editor.</b> <span>Die Seiten erscheinen auf demselben Weg wie im fertigen PDF. Ohne Pandoc setzt die Werkbank mit ihrem eingebauten Satz.</span></div></li>
+          <li><div><b>Typst steckt in der App.</b> <span>Schriften sind eingebettet. Du installierst keine TeX-Distribution.</span></div></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="sicher">
+    <div class="kopf-abschnitt">
+      <p class="marke">Sicherheit beim Schreiben</p>
+      <h2>Ein Knopf zum Speichern. Jede alte Fassung bleibt.</h2>
+      <p class="lead">Speichern ist ein sichtbarer Knopf in der Kopfleiste, auch als Strg+S. Bei jedem Speichern legt die Werkbank die vorherige Fassung als nummerierte Datei ab. Nichts wird überschrieben, nichts gelöscht.</p>
+    </div>
+    <div class="zwei">
+      <ul class="liste" style="margin:0">
+        <li><div><b>Fortlaufend nummeriert.</b> <span>Die Sicherungen liegen in <span class="tastatur">.werkbank/backups/</span> neben deinem Buch, als normale Markdown-Dateien.</span></div></li>
+        <li><div><b>Schreiben wie mit Netz.</b> <span>Autosave und Gerüst-Snapshots laufen zusätzlich im Hintergrund.</span></div></li>
+        <li><div><b>Verlauf mit Strg+H.</b> <span>Jede Sicherung erscheint dort mit Nummer und Zeitstempel.</span></div></li>
+        <li><div><b>Keine unnötigen Kopien.</b> <span>Wenn sich nichts geändert hat, meldet die Werkbank „Keine Änderungen“ und legt nichts an.</span></div></li>
+      </ul>
+      <div class="sicherung" aria-label="Beispiel einer Sicherungsliste">
+        <header><span>.werkbank/backups/teil-3/</span><span>Beispiel</span></header>
+        <ol>
+          <li class="neu"><span>teil-3-0005.md</span><span>Sicherung Nr. 5 · heute 14:03:12</span></li>
+          <li><span>teil-3-0004.md</span><span>Sicherung Nr. 4 · heute 11:47:30</span></li>
+          <li><span>teil-3-0003.md</span><span>Sicherung Nr. 3 · gestern 21:15:02</span></li>
+          <li><span>teil-3-0002.md</span><span>Sicherung Nr. 2 · gestern 18:40:19</span></li>
+          <li><span>teil-3-0001.md</span><span>Sicherung Nr. 1 · vorgestern 09:12:44</span></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section id="schreiben">
+    <div class="kopf-abschnitt">
+      <p class="marke">Schreiben</p>
+      <h2>Ein Editor für lange Strecken</h2>
+      <p class="lead">Die Werkbank ist für Sitzungen gebaut, die Stunden dauern. Neutrale Flächen in Schiefergrau oder Papier, eingebettete Libertinus-Schrift und nur ein zurückhaltender Akzent.</p>
+    </div>
+    <div class="raster">
+      <div><h3>Schreibmaschinen-Modus</h3><p>Die Zeile mit dem Cursor bleibt in der Fenstermitte. Dein Blick wandert nicht den Bildschirm hinunter.</p></div>
+      <div><h3>Wellenlinien</h3><p>LanguageTool prüft Grammatik und Stil, Hunspell die Rechtschreibung. Code und Markdown-Syntax werden ausgespart.</p></div>
+      <div><h3>Befehlspalette</h3><p><span class="tastatur">Strg+K</span> öffnet jede Funktion. Alle Kürzel lassen sich in den Einstellungen umbelegen.</p></div>
+      <div><h3>Tastatur zuerst</h3><p>Knöpfe, Schalter, Regler und Listen sind mit Tab und F6 erreichbar. Enter löst aus, Pfeile stellen ein.</p></div>
+      <div><h3>Querverweise</h3><p>Mit <span class="tastatur">@kap:name</span> verweist du auf ein Kapitel. Die Werkbank löst es auf und meldet kaputte Verweise.</p></div>
+      <div><h3>Code, der kompiliert</h3><p>Rust-Beispiele im Text prüft die Werkbank mit dem echten Compiler, damit im Buch nur Code steht, der läuft.</p></div>
+      <div><h3>Mehrere Bände</h3><p>Öffne einen Ordner mit einem Buchprojekt und wechsle zwischen den Bänden, ohne die App zu schließen. Suchen und Ersetzen geht über alle Bände.</p></div>
+      <div><h3>Statistik</h3><p>Wörter pro Tag, Schreibzeit, Wortziele und Status pro Kapitel.</p></div>
+    </div>
+  </section>
+
+  <section id="suchen">
+    <div class="kopf-abschnitt">
+      <p class="marke">Suchen und Ersetzen</p>
+      <h2>Ein Wort im ganzen Buch ändern, in allen Bänden auf einmal</h2>
+      <p class="lead">Du suchst im Kapitel, im geöffneten Band oder in allen Bänden deines Buchs. Die Liste zeigt jede Zeile vorher und nachher, und ersetzt wird erst nach einer Bestätigung.</p>
+    </div>
+    <div class="zwei">
+      <ul class="liste" style="margin:0">
+        <li><div><b>Alle Bände nebeneinander.</b> <span>Die Werkbank durchsucht jeden Band-Ordner deines Buchs und zeigt zu jedem Treffer Band, Kapitel, Datei und Zeile. Ein Klick öffnet die Stelle.</span></div></li>
+        <li><div><b>Reguläre Ausdrücke.</b> <span>Mit <span class="tastatur">$1</span> und <span class="tastatur">$2</span> setzt du Gruppen im Ersatz ein, zum Beispiel aus „Kapitel 12“ ein „Abschnitt 12“. Dazu kommen ganzes Wort und Groß-/Kleinschreibung.</span></div></li>
+        <li><div><b>Vorschau und Bestätigung.</b> <span>Du siehst jede Zeile mit dem neuen Text. „Alle ersetzen“ nennt vorher die Anzahl der Treffer und der betroffenen Kapitel.</span></div></li>
+        <li><div><b>Die alte Fassung bleibt.</b> <span>Jede geänderte Datei bekommt eine nummerierte Sicherung. Den geöffneten Band schreibst du selbst mit „Speichern“.</span></div></li>
+      </ul>
+      <div class="app" data-app="dunkel" role="img" aria-label="Nachgezeichnetes Fenster Suchen und Ersetzen mit drei Treffern in zwei Bänden">
+        <div class="suchbuehne">
+          <div class="suchdialog">
+            <h4>Suchen und Ersetzen</h4>
+            <div class="umfang"><span>Kapitel</span><span>Ganzer Band</span><span class="an">Alle Bände</span></div>
+            <div class="feld regex">Kapitel (\d+)</div>
+            <div class="feld regex">Abschnitt $1</div>
+            <div class="schalter-zeile"><span><i></i>Groß-/Kleinschreibung</span><span><i></i>Ganzes Wort</span><span class="ein"><i></i>Regulärer Ausdruck</span></div>
+            <div class="status-zeile"><span>3 Treffer in 3 Kapiteln</span><span class="app-btn">Alle ersetzen …</span></div>
+            <div class="bestaetigung">3 Treffer in 3 Kapiteln werden ersetzt. Die alte Fassung bleibt als nummerierte Sicherung erhalten.</div>
+            <div class="treffer">
+              <div class="an"><small>Band 1 · Fehler weiterreichen · teil-3.md · Zeile 42</small>Wie in Kapitel 7 gezeigt, hilft <b>?</b> hier nicht weiter.<br><span class="neu">→ Wie in Abschnitt 7 gezeigt, hilft ? hier nicht weiter.</span></div>
+              <div><small>Band 1 · Panic oder Fehler? · teil-3.md · Zeile 9</small>Mehr dazu in Kapitel 12.<br><span class="neu">→ Mehr dazu in Abschnitt 12.</span></div>
+              <div><small>Band 2 · Threads · teil-1.md · Zeile 118</small>Das Muster kennst du aus Kapitel 3.<br><span class="neu">→ Das Muster kennst du aus Abschnitt 3.</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="bildnotiz">Nachgezeichnet nach dem Fenster der Werkbank. Die Treffer sind Beispiele.</p>
+  </section>
+
+  <section id="cover">
+    <div class="kopf-abschnitt">
+      <p class="marke">Cover-Designer</p>
+      <h2>Vorderseite, Rücken und Rückseite aus einer Grafik</h2>
+      <p class="lead">Lege ein Bild hinter das ganze Cover. Die Werkbank sagt dir, welche Pixelmaße dein Bild für E-Book und Druck braucht, und skaliert es passend. Jede Textfarbe wählst du einzeln.</p>
+    </div>
+    <div class="umschlaege">
+      <div class="umschlag">
+        <svg viewBox="0 0 600 300" role="img" aria-label="Umschlag in Farbe: Rückseite, Rücken, Vorderseite">
+          <defs>
+            <linearGradient id="himmel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2b4c72"/><stop offset="0.55" stop-color="#d98e4b"/><stop offset="1" stop-color="#4a2f3d"/></linearGradient>
+          </defs>
+          <rect width="600" height="300" fill="url(#himmel)"/>
+          <circle cx="470" cy="120" r="46" fill="#f3d9a6" opacity="0.85"/>
+          <path d="M0 230 L120 170 L210 215 L300 150 L420 220 L520 175 L600 215 V300 H0Z" fill="#1d2b3d" opacity="0.8"/>
+          <rect x="24" y="150" width="240" height="110" fill="#10151c" fill-opacity="0.55"/>
+          <text x="40" y="180" font-family="Newsreader, Georgia, serif" font-size="14" fill="#f4efe6">Rust ohne Angst</text>
+          <text x="40" y="202" font-family="IBM Plex Sans, sans-serif" font-size="10" fill="#d9e2ee">Fehler verstehen, Besitz begreifen,</text>
+          <text x="40" y="217" font-family="IBM Plex Sans, sans-serif" font-size="10" fill="#d9e2ee">Programme bauen, die halten.</text>
+          <rect x="283" y="0" width="34" height="300" fill="#10151c" fill-opacity="0.6"/>
+          <text transform="translate(305 150) rotate(90)" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#f4efe6" letter-spacing="2">RUST OHNE ANGST</text>
+          <text x="460" y="62" text-anchor="middle" font-family="Newsreader, Georgia, serif" font-size="30" font-weight="600" fill="#fbf3e2">Rust</text>
+          <text x="460" y="92" text-anchor="middle" font-family="Newsreader, Georgia, serif" font-size="30" font-weight="600" fill="#fbf3e2">ohne Angst</text>
+          <text x="460" y="272" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="#f0d9b0" letter-spacing="3">BAND 1</text>
+        </svg>
+        <p class="marke">Vorschau in Farbe</p>
+      </div>
+      <div class="umschlag grau">
+        <svg viewBox="0 0 600 300" role="img" aria-label="Derselbe Umschlag in Graustufen, wie er auf einem E-Reader erscheint">
+          <rect width="600" height="300" fill="url(#himmel)"/>
+          <circle cx="470" cy="120" r="46" fill="#f3d9a6" opacity="0.85"/>
+          <path d="M0 230 L120 170 L210 215 L300 150 L420 220 L520 175 L600 215 V300 H0Z" fill="#1d2b3d" opacity="0.8"/>
+          <rect x="24" y="150" width="240" height="110" fill="#10151c" fill-opacity="0.55"/>
+          <text x="40" y="180" font-family="Newsreader, Georgia, serif" font-size="14" fill="#f4efe6">Rust ohne Angst</text>
+          <text x="40" y="202" font-family="IBM Plex Sans, sans-serif" font-size="10" fill="#d9e2ee">Fehler verstehen, Besitz begreifen,</text>
+          <text x="40" y="217" font-family="IBM Plex Sans, sans-serif" font-size="10" fill="#d9e2ee">Programme bauen, die halten.</text>
+          <rect x="283" y="0" width="34" height="300" fill="#10151c" fill-opacity="0.6"/>
+          <text transform="translate(305 150) rotate(90)" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#f4efe6" letter-spacing="2">RUST OHNE ANGST</text>
+          <text x="460" y="62" text-anchor="middle" font-family="Newsreader, Georgia, serif" font-size="30" font-weight="600" fill="#fbf3e2">Rust</text>
+          <text x="460" y="92" text-anchor="middle" font-family="Newsreader, Georgia, serif" font-size="30" font-weight="600" fill="#fbf3e2">ohne Angst</text>
+          <text x="460" y="272" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="11" fill="#f0d9b0" letter-spacing="3">BAND 1</text>
+        </svg>
+        <p class="marke">Vorschau in Graustufen für E-Reader</p>
+      </div>
+    </div>
+    <ul class="liste" style="max-width:760px">
+      <li><div><b>Kästen mit wählbarer Deckkraft.</b> <span>Rückentext und Klappentext stehen in einem Kasten, dessen Transparenz du so einstellst, dass jeder Hintergrund lesbar bleibt.</span></div></li>
+      <li><div><b>Auflösung mit Bewertung.</b> <span>Die Werkbank liest die Maße deines Bildes, vergleicht sie mit dem Bedarf bei 300 dpi und sagt, ob es reicht oder skaliert werden muss.</span></div></li>
+      <li><div><b>Als PNG, SVG und PDF.</b> <span>Das Cover geht als Bild für E-Book-Plattformen oder als PDF für den Druck hinaus.</span></div></li>
+    </ul>
+    <p class="bildnotiz">Das Beispielcover ist eine Zeichnung für diese Seite.</p>
+  </section>
+
+  <section id="daten">
+    <div class="kopf-abschnitt">
+      <p class="marke">Daten und Hilfsmittel</p>
+      <h2>Läuft auf deinem Rechner. Deine Dateien bleiben deine.</h2>
+      <p class="lead">Dein Buch besteht aus Markdown-Dateien in einem Ordner. Die Werkbank liest und schreibt sie Byte für Byte so, wie du sie ablegst, und braucht kein Konto und keinen Server.</p>
+    </div>
+    <ul class="liste" style="max-width:760px">
+      <li><div><b>Hilfsmittel im Blick.</b> <span>Die Einstellungen zeigen, ob Pandoc und Ghostscript installiert sind und in welcher Version. Wenn nicht, erklärt ein Info-Symbol die Installation für Windows, macOS, Debian, Fedora und Arch.</span></div></li>
+      <li><div><b>Deutsch zuerst.</b> <span>Oberfläche, Handbuch und Sprachprüfung sind auf deutsche Fachbücher zugeschnitten.</span></div></li>
+    </ul>
+  </section>
+
+  <section id="download">
+    <div class="kopf-abschnitt">
+      <p class="marke">Download</p>
+      <h2>28 Tage ausprobieren, ohne Anmeldung</h2>
+      <p class="lead">Lade die Werkbank herunter und teste sie vier Wochen mit vollem Funktionsumfang. Danach trägst du den Lizenzschlüssel aus deinem Kauf ein.</p>
+    </div>
+    <div class="downloads">
+      <div class="download">
+        <span class="marke">Linux · Debian, Ubuntu, Mint</span>
+        <h3>.deb-Paket</h3>
+        <a class="knopf" href="downloads/werkbank_1.1.0-1_amd64.deb" download>Herunterladen</a>
+        <p>Installieren mit <code>sudo apt install ./werkbank_1.1.0-1_amd64.deb</code></p>
+        <code>SHA-256: f6bcafea3869d1536fd8e9a477ff5208f0d6f68b20c257c0305481f5be30037f</code>
+      </div>
+      <div class="download">
+        <span class="marke">Linux · Fedora, openSUSE</span>
+        <h3>.rpm-Paket</h3>
+        <a class="knopf" href="downloads/werkbank-1.1.0-1.x86_64.rpm" download>Herunterladen</a>
+        <p>Installieren mit <code>sudo dnf install ./werkbank-1.1.0-1.x86_64.rpm</code></p>
+        <code>SHA-256: 9a8c1e4e1e53eb51edf9e8ca703517dfa224b190e3591211e7be33faafea2465</code>
+      </div>
+    </div>
+    <p class="bildnotiz">Version 1.1.0, zunächst nur für Linux (64 Bit). Windows und macOS folgen. Nach der Installation startest du die Werkbank aus dem Anwendungsmenü. Für die Satzvorschau und den Export empfiehlt sich Pandoc, die Einstellungen der Werkbank erklären die Installation. Die Prüfsummen kannst du mit <span class="tastatur">sha256sum</span> vergleichen.</p>
+  </section>
+
+  <section id="kaufen">
+    <div class="kopf-abschnitt">
+      <p class="marke">Kaufen</p>
+      <h2>Einmal bezahlen, dauerhaft nutzen</h2>
+    </div>
+    <div class="kauf">
+      <div>
+        <p class="preis">49 €<small>einmalig, kein Abo</small></p>
+        <p class="marke" style="margin-top:14px">Einführungspreis</p>
+      </div>
+      <div>
+        <ul class="liste" style="margin:0 0 24px">
+          <li><div><b>Lizenzschlüssel zu deiner E-Mail-Adresse.</b> <span>Du trägst Adresse und Schlüssel einmal in der Werkbank ein. Die Prüfung läuft offline.</span></div></li>
+          <li><div><b>Geht nicht verloren.</b> <span>Zu jeder Adresse gehört immer derselbe Schlüssel. Hast du ihn verlegt, schicke ich ihn dir erneut.</span></div></li>
+        </ul>
+        <div class="held-zeile">
+          <a class="knopf" id="kauf-knopf" data-checkout="https://buy.stripe.com/bJeeVd7Mn7HS52z3WR8so00" href="mailto:kontakt@jurzel.de?subject=Werkbank%20kaufen&body=Bitte%20schickt%20mir%20ein%20Angebot%20f%C3%BCr%20die%20Werkbank%20(49%20EUR).%0D%0A%0D%0AMeine%20E-Mail-Adresse%20f%C3%BCr%20die%20Lizenz%3A%20">Per E-Mail bestellen</a>
+        </div>
+        <p class="bildnotiz" id="kauf-notiz">Die Online-Bezahlung wird noch angebunden. Bis dahin läuft die Bestellung per E-Mail. Die Werkbank lässt sich 28 Tage lang mit vollem Funktionsumfang testen.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="schluss" id="kontakt">
+    <h2>Das Buch gehört auf die Werkbank.</h2>
+    <p class="lead">Fragen, Wünsche oder Interesse an der Werkbank? Schreib mir.</p>
+    <div class="held-zeile">
+      <a class="knopf" href="mailto:kontakt@jurzel.de">kontakt@jurzel.de</a>
+      <a class="knopf leise" href="#schreiben">Funktionen ansehen</a>
+    </div>
+  </div>
+  <footer class="fuss"><span><a href="impressum.html">Impressum</a> · <a href="datenschutz.html">Datenschutz</a></span><span>Werkbank 1.1.0 · <a href="mailto:kontakt@jurzel.de">kontakt@jurzel.de</a></span><span>Geschrieben in Rust mit Iced und Typst</span></footer>
+</div>
+
+<script>
+/* Kaufknopf: Sobald in data-checkout der Stripe-Zahlungslink steht (https://buy.stripe.com/…), führt er zur Kasse. */
+(function () {
+  var k = document.getElementById('kauf-knopf');
+  var url = k && k.getAttribute('data-checkout');
+  if (url && url.indexOf('https://') === 0) {
+    k.href = url;
+    k.textContent = 'Jetzt kaufen';
+    document.getElementById('kauf-notiz').textContent = 'Sichere Zahlung über Stripe. Den Lizenzschlüssel bekommst du per E-Mail. Die Werkbank lässt sich 28 Tage lang mit vollem Funktionsumfang testen.';
+  }
+})();
+(function () {
+  var app = document.getElementById('app');
+  var dunkel = document.getElementById('app-dunkel');
+  var hell = document.getElementById('app-hell');
+  function setze(modus) {
+    app.setAttribute('data-app', modus);
+    dunkel.setAttribute('aria-pressed', String(modus === 'dunkel'));
+    hell.setAttribute('aria-pressed', String(modus === 'hell'));
+  }
+  dunkel.addEventListener('click', function () { setze('dunkel'); });
+  hell.addEventListener('click', function () { setze('hell'); });
+})();
+</script>
+</body>
+</html>
