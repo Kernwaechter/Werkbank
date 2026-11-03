@@ -43,6 +43,11 @@
     <control>pointing</control>
   </supports>
   <releases>
+    <release version="1.2.2" date="2026-11-03">
+      <description>
+        <p>Text-Vorschau ohne Markdown-Reste: Bilder mit Bildunterschrift, Tabellen, Listen, Seitenumbrüche; sie folgt dem Cursor. Zeilennummern in Codeblöcken in Vorschau, nativem PDF und EPUB. Pandoc-Satzvorschau mit neueren Pandoc-Versionen wieder lauffähig.</p>
+      </description>
+    </release>
     <release version="1.2.1" date="2026-11-03">
       <description>
         <p>Behebt einen Absturz beim Rechtsklick auf ein markiertes Wort. Der Rechtsklick öffnet jetzt ein Korrekturmenü mit Vorschlägen, Merken und Ignorieren.</p>
