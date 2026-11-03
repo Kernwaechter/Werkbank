@@ -103,6 +103,21 @@ pub type Wellen = std::sync::Arc<std::sync::Mutex<Vec<Vec<(std::ops::Range<usize
 /// Erklärt eine unterschlängelte Stelle: (Zeile, Wort, Art, Spalte) → Hinweistext.
 pub type Erklaerung<'a> = Box<dyn Fn(usize, &str, u8, usize) -> Option<String> + 'a>;
 
+/// Rechtsklick auf eine unterschlängelte Stelle.
+#[derive(Debug, Clone)]
+pub struct WellenKlick {
+    /// Zeile (ab 0).
+    pub zeile: usize,
+    /// Byte-Bereich in der Zeile.
+    pub bereich: std::ops::Range<usize>,
+    /// Das markierte Wort bzw. die markierte Stelle.
+    pub wort: String,
+    /// Art der Markierung (siehe `markierung::WELLE_…`).
+    pub art: u8,
+    /// Mausposition im Fenster.
+    pub position: Point,
+}
+
 /// Unterschlängelte Stelle unter dem Mauszeiger: Zeile, Byte-Bereich, Art und Rechteck (relativ zum Text).
 type Schwebe = (usize, std::ops::Range<usize>, u8, Rectangle);
 
@@ -142,7 +157,7 @@ pub struct TextEditor<
     schreibmaschine: bool,
     wellen: Option<Wellen>,
     erklaerung: Option<Erklaerung<'a>>,
-    on_rechtsklick: Option<Box<dyn Fn(String, u8) -> Option<Message> + 'a>>,
+    on_rechtsklick: Option<Box<dyn Fn(WellenKlick) -> Option<Message> + 'a>>,
 }
 
 impl<'a, Message, Theme, Renderer>
@@ -323,8 +338,8 @@ where
         self
     }
 
-    /// Rechtsklick auf eine unterschlängelte Stelle: (Wort, Art) → Nachricht (z. B. Wort merken).
-    pub fn rechtsklick(mut self, f: impl Fn(String, u8) -> Option<Message> + 'a) -> Self {
+    /// Rechtsklick auf eine unterschlängelte Stelle → Nachricht (z. B. Korrekturmenü öffnen).
+    pub fn rechtsklick(mut self, f: impl Fn(WellenKlick) -> Option<Message> + 'a) -> Self {
         self.on_rechtsklick = Some(Box::new(f));
         self
     }
@@ -794,10 +809,14 @@ where
                 shell.request_redraw();
             }
         }
+        // Rechtsklick auf eine unterschlängelte Stelle. Den Hover-Zustand erst kopieren: eine Leihe
+        // in der Bedingung lebt bis zum Ende des Rumpfs, und dort wird er geleert (sonst Absturz).
+        let geschwebt = state.schwebe.borrow().clone();
         if let Some(f) = &self.on_rechtsklick
             && matches!(event, Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right)))
-            && let Some((zeile, bereich, art, rechteck)) = state.schwebe.borrow().clone()
-            && cursor.is_over(rechteck + (layout.bounds().shrink(self.padding).position() - Point::ORIGIN))
+            && let Some((zeile, bereich, art, rechteck)) = geschwebt
+            && let Some(position) = cursor.position()
+            && (rechteck + (layout.bounds().shrink(self.padding).position() - Point::ORIGIN)).contains(position)
         {
             let wort = {
                 let internal = self.content.0.borrow();
@@ -805,8 +824,9 @@ where
                     .downcast_ref::<iced_graphics::text::Editor>()
                     .and_then(|e| e.buffer().lines.get(zeile).and_then(|l| l.text().get(bereich.clone()).map(str::to_string)))
             };
-            if let Some(nachricht) = wort.and_then(|w| f(w, art)) {
-                *state.schwebe.borrow_mut() = None;
+            if let Some(nachricht) = wort.and_then(|wort| f(WellenKlick { zeile, bereich, wort, art, position })) {
+                state.schwebe.replace(None);
+                shell.request_redraw();
                 shell.publish(nachricht);
                 shell.capture_event();
                 return;

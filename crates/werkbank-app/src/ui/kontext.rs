@@ -22,6 +22,27 @@ use werkbank_kern::KapitelStatus;
 pub enum Ziel {
     Kapitel(String),
     Teil(String),
+    /// Markierte Stelle im Editor (Rechtschreibung oder Sprachprüfung).
+    Wort(WortZiel),
+}
+
+/// Eine markierte Stelle samt Vorschlägen für das Korrekturmenü.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WortZiel {
+    pub zeile: usize,
+    pub von: usize,
+    pub bis: usize,
+    pub wort: String,
+    /// Rechtschreibung (Hunspell) oder Sprachprüfung (LanguageTool).
+    pub rechtschreibung: bool,
+    /// Korrekturvorschläge (höchstens fünf).
+    pub vorschlaege: Vec<String>,
+    /// Index des LanguageTool-Treffers, falls es einer ist.
+    pub treffer: Option<usize>,
+    /// Kurzbeschreibung (bei LanguageTool die Meldung).
+    pub meldung: String,
+    /// LanguageTool-Tippfehler: lässt sich wie ein Wort merken.
+    pub tippfehler: bool,
 }
 
 /// Offenes Kontextmenü: Ziel und Fensterposition des Rechtsklicks.
@@ -174,6 +195,47 @@ pub fn menue<'a>(k: &'a Kontext, teile: &'a [Teil], fenster: Size) -> Element<'a
                 .push(thema::trennlinie())
                 .push(eintrag("Kapitel löschen …", "", Message::KapitelLoeschenFrage, true));
         }
+        Ziel::Wort(w) => {
+            let kopf = if w.rechtschreibung {
+                format!("„{}“ steht nicht im Wörterbuch", w.wort)
+            } else {
+                let m: String = w.meldung.chars().take(70).collect();
+                if w.meldung.chars().count() > 70 { format!("{m} …") } else { m }
+            };
+            liste = liste.push(container(text(kopf).size(11).color(thema::text_gedimmt())).padding([4, 10]));
+            if w.vorschlaege.is_empty() {
+                liste = liste.push(container(text("Keine Vorschläge").size(13).color(thema::text_gedimmt())).padding([5, 10]));
+            }
+            for (i, v) in w.vorschlaege.iter().enumerate() {
+                let aktion = match w.treffer {
+                    Some(t) => Message::TrefferErsetzen(t, i),
+                    None => Message::WortErsetzen { zeile: w.zeile, von: w.von, bis: w.bis, ersatz: v.clone() },
+                };
+                liste = liste.push(
+                    button(text(v).size(13).font(thema::fett()))
+                        .width(Fill)
+                        .padding([5, 10])
+                        .style(thema::listen_eintrag_stil(false))
+                        .on_press(Message::KontextAktion(Box::new(aktion))),
+                );
+            }
+            liste = liste.push(thema::trennlinie());
+            match w.treffer {
+                None => {
+                    liste = liste
+                        .push(eintrag("Merken", "für den Band", Message::WortMerken(w.wort.clone()), false))
+                        .push(eintrag("Ignorieren", "bis zum Neustart", Message::WortIgnorieren(w.wort.clone()), false));
+                }
+                Some(t) => {
+                    if w.tippfehler {
+                        liste = liste.push(eintrag("Wort merken", "für den Band", Message::TrefferWortMerken(t), false));
+                    }
+                    liste = liste
+                        .push(eintrag("Ignorieren", "diese Stelle", Message::TrefferIgnorieren(t), false))
+                        .push(eintrag("Regel ausschalten", "für den Band", Message::TrefferRegelAus(t), false));
+                }
+            }
+        }
         Ziel::Teil(_) => {
             liste = liste
                 .push(eintrag("Neues Kapitel in diesem Teil …", "Strg+Umschalt+N", Message::NeuesKapitel, false))
@@ -187,7 +249,11 @@ pub fn menue<'a>(k: &'a Kontext, teile: &'a [Teil], fenster: Size) -> Element<'a
     }
 
     // Menü möglichst an der Klickstelle, aber nie über den Fensterrand hinaus
-    let (breite, hoehe) = (290.0, match k.ziel { Ziel::Kapitel(_) => 360.0, Ziel::Teil(_) => 200.0 });
+    let (breite, hoehe) = match &k.ziel {
+        Ziel::Kapitel(_) => (290.0, 360.0),
+        Ziel::Teil(_) => (290.0, 200.0),
+        Ziel::Wort(w) => (260.0, 110.0 + 32.0 * w.vorschlaege.len().max(1) as f32),
+    };
     let x = k.position.x.min(fenster.width - breite - 8.0).max(8.0);
     let y = if k.position.y + hoehe > fenster.height { (k.position.y - hoehe).max(8.0) } else { k.position.y };
 

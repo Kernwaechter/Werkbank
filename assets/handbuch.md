@@ -47,7 +47,7 @@ Oben im Inspektor wählst du eine von vier Ansichten:
 
 ## Sprache prüfen
 
-Unbekannte Wörter markiert die Werkbank sofort rot und unterschlängelt, mit einem Hunspell-Wörterbuch auf deinem Rechner (ohne Internet). Code, Verweise, Adressen und HTML-Tags prüft sie nicht. **Fährst du mit der Maus über eine markierte Stelle**, erklärt eine Blase, was nicht stimmt, mit Vorschlag. Ein **Rechtsklick** auf ein rot markiertes Wort merkt es als richtig, für den ganzen Band; ebenso ein Klick auf das Wort im Inspektor unter „Text“.
+Unbekannte Wörter markiert die Werkbank sofort rot und unterschlängelt, mit einem Hunspell-Wörterbuch auf deinem Rechner (ohne Internet). Code, Verweise, Adressen und HTML-Tags prüft sie nicht. **Fährst du mit der Maus über eine markierte Stelle**, erklärt eine Blase, was nicht stimmt, mit Vorschlag. Ein **Rechtsklick** auf eine markierte Stelle öffnet ein kleines Menü: oben die Korrekturvorschläge (ein Klick ersetzt), darunter **Merken** (das Wort gilt im ganzen Band als richtig) und **Ignorieren** (bis zum nächsten Start nicht mehr markiert). Bei Hinweisen der Sprachprüfung kannst du die Stelle ignorieren oder die Regel für den Band ausschalten.
 
 Für Grammatik und Stil nutzt die Werkbank **LanguageTool**, das du selbst betreibst (Anleitung: Einstellungen → Prüfung, Symbol ⓘ). Code, Verweise und Adressen werden dabei nicht geprüft. `Strg+L` prüft das Kapitel; die Hinweise erscheinen orange im Text und in den Details.
 

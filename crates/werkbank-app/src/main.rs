@@ -264,6 +264,8 @@ pub struct AppState {
     pub palette: Option<Palette>,
     /// Offenes Kontextmenü (Rechtsklick auf Kapitel oder Teil).
     pub kontext: Option<ui::kontext::Kontext>,
+    /// Wörter, deren Markierung bis zum Neustart ausgeblendet ist („Ignorieren“).
+    pub ignoriert: HashSet<String>,
     /// Aktuelle Fenstergröße (damit schwebende Menüs im Fenster bleiben).
     pub fenster_groesse: Size,
     /// Teile mit Änderungen, die noch nicht auf der Platte stehen.
@@ -626,6 +628,14 @@ pub enum Message {
     KontextAktion(Box<Message>),
     /// Schließt das Kontextmenü.
     KontextSchliessen,
+    /// Rechtsklick auf eine markierte Stelle im Editor: öffnet das Korrekturmenü.
+    WellenMenue(text_editor::WellenKlick),
+    /// Ersetzt einen Bereich einer Zeile (Korrekturvorschlag der Rechtschreibung).
+    WortErsetzen { zeile: usize, von: usize, bis: usize, ersatz: String },
+    /// Blendet die Markierung eines Wortes bis zum Neustart aus.
+    WortIgnorieren(String),
+    /// Verwirft einen LanguageTool-Hinweis an dieser Stelle.
+    TrefferIgnorieren(usize),
     /// Das Fenster hat eine neue Größe.
     FensterGroesse(Size),
     /// Öffnet die Einstellungen auf einer bestimmten Seite (oder wechselt dorthin).
@@ -761,6 +771,7 @@ fn new() -> (AppState, Task<Message>) {
         vorschau_sichtbar: false,
         palette: None,
         kontext: None,
+        ignoriert: HashSet::new(),
         fenster_groesse: Size::new(1380.0, 880.0),
         inspektor_tab: 0,
         inspektor_zieht: false,
@@ -2458,6 +2469,7 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
             let auswahl = match &ziel {
                 ui::kontext::Ziel::Kapitel(id) => update(state, Message::KapitelAusgewaehlt(id.clone())),
                 ui::kontext::Ziel::Teil(id) => update(state, Message::TeilAusgewaehlt(id.clone())),
+                ui::kontext::Ziel::Wort(_) => Task::none(),
             };
             state.kontext = Some(ui::kontext::Kontext { ziel, position });
             return auswahl;
@@ -2469,6 +2481,69 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
         }
 
         Message::KontextSchliessen => state.kontext = None,
+
+        Message::WellenMenue(klick) => {
+            let rechtschreibung = klick.art == markierung::WELLE_RECHTSCHREIBUNG;
+            let (vorschlaege, treffer, meldung, tippfehler) = if rechtschreibung {
+                let v = state.woerterbuch.as_ref().map(|w| w.vorschlaege(&klick.wort)).unwrap_or_default();
+                (v.into_iter().take(5).collect(), None, String::new(), false)
+            } else {
+                let pos = (klick.zeile, klick.bereich.start);
+                let Some(i) = state.treffer.iter().position(|t| {
+                    (t.zeile, t.spalte) <= pos && pos < (t.ende_zeile, t.ende_spalte.max(t.spalte + 1))
+                }) else {
+                    return Task::none();
+                };
+                let t = &state.treffer[i];
+                (t.ersetzungen.iter().take(5).cloned().collect(), Some(i), t.meldung.clone(), t.kategorie_id == "TYPOS")
+            };
+            state.kontext = Some(ui::kontext::Kontext {
+                ziel: ui::kontext::Ziel::Wort(ui::kontext::WortZiel {
+                    zeile: klick.zeile,
+                    von: klick.bereich.start,
+                    bis: klick.bereich.end,
+                    wort: klick.wort,
+                    rechtschreibung,
+                    vorschlaege,
+                    treffer,
+                    meldung,
+                    tippfehler,
+                }),
+                position: klick.position,
+            });
+        }
+
+        Message::WortErsetzen { zeile, von, bis, ersatz } => {
+            // Hinweise dahinter in derselben Zeile rücken um die Längenänderung nach
+            let delta = ersatz.len() as isize - (bis - von) as isize;
+            let schieben = |wert: usize| (wert as isize + delta).max(0) as usize;
+            for t in state.treffer.iter_mut() {
+                if t.zeile == zeile && t.spalte >= bis {
+                    t.spalte = schieben(t.spalte);
+                }
+                if t.ende_zeile == zeile && t.ende_spalte >= bis {
+                    t.ende_spalte = schieben(t.ende_spalte);
+                }
+            }
+            state.editor_content.move_to(text_editor::Cursor {
+                position: text_editor::Position { line: zeile, column: bis },
+                selection: Some(text_editor::Position { line: zeile, column: von }),
+            });
+            let paste = text_editor::Action::Edit(text_editor::Edit::Paste(Arc::new(ersatz)));
+            return update(state, Message::EditorAktion(paste));
+        }
+
+        Message::WortIgnorieren(wort) => {
+            state.ignoriert.insert(wort.clone());
+            state.speicher_zeitstempel = format!("„{wort}“ wird bis zum Neustart nicht markiert");
+        }
+
+        Message::TrefferIgnorieren(index) => {
+            if index < state.treffer.len() {
+                state.treffer.remove(index);
+                state.pruef_status = PruefStatus::Fertig(state.treffer.len());
+            }
+        }
 
         Message::FensterGroesse(groesse) => state.fenster_groesse = groesse,
 
@@ -3386,7 +3461,7 @@ fn view(state: &AppState) -> Element<'_, Message> {
             hl_einstellung(state),
             vorschau_element(state),
             erklaerung(state),
-            Message::WortMerken,
+            Message::WellenMenue,
             Message::KontextOeffnen,
         ),
         Arbeitsbereich::Bauen => ui::bauen::ansicht(state),
@@ -3497,7 +3572,7 @@ fn erklaerung(state: &AppState) -> text_editor::Erklaerung<'_> {
                 .map(|v| format!("Vorschlag: {v}\n"))
                 .unwrap_or_default();
             Some(format!(
-                "Rechtschreibung: „{wort}“ steht nicht im Wörterbuch ({}).\n{vorschlag}Rechtsklick merkt das Wort als richtig (für den ganzen Band).",
+                "Rechtschreibung: „{wort}“ steht nicht im Wörterbuch ({}).\n{vorschlag}Rechtsklick: korrigieren, merken oder ignorieren.",
                 wb.name
             ))
         } else {
@@ -3518,7 +3593,7 @@ fn erklaerung(state: &AppState) -> text_editor::Erklaerung<'_> {
             } else {
                 format!("\nVorschlag: {}", t.ersetzungen.iter().take(3).cloned().collect::<Vec<_>>().join(" · "))
             };
-            Some(format!("{art}: {}{ersatz}\nAnnehmen oder ignorieren: Inspektor › Text.", t.meldung))
+            Some(format!("{art}: {}{ersatz}\nRechtsklick: korrigieren oder ignorieren.", t.meldung))
         }
     })
 }
@@ -3526,7 +3601,8 @@ fn erklaerung(state: &AppState) -> text_editor::Erklaerung<'_> {
 /// Markierungs-Einstellung für den Editor; wird nur neu gebaut, wenn sich etwas Relevantes ändert.
 fn hl_einstellung(state: &AppState) -> markierung::Einstellung {
     let wb = state.einstellungen.rechtschreibung.then(|| state.woerterbuch.clone()).flatten();
-    let eigene: HashSet<String> = state.ausnahmen.woerter.iter().map(|w| w.to_string()).collect();
+    let eigene: HashSet<String> =
+        state.ausnahmen.woerter.iter().map(|w| w.to_string()).chain(state.ignoriert.iter().cloned()).collect();
     let hinweise: Vec<markierung::Bereich> =
         state.treffer.iter().map(|t| (t.zeile, t.spalte, t.ende_zeile, t.ende_spalte)).collect();
     let version = markierung::Einstellung::version_berechnen(&wb, &eigene, &hinweise, state.einstellungen.hell);

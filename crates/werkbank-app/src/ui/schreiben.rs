@@ -48,7 +48,7 @@ pub fn ansicht<'a, Message: Clone + 'a>(
     hl: crate::markierung::Einstellung,
     vorschau: Element<'a, Message>,
     erklaerung: crate::editor::Erklaerung<'a>,
-    on_wort_merken: impl Fn(String) -> Message + 'a,
+    on_wellen_klick: impl Fn(crate::editor::WellenKlick) -> Message + 'a,
     on_kontext: impl Fn(Ziel, iced::Point) -> Message + Copy + 'a,
 ) -> Element<'a, Message> {
     let mut haupt_reihe = row![].width(Fill).height(Fill);
@@ -81,7 +81,7 @@ pub fn ansicht<'a, Message: Clone + 'a>(
         hl,
         vorschau,
         erklaerung,
-        on_wort_merken,
+        on_wellen_klick,
     );
     haupt_reihe = haupt_reihe.push(editor_spalte);
 
@@ -291,7 +291,7 @@ fn spalte_editor<'a, Message: Clone + 'a>(
     hl: crate::markierung::Einstellung,
     vorschau: Element<'a, Message>,
     erklaerung: crate::editor::Erklaerung<'a>,
-    on_wort_merken: impl Fn(String) -> Message + 'a,
+    on_wellen_klick: impl Fn(crate::editor::WellenKlick) -> Message + 'a,
 ) -> Element<'a, Message> {
     let aktives_kapitel = projekt.kapitel_finden(aktives_kapitel_id);
 
@@ -352,7 +352,7 @@ fn spalte_editor<'a, Message: Clone + 'a>(
         .wellen(hl.wellen.clone())
         .style(thema::schreibflaeche_stil)
         .erklaerung(erklaerung)
-        .rechtsklick(move |wort, art| (art == crate::markierung::WELLE_RECHTSCHREIBUNG).then(|| on_wort_merken(wort)))
+        .rechtsklick(move |klick| Some(on_wellen_klick(klick)))
         .highlight_with::<crate::markierung::Markierer>(hl, crate::markierung::format)
         .on_action(on_editor_aktion);
 
