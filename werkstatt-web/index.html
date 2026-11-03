@@ -252,6 +252,20 @@ section { padding-block: 84px 0; }
 .umschlag svg { width: 100%; height: auto; display: block; border-radius: 3px; }
 .umschlag.grau svg { filter: grayscale(1) contrast(1.05); }
 
+/* Benötigte Programme */
+.brauchst { margin-top: 40px; padding: 24px; border: 1px solid var(--linie); border-radius: 12px; background: var(--flaeche); display: grid; gap: 12px; }
+.brauchst h3 { margin: 0; font-size: 1.3rem; }
+.brauchst p { margin: 0; color: var(--text-leise); }
+.brauchst p b { color: var(--text); }
+.brauchst .knopf { justify-self: start; }
+.werkzeug-tabelle { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.werkzeug-tabelle th, .werkzeug-tabelle td { text-align: left; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--linie); vertical-align: top; }
+.werkzeug-tabelle th { font-family: var(--font-daten); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-leise); font-weight: 500; }
+.stufe { font-size: 0.8rem; font-weight: 600; color: var(--text-leise); white-space: nowrap; }
+.stufe.ja { color: var(--gruen, #2c7a50); }
+.stufe.druck { color: #9a5510; }
+@media (prefers-color-scheme: dark) { .stufe.ja { color: #7cc095; } .stufe.druck { color: #e0a35a; } }
+
 /* Download */
 .downloads { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
 .download { border: 1px solid var(--linie); background: var(--flaeche); border-radius: 10px; padding: 22px; display: grid; gap: 10px; align-content: start; }
@@ -305,6 +319,7 @@ section { padding-block: 84px 0; }
       <a href="#cover">Cover</a>
       <a href="#daten">Daten</a>
       <a href="#download">Download</a>
+      <a href="installation.html">Installation</a>
       <a href="#kaufen">Kaufen</a>
       <a href="#kontakt">Kontakt</a>
     </nav>
@@ -602,7 +617,7 @@ section { padding-block: 84px 0; }
       <p class="lead">Dein Buch besteht aus Markdown-Dateien in einem Ordner. Die Werkbank liest und schreibt sie Byte für Byte so, wie du sie ablegst, und braucht kein Konto und keinen Server.</p>
     </div>
     <ul class="liste" style="max-width:760px">
-      <li><div><b>Hilfsmittel im Blick.</b> <span>Die Einstellungen zeigen, ob Pandoc und Ghostscript installiert sind und in welcher Version. Wenn nicht, erklärt ein Info-Symbol die Installation für Windows, macOS, Debian, Fedora und Arch.</span></div></li>
+      <li><div><b>Hilfsmittel im Blick.</b> <span>Die Einstellungen zeigen, ob Pandoc, Ghostscript, Rust und Flutter/Dart installiert sind und in welcher Version, dazu Wörterbuch und LanguageTool. Wenn etwas fehlt, erklärt ein Info-Symbol die Installation für Windows, macOS, Debian, Fedora und Arch. Alles auf einer Seite: <a href="installation.html">Hilfsprogramme installieren</a>.</span></div></li>
       <li><div><b>Deutsch zuerst.</b> <span>Oberfläche, Handbuch und Sprachprüfung sind auf deutsche Fachbücher zugeschnitten.</span></div></li>
     </ul>
   </section>
@@ -629,7 +644,24 @@ section { padding-block: 84px 0; }
         <code>SHA-256: cd71f4ec8708a8d5a51b8121a9d7e1e89de2016cd53203b40f66d92dd4817aa1</code>
       </div>
     </div>
-    <p class="bildnotiz">Version 1.2.1, zunächst nur für Linux (64 Bit). Windows und macOS folgen. Nach der Installation startest du die Werkbank aus dem Anwendungsmenü. Für die Satzvorschau und den Export empfiehlt sich Pandoc, die Einstellungen der Werkbank erklären die Installation. Die Prüfsummen kannst du mit <span class="tastatur">sha256sum</span> vergleichen.</p>
+    <p class="bildnotiz">Version 1.2.1, zunächst nur für Linux (64 Bit). Windows und macOS folgen. Nach der Installation startest du die Werkbank aus dem Anwendungsmenü. Die Prüfsummen kannst du mit <span class="tastatur">sha256sum</span> vergleichen.</p>
+
+    <div class="brauchst" id="werkzeuge">
+      <h3>Was du dazu brauchst</h3>
+      <p><b>Für Schreiben, Speichern, Statistik, Cover und den eingebauten Buchsatz: nichts weiter.</b> Typst und die Schriften sind in der Werkbank enthalten. Einzelne Funktionen nutzen Programme, die du selbst installierst:</p>
+      <table class="werkzeug-tabelle">
+        <thead><tr><th>Programm</th><th>Wofür</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>Hunspell-Wörterbuch Deutsch</td><td>Rechtschreibung im Editor, offline</td><td><span class="stufe ja">empfohlen</span></td></tr>
+          <tr><td>Ghostscript</td><td>Druckdatei als PDF/X-3</td><td><span class="stufe druck">für den Druck</span></td></tr>
+          <tr><td>LanguageTool und Java 17+</td><td>Grammatik, Stil, Zeichensetzung</td><td><span class="stufe">optional</span></td></tr>
+          <tr><td>Pandoc 3+</td><td>Satzvorschau und Bauskripte bei Pandoc-Büchern</td><td><span class="stufe">optional</span></td></tr>
+          <tr><td>Typst, Python 3</td><td>Eigene Bauskripte im Bereich „Bauen“</td><td><span class="stufe">optional</span></td></tr>
+          <tr><td>Rust, Flutter oder Dart</td><td>Code-Prüfer für die Beispiele im Buch</td><td><span class="stufe">optional</span></td></tr>
+        </tbody>
+      </table>
+      <a class="knopf leise" href="installation.html">Installation für Linux, macOS und Windows</a>
+    </div>
   </section>
 
   <section id="kaufen">

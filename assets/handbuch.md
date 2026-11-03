@@ -43,7 +43,7 @@ Oben im Inspektor wählst du eine von vier Ansichten:
 
 ## Vorschau
 
-`Strg+P` zeigt das Kapitel **so, wie es gesetzt wird**: Markdown → Pandoc → Typst → Seiten (wie die Bauskripte), mit B5-Format, Libertinus und farbigem Code. Sie erneuert sich kurz nach dem Tippen. Ohne Pandoc setzt der eingebaute Übersetzer. Ob Pandoc und Ghostscript installiert sind, siehst du unter Einstellungen → Werkzeuge; das Symbol ⓘ erklärt die Installation für Windows, macOS, Debian/Ubuntu, Fedora und Arch. „Text-Vorschau“ schaltet auf die schnelle Textdarstellung um.
+`Strg+P` zeigt das Kapitel **so, wie es gesetzt wird**: Markdown → Pandoc → Typst → Seiten (wie die Bauskripte), mit B5-Format, Libertinus und farbigem Code. Sie erneuert sich kurz nach dem Tippen. Ohne Pandoc setzt der eingebaute Übersetzer. Ob Pandoc und Ghostscript installiert sind, siehst du unter Einstellungen → Werkzeuge; das Symbol ⓘ erklärt die Installation für Windows, macOS, Debian/Ubuntu, Fedora und Arch. „Text“ schaltet auf die schnelle Text-Vorschau um: Sie zeigt Überschriften, Listen, Tabellen und Bilder (mit Bildunterschrift, Pfade relativ zum Bandordner) und folgt beim Schreiben dem Cursor. Codeblöcke haben in beiden Vorschauen und im nativen Satz Zeilennummern, je Block ab 1. Den Pandoc-Weg geht die Satzvorschau nur bei Bänden mit einer `pdf-header.typ`; alle anderen setzt der eingebaute Satz.
 
 ## Sprache prüfen
 

@@ -326,11 +326,16 @@ fn spalte_editor<'a, Message: Clone + 'a>(
         .unwrap_or("");
     let _ = (&pfad_str, zeichen, lesedauer);
     let breadcrumb_leiste = row![
-        text(if teil_titel.is_empty() { String::new() } else { format!("{teil_titel}  ›") })
-            .size(12)
-            .color(thema::text_gedimmt())
-            .wrapping(iced::widget::text::Wrapping::None),
-        text(titel).size(12).color(thema::text_hell()).wrapping(iced::widget::text::Wrapping::None).width(Fill),
+        container(
+            text(if teil_titel.is_empty() { String::new() } else { format!("{teil_titel}  ›") })
+                .size(12)
+                .color(thema::text_gedimmt())
+                .wrapping(iced::widget::text::Wrapping::None),
+        )
+        .max_width(220)
+        .clip(true),
+        // Lange Titel werden abgeschnitten statt die Wortzahl zu überdecken
+        container(text(titel).size(12).color(thema::text_hell()).wrapping(iced::widget::text::Wrapping::None)).width(Fill).clip(true),
         text(format!("{} Wörter", thema::tausender(wortzahl))).size(12).color(thema::text_gedimmt()),
     ]
     .spacing(6)

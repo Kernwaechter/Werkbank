@@ -1243,6 +1243,7 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
                     state.vorschau_faellig = Some(Instant::now());
                 }
             }
+            return vorschau_folgen(state);
         }
 
         Message::Speichern => {
@@ -1331,6 +1332,7 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
 
         Message::VorschauText(an) => {
             state.satz_vorschau.text_modus = an;
+            return vorschau_folgen(state);
         }
 
         Message::SatzPdfx(an) => {
@@ -1388,7 +1390,7 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
                 position: text_editor::Position { line: zeile, column: spalte },
                 selection: None,
             });
-            return iced::widget::operation::focus(ui::schreiben::editor_id());
+            return Task::batch([iced::widget::operation::focus(ui::schreiben::editor_id()), vorschau_folgen(state)]);
         }
 
         Message::NeuesKapitel => {
@@ -3539,6 +3541,19 @@ fn view(state: &AppState) -> Element<'_, Message> {
     }
 }
 
+/// Die Text-Vorschau folgt dem Cursor: Sie scrollt an die Stelle, die der Cursorzeile im Kapitel entspricht.
+fn vorschau_folgen(state: &AppState) -> Task<Message> {
+    if !(state.vorschau_sichtbar && state.satz_vorschau.text_modus) {
+        return Task::none();
+    }
+    let zeilen = state.editor_content.line_count().max(2) - 1;
+    let anteil = (state.editor_content.cursor().position.line as f32 / zeilen as f32).clamp(0.0, 1.0);
+    iced::widget::operation::snap_to(
+        ui::vorschau::scroll_id(),
+        iced::widget::operation::RelativeOffset { x: None, y: Some(anteil) },
+    )
+}
+
 /// Die Vorschau neben dem Editor: Satzbild (Standard) oder schnelle Textvorschau.
 fn vorschau_element(state: &AppState) -> Element<'_, Message> {
     if state.satz_vorschau.text_modus {
@@ -3552,7 +3567,12 @@ fn vorschau_element(state: &AppState) -> Element<'_, Message> {
                     .on_press(Message::VorschauText(false))
             )
             .padding([6, 12]),
-            ui::vorschau::ansicht(inhalt, zeile, |zeile, spalte| Message::SpringeZuZeile { zeile, spalte }),
+            ui::vorschau::ansicht(
+                inhalt,
+                zeile,
+                |zeile, spalte| Message::SpringeZuZeile { zeile, spalte },
+                Some(state.projekt.wurzelverzeichnis.as_path()),
+            ),
         ]
         .into()
     } else {

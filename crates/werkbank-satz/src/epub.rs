@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use werkbank_kern::Projekt;
 
-const STANDARD_CSS: &str = "body{font-family:serif;line-height:1.45;margin:0 4%}h1,h2,h3,h4{font-family:sans-serif;line-height:1.2;page-break-after:avoid}h1{font-size:1.9em;text-align:center;margin:3em 0 1em}h2{font-size:1.45em;margin:1.6em 0 .6em}pre{background:#f2f2f2;padding:.6em;overflow-x:auto;white-space:pre-wrap;font-size:.82em}code{font-family:monospace;font-size:.92em}table{border-collapse:collapse}td,th{border:1px solid #888;padding:.25em .5em}blockquote{border-left:3px solid #aaa;margin-left:0;padding-left:1em;color:#444}img{max-width:100%}";
+const STANDARD_CSS: &str = "body{font-family:serif;line-height:1.45;margin:0 4%}h1,h2,h3,h4{font-family:sans-serif;line-height:1.2;page-break-after:avoid}h1{font-size:1.9em;text-align:center;margin:3em 0 1em}h2{font-size:1.45em;margin:1.6em 0 .6em}pre{background:#f2f2f2;padding:.6em;overflow-x:auto;white-space:pre-wrap;font-size:.82em}code{font-family:monospace;font-size:.92em}table{border-collapse:collapse}td,th{border:1px solid #888;padding:.25em .5em}blockquote{border-left:3px solid #aaa;margin-left:0;padding-left:1em;color:#444}img{max-width:100%}.zn{display:inline-block;width:2.2em;margin-right:.8em;text-align:right;color:#888;-webkit-user-select:none;user-select:none}";
 
 fn xhtml(titel: &str, koerper: &str) -> String {
     format!(
@@ -52,7 +52,33 @@ fn koerper(md: &str, nummern: &HashMap<String, usize>, dateinamen: &HashMap<Stri
 
     let mut opt = Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TABLES;
     opt.insert(Options::ENABLE_HEADING_ATTRIBUTES);
-    let ereignisse = Parser::new_ext(&text, opt).map(|e| match e {
+    // Codeblöcke bekommen Zeilennummern (je Block ab 1); dafür wird ihr Text als fertiges HTML ausgegeben
+    let mut im_code = false;
+    let mut zeile = 0usize;
+    let mut zeilenanfang = true;
+    let ereignisse = Parser::new_ext(&text, opt).map(move |e| match e {
+        Event::Start(Tag::CodeBlock(art)) => {
+            im_code = true;
+            zeile = 0;
+            zeilenanfang = true;
+            Event::Start(Tag::CodeBlock(art))
+        }
+        Event::End(pulldown_cmark::TagEnd::CodeBlock) => {
+            im_code = false;
+            Event::End(pulldown_cmark::TagEnd::CodeBlock)
+        }
+        Event::Text(t) if im_code => {
+            let mut html = String::new();
+            for stueck in t.split_inclusive('\n') {
+                if zeilenanfang {
+                    zeile += 1;
+                    html.push_str(&format!("<span class=\"zn\">{zeile}</span>"));
+                }
+                html.push_str(&html_maskieren(stueck));
+                zeilenanfang = stueck.ends_with('\n');
+            }
+            Event::Html(html.into())
+        }
         Event::Start(Tag::Image { link_type, dest_url, title, id }) if !dest_url.starts_with("http") => {
             let pfad = dest_url.to_string();
             let name = Path::new(&pfad).file_name().and_then(|n| n.to_str()).unwrap_or("bild").to_string();

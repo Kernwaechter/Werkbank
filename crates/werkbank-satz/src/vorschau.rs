@@ -73,7 +73,8 @@ fn pandoc_zu_typst(md: &str, wurzel: &Path) -> Result<String, String> {
     let temp = std::env::temp_dir().join(format!("werkbank-vorschau-{}", std::process::id()));
     std::fs::create_dir_all(&temp).map_err(|e| e.to_string())?;
     let kopf = temp.join("kopf.typ");
-    let inhalt = kopfdatei(wurzel).and_then(|p| std::fs::read_to_string(p).ok()).unwrap_or_default();
+    let mut inhalt = kopfdatei(wurzel).and_then(|p| std::fs::read_to_string(p).ok()).unwrap_or_default();
+    inhalt.push_str(CODE_ZEILENNUMMERN);
     std::fs::write(&kopf, inhalt).map_err(|e| e.to_string())?;
 
     let mut kind = Command::new("pandoc")
@@ -94,8 +95,22 @@ fn pandoc_zu_typst(md: &str, wurzel: &Path) -> Result<String, String> {
     if !aus.status.success() {
         return Err(format!("Pandoc-Fehler: {}", String::from_utf8_lossy(&aus.stderr).lines().take(4).collect::<Vec<_>>().join(" ")));
     }
-    Ok(String::from_utf8_lossy(&aus.stdout).to_string())
+    Ok(typst_013_tauglich(&String::from_utf8_lossy(&aus.stdout)))
 }
+
+/// Neuere Pandoc-Vorlagen (ab 3.8) prüfen `"divider" in std`; das kann erst Typst 0.15.
+/// Die eingebaute Typst-Version bekommt stattdessen direkt die Linie.
+fn typst_013_tauglich(typ: &str) -> String {
+    typ.replace(r#"if "divider" in std { divider } else { horizontalRule }"#, "horizontalRule")
+}
+
+/// Zeilennummern in Codeblöcken (je Block ab 1), auch für den Pandoc-Weg.
+const CODE_ZEILENNUMMERN: &str = "
+#show raw.where(block: true): it => {
+  show raw.line: l => box(width: 1.8em, align(right, text(fill: luma(140), str(l.number)))) + h(0.8em) + l.body
+  it
+}
+";
 
 /// Eingebauter Satz eines Kapitels (Rückfall ohne Pandoc): B5, Libertinus, wie das Lese-PDF.
 pub fn eingebaut_zu_typst(md: &str, wurzel: &Path, nummern: &HashMap<String, usize>) -> String {
@@ -104,7 +119,11 @@ pub fn eingebaut_zu_typst(md: &str, wurzel: &Path, nummern: &HashMap<String, usi
 #set text(font: ("Libertinus Serif", "DejaVu Serif"), size: 10.5pt, lang: "de")
 #set par(justify: true, leading: 0.62em, spacing: 0.8em)
 #show raw: set text(font: ("DejaVu Sans Mono",), size: 0.78em)
-#show raw.where(block: true): it => block(width: 100%, fill: luma(242), inset: 6pt, radius: 2pt, breakable: true, it)
+// Codeblöcke: jede Zeile mit Nummer (je Block ab 1, wie der Buchtext sie zitiert)
+#show raw.where(block: true): it => block(width: 100%, fill: luma(242), inset: 6pt, radius: 2pt, breakable: true, {
+  show raw.line: l => box(width: 1.8em, align(right, text(fill: luma(140), str(l.number)))) + h(0.8em) + l.body
+  it
+})
 #show link: set text(fill: rgb("#2c5c82"))
 #show heading.where(level: 1): it => { v(6mm); text(size: 22pt, weight: "bold", it.body); v(4mm) }
 #show heading.where(level: 2): it => { v(5mm); text(size: 16pt, weight: "bold", it.body); v(3mm) }
@@ -130,6 +149,9 @@ pub fn vorschau(
     pixel_pro_pt: f32,
 ) -> Result<VorschauErgebnis, String> {
     let ordner = produktionsordner(wurzel);
+    // Den Pandoc-Weg gehen nur Bände, die auch mit Pandoc gebaut werden (Kopfdatei `pdf-header.typ`).
+    // Andere Bücher (z. B. mit eigenem HTML-Bauskript) setzt der eingebaute Satz – näher an ihrem Druckbild.
+    let pandoc = pandoc && kopfdatei(&ordner).is_some();
     let mut hinweise = Vec::new();
     // Verweise wie im Buchbau auflösen („Kapitel 12“)
     let md = crate::markdown::produktionsersetzung(md, nummern, teile);
@@ -192,12 +214,20 @@ mod tests {
     }
 
     #[test]
+    fn pandoc_vorlage_wird_typst_013_tauglich() {
+        let t = typst_013_tauglich(r#"#let divider = if "divider" in std { divider } else { horizontalRule }"#);
+        assert_eq!(t, "#let divider = horizontalRule");
+    }
+
+    #[test]
     fn pandoc_weg_wenn_vorhanden() {
         if pandoc_version().is_none() || hauptversion(&pandoc_version().unwrap()).unwrap_or(0) < 3 {
             return;
         }
         let o = std::env::temp_dir().join("werkbank-satz-vorschau-pandoc");
         let _ = std::fs::create_dir_all(&o);
+        // Mit Kopfdatei gilt der Band als Pandoc-Buch
+        std::fs::write(o.join("pdf-header.typ"), "").unwrap();
         let md = "## Kapitel [x]: Titel\n\nText **fett** und *kursiv*, `code`.\n\n- eins\n- zwei\n\n```rust\nfn main() {}\n```\n";
         let e = vorschau(md, &o, &HashMap::new(), &HashMap::new(), true, 2, 1.0).unwrap();
         assert_eq!(e.quelle, "Pandoc und Typst", "Hinweise: {:?}", e.hinweise);

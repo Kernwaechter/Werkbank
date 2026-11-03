@@ -476,7 +476,11 @@ const KOPF: &str = r##"#set document(title: __TITEL__, author: __AUTOR__)
 #set text(font: ("Libertinus Serif", "DejaVu Serif"), size: __GR__pt, lang: "de")
 #set par(justify: true, leading: 0.62em, spacing: 0.8em)
 #show raw: set text(font: ("DejaVu Sans Mono",), size: 0.78em)
-#show raw.where(block: true): it => block(width: 100%, fill: luma(242), inset: 6pt, radius: 2pt, breakable: true, it)
+// Codeblöcke: jede Zeile mit Nummer (je Block ab 1, wie der Buchtext sie zitiert)
+#show raw.where(block: true): it => block(width: 100%, fill: luma(242), inset: 6pt, radius: 2pt, breakable: true, {
+  show raw.line: l => box(width: 1.8em, align(right, text(fill: luma(140), str(l.number)))) + h(0.8em) + l.body
+  it
+})
 #set heading(numbering: none)
 #show link: set text(fill: __LINK__)
 

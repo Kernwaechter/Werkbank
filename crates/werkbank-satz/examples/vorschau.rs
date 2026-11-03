@@ -1,12 +1,18 @@
-//! Setzt ein Kapitel eines Bandes als Vorschau: `cargo run --release -p werkbank-satz --example vorschau -- <Bandordner> <Kapitelnummer> <Ausgabeordner> [pandoc|nativ]`
+//! Setzt ein Kapitel eines Bandes als Vorschau: `cargo run --release -p werkbank-satz --example vorschau -- <Bandordner> <Kapitelnummer|bild> <Ausgabeordner> [pandoc|nativ]`
 use std::path::Path;
 use werkbank_kern::Projekt;
 
 fn main() {
     let a: Vec<String> = std::env::args().skip(1).collect();
     let p = Projekt::aus_verzeichnis(Path::new(&a[0])).unwrap();
-    let nr: usize = a[1].parse().unwrap();
-    let k = p.teile.iter().flat_map(|t| t.kapitel.iter()).nth(nr).unwrap();
+    // Kapitelnummer oder „bild“ = erstes Kapitel mit einer Abbildung
+    let k = if a[1] == "bild" {
+        p.teile.iter().flat_map(|t| t.kapitel.iter()).find(|k| k.inhalt.contains("\n![")).unwrap()
+    } else {
+        let nr: usize = a[1].parse().unwrap();
+        p.teile.iter().flat_map(|t| t.kapitel.iter()).nth(nr).unwrap()
+    };
+    println!("Kapitel: {}", k.titel);
     let nummern = werkbank_satz::markdown::kapitelnummern(&p);
     let teile = werkbank_satz::markdown::teil_nummern(&p);
     let t = std::time::Instant::now();

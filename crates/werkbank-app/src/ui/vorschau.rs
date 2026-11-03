@@ -7,38 +7,94 @@
 //!    springt im Editor unmittelbar an die entsprechende Quelltextzeile.
 
 use crate::thema;
-use iced::widget::{button, column, container, row, scrollable, space, text};
-use iced::{Alignment, Element, Fill, Padding, Pixels};
+use iced::widget::{button, column, container, image, row, scrollable, space, text};
+use iced::{Alignment, Element, Fill, FillPortion, Padding, Pixels};
+use std::path::Path;
 
 /// Ein geparster Textblock aus dem Markdown-Quelltext mit Zeileninformation.
-#[derive(Debug, Clone)]
+///
+/// Die Regeln folgen dem Buchbau (`build_book.py`): Bilder stehen als eigene Zeile
+/// `![Unterschrift](images/datei.png)`, HTML-Hüllen wie `<div class="imprint">` sind nur
+/// Satzanweisungen, `<div class="page-break"></div>` ist ein Seitenumbruch.
+#[derive(Debug, Clone, PartialEq)]
 pub enum MarkdownBlock {
-    /// Überschrift mit Ebene (1 bis 4), Text und Quellzeile.
-    Ueberschrift {
-        ebene: usize,
-        text: String,
-        zeile: usize,
-    },
-    /// Rust-Codeblock mit Codezeilen und Quellzeilenbereich.
-    CodeBlock {
-        code: Vec<String>,
-        start_zeile: usize,
-        end_zeile: usize,
-    },
+    /// Überschrift mit Ebene (1 bis 6), Text und Quellzeile.
+    Ueberschrift { ebene: usize, text: String, zeile: usize },
+    /// Codeblock mit Sprache, Codezeilen und Quellzeilenbereich.
+    CodeBlock { sprache: String, code: Vec<String>, start_zeile: usize, end_zeile: usize },
     /// Zitat oder Hinweisblock (`> ...`).
-    Zitat {
-        zeilen: Vec<String>,
-        start_zeile: usize,
-        end_zeile: usize,
-    },
+    Zitat { zeilen: Vec<String>, start_zeile: usize, end_zeile: usize },
     /// Normaler Fließtext-Absatz mit Quellzeilenbereich.
-    Absatz {
-        text: String,
-        start_zeile: usize,
-        end_zeile: usize,
-    },
-    /// Listenpunkt mit Quellzeile.
-    ListenPunkt { text: String, zeile: usize },
+    Absatz { text: String, start_zeile: usize, end_zeile: usize },
+    /// Listenpunkt: Marke („•“ oder „3.“), Einzugsebene, Text und Quellzeile.
+    ListenPunkt { marke: String, ebene: usize, text: String, zeile: usize },
+    /// Eigenständiges Bild mit Pfad (wie im Text) und Bildunterschrift.
+    Bild { pfad: String, unterschrift: String, zeile: usize },
+    /// Tabelle: Kopfzeile und Datenzeilen (Trennzeile `|---|` entfällt).
+    Tabelle { zeilen: Vec<Vec<String>>, start_zeile: usize, end_zeile: usize },
+    /// Seitenumbruch (`<div class="page-break"></div>`).
+    Seitenumbruch { zeile: usize },
+}
+
+/// Ebene einer Überschrift (`#` bis `######` mit Leerzeichen danach).
+fn ueberschrift(z: &str) -> Option<(usize, &str)> {
+    let n = z.chars().take_while(|c| *c == '#').count();
+    ((1..=6).contains(&n) && z[n..].starts_with(' ')).then(|| (n, z[n..].trim()))
+}
+
+/// Listenpunkt: (Marke, Text) für `- `, `* `, `+ ` oder `12. `.
+fn listenpunkt(z: &str) -> Option<(String, &str)> {
+    for p in ["- ", "* ", "+ "] {
+        if let Some(rest) = z.strip_prefix(p) {
+            return Some(("•".to_string(), rest));
+        }
+    }
+    let ziffern = z.chars().take_while(char::is_ascii_digit).count();
+    (ziffern > 0 && ziffern <= 3 && z[ziffern..].starts_with(". ")).then(|| (z[..ziffern + 1].to_string(), &z[ziffern + 2..]))
+}
+
+/// Eigenständige Bildzeile `![Unterschrift](pfad)`.
+fn bildzeile(z: &str) -> Option<(String, String)> {
+    let rest = z.strip_prefix("![")?;
+    let (alt, rest) = rest.split_once("](")?;
+    let pfad = rest.strip_suffix(')')?;
+    // Titel in Anführungszeichen (`bild.png "Titel"`) gehört nicht zum Pfad
+    let pfad = pfad.split(" \"").next().unwrap_or(pfad).trim();
+    (!pfad.is_empty()).then(|| (alt.trim().to_string(), pfad.to_string()))
+}
+
+/// Reine HTML-Zeile (Hülle, Kommentar), die im Buch nur den Satz steuert.
+fn html_zeile(z: &str) -> bool {
+    (z.starts_with('<') && z.ends_with('>') && z[1..].chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '/' || c == '!'))
+        || (z.starts_with("<!--") && z.ends_with("-->"))
+}
+
+fn ist_seitenumbruch(z: &str) -> bool {
+    z.contains("page-break") && z.starts_with('<')
+}
+
+fn ist_tabellenzeile(z: &str) -> bool {
+    z.starts_with('|') && z.ends_with('|') && z.len() > 1
+}
+
+fn trennlinie(z: &str) -> bool {
+    let nur = |c: char| z.len() >= 3 && z.chars().all(|x| x == c || x == ' ');
+    nur('-') || nur('*') || nur('_')
+}
+
+/// Beginnt mit dieser Zeile ein neuer Block (dann endet ein laufender Absatz)?
+fn blockanfang(z: &str) -> bool {
+    z.is_empty()
+        || z.starts_with("```")
+        || z.starts_with("~~~")
+        || z.starts_with('>')
+        || z.starts_with(":::")
+        || ueberschrift(z).is_some()
+        || listenpunkt(z).is_some()
+        || bildzeile(z).is_some()
+        || html_zeile(z)
+        || ist_tabellenzeile(z)
+        || trennlinie(z)
 }
 
 /// Parst den Markdown-Text zeilenweise in Blöcke mit Quellzeilen-Zuordnung.
@@ -51,136 +107,103 @@ pub fn parse_bloecke(inhalt: &str) -> Vec<MarkdownBlock> {
         let zeile = zeilen[i];
         let getrimmt = zeile.trim();
 
-        // Leere Zeilen überspringen
-        if getrimmt.is_empty() {
+        if getrimmt.is_empty() || trennlinie(getrimmt) || getrimmt.starts_with(":::") {
             i += 1;
             continue;
         }
 
-        // Trennlinien, Pandoc-Container (`:::`) und einzeilige Kommentare gehören nicht zum Text
-        let nur_zeichen = |z: char| getrimmt.len() >= 3 && getrimmt.chars().all(|c| c == z);
-        if nur_zeichen('-') || nur_zeichen('*') || nur_zeichen('_') || getrimmt.starts_with(":::")
-            || (getrimmt.starts_with("<!--") && getrimmt.ends_with("-->"))
-        {
-            i += 1;
-            continue;
-        }
-
-        // Codeblöcke erkennen (```rust oder ```)
-        if getrimmt.starts_with("```") {
+        // Codeblöcke (``` oder ~~~, mit Sprache)
+        if getrimmt.starts_with("```") || getrimmt.starts_with("~~~") {
+            let zaun = &getrimmt[..3];
+            let sprache = getrimmt[3..].split(|c: char| c.is_whitespace() || c == ',' || c == '{').next().unwrap_or("").to_string();
             let start_zeile = i;
             i += 1;
-            let mut code_zeilen = Vec::new();
-            while i < zeilen.len() && !zeilen[i].trim().starts_with("```") {
-                code_zeilen.push(zeilen[i].to_string());
+            let mut code = Vec::new();
+            while i < zeilen.len() && !zeilen[i].trim().starts_with(zaun) {
+                code.push(zeilen[i].to_string());
                 i += 1;
             }
             let end_zeile = i;
-            if i < zeilen.len() {
-                i += 1; // End-Backticks überspringen
+            i = (i + 1).min(zeilen.len().max(i));
+            bloecke.push(MarkdownBlock::CodeBlock { sprache, code, start_zeile, end_zeile });
+            continue;
+        }
+
+        // HTML-Hüllen sind Satzanweisungen; nur der Seitenumbruch wird sichtbar
+        if html_zeile(getrimmt) {
+            if ist_seitenumbruch(getrimmt) {
+                bloecke.push(MarkdownBlock::Seitenumbruch { zeile: i });
             }
-            bloecke.push(MarkdownBlock::CodeBlock {
-                code: code_zeilen,
-                start_zeile,
-                end_zeile,
-            });
-            continue;
-        }
-
-        // Überschriften erkennen
-        if let Some(rest) = getrimmt.strip_prefix("#### ") {
-            bloecke.push(MarkdownBlock::Ueberschrift {
-                ebene: 4,
-                text: rest.to_string(),
-                zeile: i,
-            });
-            i += 1;
-            continue;
-        } else if let Some(rest) = getrimmt.strip_prefix("### ") {
-            bloecke.push(MarkdownBlock::Ueberschrift {
-                ebene: 3,
-                text: rest.to_string(),
-                zeile: i,
-            });
-            i += 1;
-            continue;
-        } else if let Some(rest) = getrimmt.strip_prefix("## ") {
-            bloecke.push(MarkdownBlock::Ueberschrift {
-                ebene: 2,
-                text: rest.to_string(),
-                zeile: i,
-            });
-            i += 1;
-            continue;
-        } else if let Some(rest) = getrimmt.strip_prefix("# ") {
-            bloecke.push(MarkdownBlock::Ueberschrift {
-                ebene: 1,
-                text: rest.to_string(),
-                zeile: i,
-            });
             i += 1;
             continue;
         }
 
-        // Zitate erkennen (`> `)
-        if getrimmt.starts_with('>') {
+        if let Some((ebene, rest)) = ueberschrift(getrimmt) {
+            bloecke.push(MarkdownBlock::Ueberschrift { ebene, text: rest.to_string(), zeile: i });
+            i += 1;
+            continue;
+        }
+
+        if let Some((unterschrift, pfad)) = bildzeile(getrimmt) {
+            bloecke.push(MarkdownBlock::Bild { pfad, unterschrift, zeile: i });
+            i += 1;
+            continue;
+        }
+
+        if ist_tabellenzeile(getrimmt) {
             let start_zeile = i;
-            let mut zitat_zeilen = Vec::new();
-            while i < zeilen.len() && zeilen[i].trim().starts_with('>') {
-                let text_teil = zeilen[i]
-                    .trim()
-                    .strip_prefix('>')
-                    .unwrap_or("")
-                    .trim()
-                    .to_string();
-                zitat_zeilen.push(text_teil);
+            let mut tabelle = Vec::new();
+            while i < zeilen.len() && ist_tabellenzeile(zeilen[i].trim()) {
+                let z = zeilen[i].trim();
+                let zellen: Vec<String> = z[1..z.len() - 1].split('|').map(|c| c.trim().to_string()).collect();
+                let ist_trenner = zellen.iter().all(|c| !c.is_empty() && c.chars().all(|x| x == '-' || x == ':'));
+                if !ist_trenner {
+                    tabelle.push(zellen);
+                }
                 i += 1;
             }
-            bloecke.push(MarkdownBlock::Zitat {
-                zeilen: zitat_zeilen,
-                start_zeile,
-                end_zeile: i.saturating_sub(1),
-            });
+            bloecke.push(MarkdownBlock::Tabelle { zeilen: tabelle, start_zeile, end_zeile: i.saturating_sub(1) });
             continue;
         }
 
-        // Listenpunkte erkennen
-        if let Some(rest) = getrimmt
-            .strip_prefix("- ")
-            .or_else(|| getrimmt.strip_prefix("* "))
-        {
-            bloecke.push(MarkdownBlock::ListenPunkt {
-                text: rest.to_string(),
-                zeile: i,
-            });
+        if getrimmt.starts_with('>') {
+            let start_zeile = i;
+            let mut zitat = Vec::new();
+            while i < zeilen.len() && zeilen[i].trim().starts_with('>') {
+                zitat.push(zeilen[i].trim().trim_start_matches('>').trim().to_string());
+                i += 1;
+            }
+            bloecke.push(MarkdownBlock::Zitat { zeilen: zitat, start_zeile, end_zeile: i.saturating_sub(1) });
+            continue;
+        }
+
+        if let Some((marke, rest)) = listenpunkt(getrimmt) {
+            let einzug = zeile.len() - zeile.trim_start().len();
+            bloecke.push(MarkdownBlock::ListenPunkt { marke, ebene: einzug / 2, text: rest.to_string(), zeile: i });
             i += 1;
             continue;
         }
 
-        // Fließtext-Absatz zusammenfassen bis zur nächsten Leerzeile
+        // Fließtext-Absatz bis zur nächsten Leerzeile oder zum nächsten Block;
+        // zwei Leerzeichen am Zeilenende erzwingen einen Zeilenumbruch (wie im Buchbau)
         let start_zeile = i;
-        let mut absatz_zeilen = Vec::new();
-        while i < zeilen.len()
-            && !zeilen[i].trim().is_empty()
-            && !zeilen[i].trim().starts_with('#')
-            && !zeilen[i].trim().starts_with("```")
-            && !zeilen[i].trim().starts_with('>')
-            && !zeilen[i].trim().starts_with("- ")
-        {
-            absatz_zeilen.push(zeilen[i].trim());
+        let mut text = String::new();
+        while i < zeilen.len() && (i == start_zeile || !blockanfang(zeilen[i].trim())) {
+            let z = zeilen[i];
+            if !text.is_empty() && !text.ends_with('\n') {
+                text.push(' ');
+            }
+            text.push_str(z.trim());
+            if z.ends_with("  ") {
+                text.push('\n');
+            }
             i += 1;
         }
-
-        bloecke.push(MarkdownBlock::Absatz {
-            text: absatz_zeilen.join(" "),
-            start_zeile,
-            end_zeile: i.saturating_sub(1),
-        });
+        bloecke.push(MarkdownBlock::Absatz { text: text.trim_end().to_string(), start_zeile, end_zeile: i.saturating_sub(1) });
     }
 
     bloecke
 }
-
 
 /// Zerlegt Inline-Markdown (`**fett**`, `*kursiv*`, `` `code` ``, `~~durch~~`, Links, Bilder,
 /// Maskierungen) in formatierte Textstücke; die Steuerzeichen selbst erscheinen nicht.
@@ -307,6 +330,14 @@ fn inline_lesen(
                     }
                 }
             }
+            '<' if naechst.is_some_and(|n| n.is_ascii_alphabetic() || n == '/') && finde(i, &['>']).is_some() => {
+                let ende = finde(i, &['>']).unwrap_or(i);
+                let tag: String = z[i + 1..ende].iter().collect::<String>().to_lowercase();
+                if tag.starts_with("br") {
+                    puffer.push('\n');
+                }
+                i = ende + 1;
+            }
             '{' if z[i..].iter().take_while(|&&k| k != '}').count() > 1 && z[i + 1..].iter().take_while(|&&k| k != '}').next() == Some(&'#') => {
                 // Pandoc-Attribut wie `{#kap:x}` gehört nicht zum Text
                 let ende = finde(i, &['}']).unwrap_or(z.len() - 1);
@@ -330,18 +361,26 @@ fn markdown_text<'a, Message: Clone + 'a>(quelle: &str, groesse: f32, farbe: ice
         .into()
 }
 
+/// Kennung der scrollbaren Text-Vorschau (damit sie dem Cursor folgen kann).
+pub fn scroll_id() -> iced::widget::Id {
+    iced::widget::Id::new("text-vorschau")
+}
+
 /// Erzeugt die Live-Vorschau-Spalte.
+///
+/// `basis` ist der Bandordner; Bildpfade wie `images/x.png` gelten relativ dazu.
 pub fn ansicht<'a, Message: Clone + 'a>(
     inhalt: &'a str,
     cursor_zeile: usize,
     on_springe_zu_zeile: impl Fn(usize, usize) -> Message + Copy + 'a,
+    basis: Option<&'a Path>,
 ) -> Element<'a, Message> {
-    darstellen(inhalt, cursor_zeile, on_springe_zu_zeile, true)
+    darstellen(inhalt, cursor_zeile, on_springe_zu_zeile, true, basis)
 }
 
 /// Gesetzter Markdown-Text ohne Vorschau-Kopf, z. B. für das Handbuch (dort springt kein Klick in einen Editor).
 pub fn lesetext<'a, Message: Clone + 'a>(inhalt: &'a str, nichts: Message) -> Element<'a, Message> {
-    darstellen(inhalt, usize::MAX, move |_, _| nichts.clone(), false)
+    darstellen(inhalt, usize::MAX, move |_, _| nichts.clone(), false, None)
 }
 
 fn darstellen<'a, Message: Clone + 'a>(
@@ -349,6 +388,7 @@ fn darstellen<'a, Message: Clone + 'a>(
     cursor_zeile: usize,
     on_springe_zu_zeile: impl Fn(usize, usize) -> Message + Clone + 'a,
     mit_kopf: bool,
+    basis: Option<&'a Path>,
 ) -> Element<'a, Message> {
     let bloecke = parse_bloecke(inhalt);
 
@@ -377,6 +417,7 @@ fn darstellen<'a, Message: Clone + 'a>(
                     1 => (22, thema::akzent()),
                     2 => (18, thema::text_hell()),
                     3 => (15, thema::text_hell()),
+                    4 => (14, thema::text_hell()),
                     _ => (13, thema::text_gedimmt()),
                 };
 
@@ -390,53 +431,118 @@ fn darstellen<'a, Message: Clone + 'a>(
                 spalte = spalte.push(btn);
             }
 
-            MarkdownBlock::CodeBlock {
-                code,
-                start_zeile,
-                end_zeile,
-            } => {
+            MarkdownBlock::CodeBlock { sprache, code, start_zeile, end_zeile } => {
                 let aktiv = cursor_zeile >= start_zeile && cursor_zeile <= end_zeile;
-
-                let code_zeilen_anzahl = code.len();
-                let mut code_spalte = column![].spacing(2);
-                for (rel_nr, zeile_text) in code.into_iter().enumerate() {
-                    let code_zeile_nr = start_zeile + rel_nr + 1;
-                    let zeilen_ansicht = row![
-                        text(format!("{:2} │ ", code_zeile_nr))
-                            .size(12)
-                            .color(thema::text_gedimmt()),
-                        text(zeile_text)
-                            .size(12)
-                            .color(thema::text_gedimmt()),
-                    ]
-                    .align_y(Alignment::Center);
-
-                    code_spalte = code_spalte.push(zeilen_ansicht);
-                }
-
+                let anzahl = code.len();
+                let code_text = code.join("\n");
                 let karten_kopf = row![
-                    text("🦀 Rust").size(11).color(thema::akzent()),
-                    space::horizontal(),
-                    text(format!("{} Zeilen", code_zeilen_anzahl))
+                    text(if sprache.is_empty() { "CODE".to_string() } else { sprache.to_uppercase() })
                         .size(10)
-                        .color(thema::text_gedimmt()),
+                        .color(thema::akzent()),
+                    space::horizontal(),
+                    text(format!("{anzahl} Zeilen")).size(10).color(thema::text_gedimmt()),
                 ]
                 .align_y(Alignment::Center);
-
+                // Zeilennummern je Codeblock ab 1, wie der Buchtext sie zitiert („Zeile 5 bis 11“)
+                let breite = anzahl.to_string().len();
+                let nummern = (1..=anzahl.max(1)).map(|n| format!("{n:>breite$}")).collect::<Vec<_>>().join("\n");
                 let kasten = container(
-                    column![karten_kopf, space::vertical().height(4), code_spalte].spacing(4),
+                    column![
+                        karten_kopf,
+                        row![
+                            text(nummern).size(12).font(iced::Font::MONOSPACE).color(thema::text_gedimmt()),
+                            text(code_text).size(12).font(iced::Font::MONOSPACE).color(thema::text_hell()).wrapping(iced::widget::text::Wrapping::None),
+                        ]
+                        .spacing(12),
+                    ]
+                    .spacing(6),
                 )
                 .padding(10)
                 .style(thema::codeblock_container_stil)
                 .width(Fill);
-
-                let btn = button(kasten)
+                let btn = button(scrollable(kasten).direction(scrollable::Direction::Horizontal(scrollable::Scrollbar::new().width(4).scroller_width(4))))
                     .padding([2, 4])
                     .width(Fill)
                     .style(thema::vorschau_block_stil(aktiv))
                     .on_press(on_springe_zu_zeile(start_zeile, 0));
-
                 spalte = spalte.push(btn);
+            }
+
+            MarkdownBlock::Bild { pfad, unterschrift, zeile } => {
+                let aktiv = cursor_zeile == zeile;
+                let datei = basis.map(|b| b.join(&pfad)).filter(|p| p.is_file());
+                let bild: Element<'a, Message> = match datei {
+                    Some(d) => container(image(image::Handle::from_path(d)).width(Fill).content_fit(iced::ContentFit::Contain))
+                        .max_width(640)
+                        .into(),
+                    None => text(format!("Bild nicht gefunden: {pfad}")).size(12).color(thema::fehler_rot()).into(),
+                };
+                let mut inhalt = column![bild].spacing(6).align_x(Alignment::Center).width(Fill);
+                if !unterschrift.is_empty() {
+                    inhalt = inhalt.push(
+                        iced::widget::rich_text(inline_spans(&unterschrift, 12.0, thema::text_gedimmt()))
+                            .size(12)
+                            .align_x(iced::alignment::Horizontal::Center)
+                            .width(Fill),
+                    );
+                }
+                spalte = spalte.push(
+                    button(inhalt)
+                        .padding([6, 8])
+                        .width(Fill)
+                        .style(thema::vorschau_block_stil(aktiv))
+                        .on_press(on_springe_zu_zeile(zeile, 0)),
+                );
+            }
+
+            MarkdownBlock::Tabelle { zeilen, start_zeile, end_zeile } => {
+                let aktiv = cursor_zeile >= start_zeile && cursor_zeile <= end_zeile;
+                let spalten = zeilen.iter().map(Vec::len).max().unwrap_or(1).max(1);
+                let mut tabelle = column![].spacing(0).width(Fill);
+                for (nr, z) in zeilen.iter().enumerate() {
+                    let mut reihe = row![].spacing(10).width(Fill);
+                    for k in 0..spalten {
+                        let zelle = z.get(k).map(String::as_str).unwrap_or("");
+                        let farbe = thema::text_hell();
+                        let inhalt: Element<'a, Message> = if nr == 0 {
+                            iced::widget::rich_text(
+                                inline_spans(zelle, 12.0, farbe).into_iter().map(|sp| sp.font(thema::editor_font(true))).collect::<Vec<_>>(),
+                            )
+                            .size(12)
+                            .into()
+                        } else {
+                            markdown_text::<Message>(zelle, 12.0, farbe)
+                        };
+                        reihe = reihe.push(container(inhalt).width(FillPortion(1)));
+                    }
+                    tabelle = tabelle.push(container(reihe).padding([5, 8]));
+                    tabelle = tabelle.push(thema::trennlinie());
+                }
+                spalte = spalte.push(
+                    button(container(tabelle).style(thema::codeblock_container_stil).padding([2, 0]))
+                        .padding([2, 4])
+                        .width(Fill)
+                        .style(thema::vorschau_block_stil(aktiv))
+                        .on_press(on_springe_zu_zeile(start_zeile, 0)),
+                );
+            }
+
+            MarkdownBlock::Seitenumbruch { zeile } => {
+                spalte = spalte.push(
+                    button(
+                        row![
+                            container(thema::trennlinie()).width(Fill),
+                            text("Seitenumbruch").size(10).color(thema::text_gedimmt()),
+                            container(thema::trennlinie()).width(Fill),
+                        ]
+                        .spacing(8)
+                        .align_y(Alignment::Center),
+                    )
+                    .padding([4, 8])
+                    .width(Fill)
+                    .style(thema::vorschau_block_stil(cursor_zeile == zeile))
+                    .on_press(on_springe_zu_zeile(zeile, 0)),
+                );
             }
 
             MarkdownBlock::Zitat {
@@ -464,17 +570,15 @@ fn darstellen<'a, Message: Clone + 'a>(
                 spalte = spalte.push(btn);
             }
 
-            MarkdownBlock::ListenPunkt {
-                text: punkt_text,
-                zeile,
-            } => {
+            MarkdownBlock::ListenPunkt { marke, ebene, text: punkt_text, zeile } => {
                 let aktiv = cursor_zeile == zeile;
                 let zeilen_ansicht = row![
-                    text("•").size(14).color(thema::akzent()),
+                    space::horizontal().width(ebene as f32 * 18.0),
+                    text(marke).size(13).color(thema::akzent()).width(22),
                     markdown_text::<Message>(&punkt_text, 13.0, thema::text_hell()),
                 ]
-                .spacing(8)
-                .align_y(Alignment::Center);
+                .spacing(4)
+                .align_y(Alignment::Start);
 
                 let btn = button(zeilen_ansicht)
                     .padding([3, 6])
@@ -513,7 +617,7 @@ fn darstellen<'a, Message: Clone + 'a>(
     }
     container(
         gesamt.push(
-            container(scrollable(zentrierter_vorschau_inhalt).height(Fill))
+            container(scrollable(zentrierter_vorschau_inhalt).id(scroll_id()).height(Fill))
                 .center_x(Fill)
                 .padding(Padding::from([10, 20]))
                 .height(Fill)
@@ -543,5 +647,22 @@ mod tests {
         assert_eq!(klartext("Titel {#kap:x}"), "Titel ");
         assert_eq!(klartext("snake_case_name und 2 * 3 * 4"), "snake_case_name und 2 * 3 * 4");
         assert_eq!(klartext(r"maskiert \*kein Stern\*"), "maskiert *kein Stern*");
+        assert_eq!(klartext("Zeile<br />neu und <kbd>Strg</kbd>, a < b"), "Zeile\nneu und Strg, a < b");
+    }
+
+    #[test]
+    fn bloecke_wie_im_buchbau() {
+        let md = "## Titel\nText direkt davor\n![Abbildung 1: Fenster](images/a.png)\n\n<div class=\"imprint\">\n**Impressum**\n</div>\n<div class=\"page-break\"></div>\n\n1. Erstens\n2. Zweitens\n  - eingerückt\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n```dart\nvoid main() {}\n```\n##### Klein";
+        let b = parse_bloecke(md);
+        assert!(matches!(&b[0], MarkdownBlock::Ueberschrift { ebene: 2, .. }));
+        assert!(matches!(&b[1], MarkdownBlock::Absatz { text, .. } if text == "Text direkt davor"), "Absatz endet vor dem Bild: {b:?}");
+        assert!(matches!(&b[2], MarkdownBlock::Bild { pfad, unterschrift, .. } if pfad == "images/a.png" && unterschrift == "Abbildung 1: Fenster"));
+        assert!(matches!(&b[3], MarkdownBlock::Absatz { text, .. } if text == "**Impressum**"), "HTML-Hüllen verschwinden: {b:?}");
+        assert!(matches!(&b[4], MarkdownBlock::Seitenumbruch { .. }));
+        assert!(matches!(&b[5], MarkdownBlock::ListenPunkt { marke, .. } if marke == "1."));
+        assert!(matches!(&b[7], MarkdownBlock::ListenPunkt { marke, ebene: 1, .. } if marke == "•"));
+        assert!(matches!(&b[8], MarkdownBlock::Tabelle { zeilen, .. } if zeilen.len() == 2 && zeilen[1] == ["1", "2"]));
+        assert!(matches!(&b[9], MarkdownBlock::CodeBlock { sprache, .. } if sprache == "dart"));
+        assert!(matches!(&b[10], MarkdownBlock::Ueberschrift { ebene: 5, .. }));
     }
 }

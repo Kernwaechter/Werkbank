@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Werkbank – Hilfsprogramme installieren</title>
+<meta name="description" content="Welche Hilfsprogramme die Werkbank für welche Funktion braucht und wie du sie unter Linux, macOS und Windows installierst: Hunspell, LanguageTool, Java, Pandoc, Typst, Ghostscript, Python, Rust, Flutter.">
+<link rel="stylesheet" href="schriften/schriften.css">
+<style>
+:root{--bg:#f2f4f7;--flaeche:#fbfcfd;--text:#1b2129;--leise:#566170;--akzent:#24598a;--akzent-flaeche:#e1eaf3;--linie:#cfd6df;--code:#e9edf2;--gruen:#2c7a50;--orange:#9a5510;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#171c22;--flaeche:#1e242c;--text:#e4e8ee;--leise:#a3adbb;--akzent:#8fb6da;--akzent-flaeche:#26384b;--linie:#374250;--code:#121619;--gruen:#7cc095;--orange:#e0a35a;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:400 17px/1.65 "IBM Plex Sans","Segoe UI",system-ui,sans-serif;padding:0 max(16px,env(safe-area-inset-left,0px))}
+main{max-width:920px;margin:0 auto;padding-block:40px 72px}
+h1,h2{font-family:"Newsreader",Georgia,serif;font-weight:560;line-height:1.15;margin:0 0 .5em}
+h1{font-size:clamp(2rem,5vw,2.8rem)}
+h2{font-size:1.45rem;margin:0}
+a{color:var(--akzent)}
+.zurueck{font-size:.9rem;color:var(--leise)}
+.lead{font-size:1.1rem;color:var(--leise);max-width:64ch}
+.marke{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--leise)}
+code,.befehl{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.86em}
+code{background:var(--code);padding:1px 5px;border-radius:4px}
+.systeme{position:sticky;top:0;z-index:2;background:var(--bg);padding:12px 0;margin:18px 0 8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--linie)}
+.umschalter{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--linie);border-radius:8px;background:var(--flaeche)}
+.umschalter button{font:500 .9rem "IBM Plex Sans",system-ui,sans-serif;padding:6px 14px;border:0;border-radius:6px;background:transparent;color:var(--leise);cursor:pointer}
+.umschalter button[aria-pressed="true"]{background:var(--akzent-flaeche);color:var(--text)}
+.uebersicht{width:100%;border-collapse:collapse;margin:20px 0 8px;font-size:.95rem}
+.uebersicht th,.uebersicht td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--linie);vertical-align:top}
+.uebersicht th{font-weight:600;font-size:.82rem;color:var(--leise);text-transform:uppercase;letter-spacing:.06em}
+.noetig{font-size:.8rem;font-weight:600;white-space:nowrap}
+.noetig.ja{color:var(--gruen)}.noetig.opt{color:var(--leise)}.noetig.druck{color:var(--orange)}
+.werkzeug{background:var(--flaeche);border:1px solid var(--linie);border-radius:12px;padding:22px 24px;margin-top:22px}
+.werkzeug-kopf{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline}
+.werkzeug p{margin:.5em 0}
+.os{margin-top:14px}
+.os h3{font:600 .8rem "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--leise);margin:0 0 6px}
+.befehl{display:block;background:var(--code);border-radius:6px;padding:8px 12px;margin:4px 0;overflow-x:auto;white-space:pre}
+.distro{font-size:.85rem;color:var(--leise);margin:8px 0 0}
+.pruefen{font-size:.9rem;color:var(--leise)}
+body[data-os="linux"] .os:not([data-os="linux"]),
+body[data-os="mac"] .os:not([data-os="mac"]),
+body[data-os="windows"] .os:not([data-os="windows"]){display:none}
+.hinweis-box{border-left:3px solid var(--akzent);padding:4px 0 4px 14px;margin:18px 0;color:var(--leise)}
+@media (max-width:640px){.uebersicht .wofuer{display:none}.werkzeug{padding:18px}}
+</style>
+</head>
+<body>
+<main>
+<p class="zurueck"><a href="index.html">← Zur Werkbank</a></p>
+<p class="marke">Installation</p>
+<h1>Hilfsprogramme für die Werkbank</h1>
+<p class="lead">Zum Schreiben, Speichern, für Statistik, Cover und den eingebauten Buchsatz brauchst du nichts weiter: Die Werkbank bringt Typst und die Schriften mit. Für einige Funktionen nutzt sie Programme, die du selbst installierst. Hier steht, wofür jedes gut ist und wie du es unter Linux, macOS und Windows einrichtest.</p>
+
+<table class="uebersicht">
+  <thead><tr><th>Programm</th><th class="wofuer">Wofür</th><th>Brauchst du es?</th></tr></thead>
+  <tbody>
+    <tr><td><a href="#hunspell">Hunspell-Wörterbuch (Deutsch)</a></td><td class="wofuer">Rote Markierung unbekannter Wörter, offline</td><td><span class="noetig ja">empfohlen</span></td></tr>
+    <tr><td><a href="#languagetool">LanguageTool und Java 17+</a></td><td class="wofuer">Grammatik, Stil und Zeichensetzung</td><td><span class="noetig opt">optional</span></td></tr>
+    <tr><td><a href="#ghostscript">Ghostscript</a></td><td class="wofuer">Druckdatei als PDF/X-3 für Druckdienstleister</td><td><span class="noetig druck">für den Druck</span></td></tr>
+    <tr><td><a href="#pandoc">Pandoc 3 oder neuer</a></td><td class="wofuer">Satzvorschau und Bauskripte für Bücher, die mit Pandoc gebaut werden</td><td><span class="noetig opt">optional</span></td></tr>
+    <tr><td><a href="#typst">Typst (Kommandozeile)</a></td><td class="wofuer">Nur für eigene Bauskripte, die <code>typst</code> aufrufen</td><td><span class="noetig opt">optional</span></td></tr>
+    <tr><td><a href="#python">Python 3</a></td><td class="wofuer">Eigene Bauskripte (Bereich „Bauen“)</td><td><span class="noetig opt">optional</span></td></tr>
+    <tr><td><a href="#rust">Rust (rustc)</a></td><td class="wofuer">Code-Prüfer für Rust-Beispiele</td><td><span class="noetig opt">optional</span></td></tr>
+    <tr><td><a href="#flutter">Flutter oder Dart</a></td><td class="wofuer">Code-Prüfer für Dart- und Flutter-Beispiele</td><td><span class="noetig opt">optional</span></td></tr>
+  </tbody>
+</table>
+<p class="pruefen">Ob ein Programm gefunden wird, zeigt die Werkbank unter <b>Einstellungen → Werkzeuge</b> (Pandoc, Ghostscript, Rust, Dart/Flutter) bzw. <b>Einstellungen → Prüfung</b> (Wörterbuch, LanguageTool). Nach einer Installation dort „Erneut prüfen“ wählen.</p>
+
+<div class="systeme">
+  <span class="marke">Anleitung für</span>
+  <div class="umschalter" role="group" aria-label="Betriebssystem">
+    <button type="button" data-wahl="linux" aria-pressed="false">Linux</button>
+    <button type="button" data-wahl="mac" aria-pressed="false">macOS</button>
+    <button type="button" data-wahl="windows" aria-pressed="false">Windows</button>
+    <button type="button" data-wahl="" aria-pressed="false">Alle</button>
+  </div>
+</div>
+
+<section class="werkzeug" id="hunspell">
+  <div class="werkzeug-kopf"><h2>Hunspell-Wörterbuch (Deutsch)</h2><span class="noetig ja">empfohlen</span></div>
+  <p>Damit markiert die Werkbank unbekannte Wörter sofort rot, ohne Internet. Sie sucht die Dateien <code>de_DE.aff</code> und <code>de_DE.dic</code> an den üblichen Orten.</p>
+  <div class="os" data-os="linux"><h3>Linux</h3>
+    <p class="distro">Debian, Ubuntu, Mint</p><span class="befehl">sudo apt install hunspell-de-de</span>
+    <p class="distro">Fedora</p><span class="befehl">sudo dnf install hunspell-de</span>
+    <p class="distro">Arch, Manjaro</p><span class="befehl">sudo pacman -S hunspell-de</span>
+  </div>
+  <div class="os" data-os="mac"><h3>macOS</h3>
+    <p>Die deutschen Wörterbuchdateien aus dem <a href="https://github.com/LibreOffice/dictionaries/tree/master/de">LibreOffice-Wörterbuchpaket</a> laden (<code>de_DE_frami.aff</code> und <code>de_DE_frami.dic</code>), in <code>de_DE.aff</code> und <code>de_DE.dic</code> umbenennen und in diesen Ordner legen:</p>
+    <span class="befehl">mkdir -p ~/Library/Spelling &amp;&amp; mv de_DE.aff de_DE.dic ~/Library/Spelling/</span>
+  </div>
+  <div class="os" data-os="windows"><h3>Windows</h3>
+    <p>Die Dateien wie bei macOS laden und umbenennen, in einen Ordner deiner Wahl legen (z. B. <code>C:\Woerterbuecher</code>) und diesen Ordner in der Werkbank unter <b>Einstellungen → Prüfung → Ordner mit Wörterbüchern</b> eintragen.</p>
+  </div>
+</section>
+
+<section class="werkzeug" id="languagetool">
+  <div class="werkzeug-kopf"><h2>LanguageTool und Java</h2><span class="noetig opt">optional</span></div>
+  <p>LanguageTool prüft Grammatik, Stil und Zeichensetzung. Du betreibst es selbst auf deinem Rechner, dein Text verlässt ihn nicht. Es braucht Java 17 oder neuer.</p>
+  <div class="os" data-os="linux"><h3>Linux</h3>
+    <p class="distro">1. Java – Debian, Ubuntu, Mint</p><span class="befehl">sudo apt install default-jre</span>
+    <p class="distro">Fedora</p><span class="befehl">sudo dnf install java-latest-openjdk</span>
+    <p class="distro">Arch, Manjaro</p><span class="befehl">sudo pacman -S jre-openjdk</span>
+    <p class="distro">2. LanguageTool laden und entpacken</p>
+    <span class="befehl">curl -LO https://languagetool.org/download/LanguageTool-stable.zip
+unzip LanguageTool-stable.zip -d ~/</span>
+  </div>
+  <div class="os" data-os="mac"><h3>macOS</h3>
+    <p class="distro">1. Java (Homebrew)</p><span class="befehl">brew install openjdk</span>
+    <p class="distro">2. LanguageTool laden und entpacken</p>
+    <span class="befehl">curl -LO https://languagetool.org/download/LanguageTool-stable.zip
+unzip LanguageTool-stable.zip -d ~/</span>
+  </div>
+  <div class="os" data-os="windows"><h3>Windows (PowerShell)</h3>
+    <p class="distro">1. Java</p><span class="befehl">winget install --id EclipseAdoptium.Temurin.21.JRE</span>
+    <p class="distro">2. LanguageTool laden und entpacken</p>
+    <span class="befehl">Invoke-WebRequest -Uri https://languagetool.org/download/LanguageTool-stable.zip -OutFile LanguageTool.zip
+Expand-Archive LanguageTool.zip -DestinationPath C:\LanguageTool</span>
+  </div>
+  <p class="hinweis-box">Danach in der Werkbank: <b>Einstellungen → Prüfung → Lokaler Server</b>, den entpackten Ordner wählen und „Server starten“. Nach 10 bis 30 Sekunden steht die Verbindung auf „Erreichbar“. Ohne Java geht es auch mit Docker: <code>docker run -d -p 8081:8010 erikvl87/languagetool</code>, dann als Adresse <code>http://localhost:8081</code> eintragen.</p>
+</section>
+
+<section class="werkzeug" id="ghostscript">
+  <div class="werkzeug-kopf"><h2>Ghostscript</h2><span class="noetig druck">für den Druck</span></div>
+  <p>Wandelt das Druck-PDF in eine PDF/X-3-Datei in Graustufen um, wie sie Druckdienstleister und Selfpublishing-Portale verlangen.</p>
+  <div class="os" data-os="linux"><h3>Linux</h3>
+    <p class="distro">Debian, Ubuntu, Mint</p><span class="befehl">sudo apt install ghostscript</span>
+    <p class="distro">Fedora</p><span class="befehl">sudo dnf install ghostscript</span>
+    <p class="distro">Arch, Manjaro</p><span class="befehl">sudo pacman -S ghostscript</span>
+  </div>
+  <div class="os" data-os="mac"><h3>macOS</h3><span class="befehl">brew install ghostscript</span></div>
+  <div class="os" data-os="windows"><h3>Windows</h3><span class="befehl">winget install --id ArtifexSoftware.GhostScript</span>
+    <p class="distro">Das Programm heißt unter Windows <code>gswin64c</code>; die Werkbank findet es.</p></div>
+  <p class="pruefen">Prüfen: <code>gs --version</code></p>
+</section>
+
+<section class="werkzeug" id="pandoc">
+  <div class="werkzeug-kopf"><h2>Pandoc</h2><span class="noetig opt">optional</span></div>
+  <p>Für Bücher, deren Bauskripte mit Pandoc arbeiten (Markdown → Typst). Die Satzvorschau geht dann denselben Weg. Ohne Pandoc setzt der eingebaute Satz. Nötig ist Version 3 oder neuer.</p>
+  <div class="os" data-os="linux"><h3>Linux</h3>
+    <p class="distro">Debian, Ubuntu, Mint</p><span class="befehl">sudo apt install pandoc</span>
+    <p class="distro">Fedora</p><span class="befehl">sudo dnf install pandoc</span>
+    <p class="distro">Arch, Manjaro</p><span class="befehl">sudo pacman -S pandoc-cli</span>
+    <p class="distro">Ist die Version der Distribution älter als 3: das aktuelle .deb von den <a href="https://github.com/jgm/pandoc/releases">Pandoc-Releases</a> laden und installieren:</p>
+    <span class="befehl">sudo apt install ./pandoc-*-amd64.deb</span>
+  </div>
+  <div class="os" data-os="mac"><h3>macOS</h3><span class="befehl">brew install pandoc</span></div>
+  <div class="os" data-os="windows"><h3>Windows</h3><span class="befehl">winget install --id JohnMacFarlane.Pandoc</span></div>
+  <p class="pruefen">Prüfen: <code>pandoc --version</code></p>
+</section>
+
+<section class="werkzeug" id="typst">
+  <div class="werkzeug-kopf"><h2>Typst (Kommandozeile)</h2><span class="noetig opt">optional</span></div>
+  <p>Die Werkbank selbst braucht kein eigenes Typst, sie bringt es eingebaut mit. Installiere es nur, wenn deine eigenen Bauskripte <code>typst compile</code> aufrufen.</p>
+  <div class="os" data-os="linux"><h3>Linux</h3>
+    <p class="distro">Arch, Manjaro</p><span class="befehl">sudo pacman -S typst</span>
+    <p class="distro">Alle Distributionen: fertiges Programm von den <a href="https://github.com/typst/typst/releases">Typst-Releases</a> laden, entpacken und nach <code>~/.local/bin</code> legen – oder mit Rust bauen:</p>
+    <span class="befehl">cargo install --locked typst-cli</span>
+  </div>
+  <div class="os" data-os="mac"><h3>macOS</h3><span class="befehl">brew install typst</span></div>
+  <div class="os" data-os="windows"><h3>Windows</h3><span class="befehl">winget install --id Typst.Typst</span></div>
+  <p class="pruefen">Prüfen: <code>typst --version</code></p>
+</section>
+
+<section class="werkzeug" id="python">
+  <div class="werkzeug-kopf"><h2>Python 3</h2><span class="noetig opt">optional</span></div>
+  <p>Der Bereich „Bauen“ startet die Bauskripte deines Buches. Sind sie in Python geschrieben, braucht es Python 3 – und die Pakete, die das Skript selbst importiert (steht meist am Anfang des Skripts).</p>
+  <div class="os" data-os="linux"><h3>Linux</h3>
+    <p class="distro">Debian, Ubuntu, Mint</p><span class="befehl">sudo apt install python3 python3-pip</span>
+    <p class="distro">Fedora</p><span class="befehl">sudo dnf install python3 python3-pip</span>
+    <p class="distro">Arch, Manjaro</p><span class="befehl">sudo pacman -S python python-pip</span>
+  </div>
+  <div class="os" data-os="mac"><h3>macOS</h3><span class="befehl">brew install python</span></div>
+  <div class="os" data-os="windows"><h3>Windows</h3><span class="befehl">winget install --id Python.Python.3.12</span></div>
+  <p class="pruefen">Prüfen: <code>python3 --version</code> (Windows: <code>python --version</code>)</p>
+</section>
+
+<section class="werkzeug" id="rust">
+  <div class="werkzeug-kopf"><h2>Rust</h2><span class="noetig opt">optional</span></div>
+  <p>Der Code-Prüfer lässt jedes Rust-Beispiel deines Buches vom echten Compiler prüfen. Empfohlen ist rustup, damit die aktuelle Version (Edition 2024) bereitsteht.</p>
+  <div class="os" data-os="linux"><h3>Linux</h3>
+    <span class="befehl">curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh</span>
+    <p class="distro">Aus den Paketquellen geht auch (oft ältere Version): <code>sudo apt install rustc</code>, <code>sudo dnf install rust</code>, <code>sudo pacman -S rustup</code></p>
+  </div>
+  <div class="os" data-os="mac"><h3>macOS</h3><span class="befehl">curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh</span></div>
+  <div class="os" data-os="windows"><h3>Windows</h3><span class="befehl">winget install --id Rustlang.Rustup</span>
+    <p class="distro">Danach ein neues Terminal öffnen.</p></div>
+  <p class="pruefen">Prüfen: <code>rustc --version</code>. Die Werkbank findet rustc auch unter <code>~/.cargo/bin</code>, wenn es nicht im Suchpfad steht.</p>
+</section>
+
+<section class="werkzeug" id="flutter">
+  <div class="werkzeug-kopf"><h2>Flutter oder Dart</h2><span class="noetig opt">optional</span></div>
+  <p>Der Code-Prüfer analysiert Dart- und Flutter-Beispiele mit <code>dart analyze</code>. Flutter bringt Dart mit. Nur mit Dart werden Flutter-Beispiele übersprungen.</p>
+  <div class="os" data-os="linux"><h3>Linux</h3>
+    <p class="distro">Mit Snap</p><span class="befehl">sudo snap install flutter --classic</span>
+    <p class="distro">Oder per Git in den Home-Ordner</p><span class="befehl">git clone https://github.com/flutter/flutter.git -b stable ~/flutter</span>
+  </div>
+  <div class="os" data-os="mac"><h3>macOS</h3><span class="befehl">brew install --cask flutter</span>
+    <p class="distro">Nur Dart: <code>brew tap dart-lang/dart &amp;&amp; brew install dart</code></p></div>
+  <div class="os" data-os="windows"><h3>Windows</h3>
+    <p>Das Flutter-SDK als ZIP von <a href="https://docs.flutter.dev/get-started/install">flutter.dev</a> laden, nach <code>C:\src\flutter</code> entpacken und <code>C:\src\flutter\bin</code> zum PATH hinzufügen. Oder:</p>
+    <span class="befehl">choco install flutter</span></div>
+  <p class="pruefen">Prüfen: <code>flutter --version</code>. Die Werkbank findet Flutter auch unter <code>~/flutter</code>, <code>~/Development/flutter</code> und über <code>FLUTTER_ROOT</code>.</p>
+</section>
+</main>
+<script>
+(function () {
+  var knoepfe = document.querySelectorAll('.umschalter button');
+  function setze(os) {
+    if (os) document.body.setAttribute('data-os', os); else document.body.removeAttribute('data-os');
+    knoepfe.forEach(function (k) { k.setAttribute('aria-pressed', String(k.getAttribute('data-wahl') === os)); });
+  }
+  knoepfe.forEach(function (k) { k.addEventListener('click', function () { setze(k.getAttribute('data-wahl')); }); });
+  var ua = navigator.userAgent;
+  setze(/Windows/i.test(ua) ? 'windows' : /Mac OS X|Macintosh/i.test(ua) ? 'mac' : 'linux');
+})();
+</script>
+</body>
+</html>
