@@ -13,21 +13,21 @@ use werkbank_kern::statistik::Statistik;
 use werkbank_kern::{KapitelStatus, markdown};
 
 fn karte<'a>(inhalt: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
-    container(inhalt).padding(14).width(Fill).style(thema::infobox_stil).into()
+    container(inhalt).padding(16).width(Fill).style(thema::gruppe_stil).into()
 }
 
 fn kennzahl<'a>(titel: &'a str, wert: String, hinweis: String) -> Element<'a, Message> {
     container(
         column![
             text(titel).size(11).color(thema::text_gedimmt()),
-            text(wert).size(22).color(thema::text_hell()),
+            text(wert).size(24).font(thema::fett()).color(thema::text_hell()),
             text(hinweis).size(10).color(thema::text_gedimmt()),
         ]
         .spacing(2),
     )
-    .padding(12)
+    .padding(14)
     .width(Length::FillPortion(1))
-    .style(thema::infobox_stil)
+    .style(thema::gruppe_stil)
     .into()
 }
 
@@ -99,7 +99,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
         .map_or("noch keine Messung".to_string(), |t| format!("{t:.0} Wörter / Std."));
 
     let kopf = column![
-        text("Statistik & Schreibtempo").size(20).color(thema::text_hell()),
+        text("Statistik & Schreibtempo").size(22).font(thema::fett()).color(thema::text_hell()),
         text(if state.band.ordner.is_some() {
             "Gespeichert in .werkbank/statistik.json des Bandes. Gezählt werden Netto-Wörter: neu geschrieben minus gestrichen."
         } else {
@@ -113,7 +113,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     let heute_karte = karte(
         column![
             row![
-                text("Tagespensum").size(15).color(thema::text_hell()),
+                text("Tagespensum").size(14).font(thema::fett()).color(thema::text_hell()),
                 space::horizontal(),
                 text(format!("{netto_heute} / {pensum} Wörter ({fortschritt:.0}%)"))
                     .size(12)
@@ -160,7 +160,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
 
     let heatmap_karte = karte(
         column![
-            text("Aktivität der letzten 26 Wochen").size(13).color(thema::text_hell()),
+            text("Aktivität der letzten 26 Wochen").size(14).font(thema::fett()).color(thema::text_hell()),
             scrollable(heatmap(s, pensum as i64)).direction(scrollable::Direction::Horizontal(Default::default())),
             text(format!("Dunkel = wenig, hell = Pensum von {pensum} Wörtern erreicht")).size(10).color(thema::text_gedimmt()),
         ]
@@ -168,31 +168,37 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     );
 
     // Fortschritt je Teil mit Statusampel
-    let mut teile = column![text("Fortschritt je Teil").size(13).color(thema::text_hell())].spacing(8);
+    let mut teile = column![text("Fortschritt je Teil").size(14).font(thema::fett()).color(thema::text_hell())].spacing(12);
     for t in &projekt.teile {
         let zaehle = |st: KapitelStatus| t.kapitel.iter().filter(|k| k.status == st).count();
         let ziel: usize = t.kapitel.iter().map(|k| k.wortziel).sum();
         let woerter = t.gesamtwortzahl();
         let anteil = if ziel == 0 { 0.0 } else { (woerter as f32 / ziel as f32 * 100.0).min(100.0) };
+        // Titel in eigener Zeile (darf umbrechen), darunter die Stände als farbige Punkte – nur die vorhandenen
+        let mut staende = row![].spacing(10).align_y(Alignment::Center);
+        for (st, name) in [
+            (KapitelStatus::Entwurf, "Entwurf"),
+            (KapitelStatus::InArbeit, "in Arbeit"),
+            (KapitelStatus::Ueberarbeitet, "überarbeitet"),
+            (KapitelStatus::Fertig, "fertig"),
+        ] {
+            let n = zaehle(st);
+            if n > 0 {
+                staende = staende.push(
+                    row![text("●").size(9).color(thema::status_farbe(st)), text(format!("{n} {name}")).size(11).color(thema::text_gedimmt())]
+                        .spacing(4)
+                        .align_y(Alignment::Center),
+                );
+            }
+        }
         teile = teile.push(
             column![
-                row![
-                    text(&t.titel).size(12).color(thema::text_hell()),
-                    space::horizontal(),
-                    text(format!(
-                        "● {} Entwurf  ● {} in Arbeit  ● {} überarbeitet  ● {} fertig",
-                        zaehle(KapitelStatus::Entwurf),
-                        zaehle(KapitelStatus::InArbeit),
-                        zaehle(KapitelStatus::Ueberarbeitet),
-                        zaehle(KapitelStatus::Fertig)
-                    ))
-                    .size(10)
-                    .color(thema::text_gedimmt()),
-                ]
-                .align_y(Alignment::Center),
+                text(&t.titel).size(13).color(thema::text_hell()),
+                row![staende, space::horizontal(), text(format!("{anteil:.0} %")).size(11).color(thema::text_gedimmt())]
+                    .align_y(Alignment::Center),
                 progress_bar(0.0..=100.0, anteil).girth(4.0).style(progress_bar::primary),
             ]
-            .spacing(3),
+            .spacing(4),
         );
     }
 
@@ -210,7 +216,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     let code_anteil = code_woerter as f32 / (code_woerter + fliess_woerter).max(1) as f32 * 100.0;
     let buch = karte(
         column![
-            text("Buch").size(13).color(thema::text_hell()),
+            text("Buch").size(14).font(thema::fett()).color(thema::text_hell()),
             metrik("Wörter", projekt.gesamtwortzahl().to_string()),
             metrik("Zeichen", projekt.gesamtzeichenzahl().to_string()),
             metrik("Normseiten (1.800 Zeichen)", format!("{:.1}", projekt.normseiten())),
@@ -248,7 +254,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     }
     let text_karte = karte(
         column![
-            text("Textqualität").size(13).color(thema::text_hell()),
+            text("Textqualität").size(14).font(thema::fett()).color(thema::text_hell()),
             row![qualitaet("Offenes Kapitel", &a_kap), qualitaet("Ganzes Buch", &a_buch), floskel_liste.width(Fill)].spacing(20),
         ]
         .spacing(10),

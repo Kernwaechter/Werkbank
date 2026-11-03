@@ -336,10 +336,24 @@ pub fn ansicht<'a, Message: Clone + 'a>(
     cursor_zeile: usize,
     on_springe_zu_zeile: impl Fn(usize, usize) -> Message + Copy + 'a,
 ) -> Element<'a, Message> {
+    darstellen(inhalt, cursor_zeile, on_springe_zu_zeile, true)
+}
+
+/// Gesetzter Markdown-Text ohne Vorschau-Kopf, z. B. für das Handbuch (dort springt kein Klick in einen Editor).
+pub fn lesetext<'a, Message: Clone + 'a>(inhalt: &'a str, nichts: Message) -> Element<'a, Message> {
+    darstellen(inhalt, usize::MAX, move |_, _| nichts.clone(), false)
+}
+
+fn darstellen<'a, Message: Clone + 'a>(
+    inhalt: &'a str,
+    cursor_zeile: usize,
+    on_springe_zu_zeile: impl Fn(usize, usize) -> Message + Clone + 'a,
+    mit_kopf: bool,
+) -> Element<'a, Message> {
     let bloecke = parse_bloecke(inhalt);
 
     let kopf = row![
-        text("👁 LIVE-VORSCHAU").size(12).color(thema::akzent()),
+        thema::abschnitt_titel("Live-Vorschau"),
         text("•").size(10).color(thema::text_gedimmt()),
         text("Klick auf Text springt in den Editor")
             .size(11)
@@ -493,17 +507,18 @@ pub fn ansicht<'a, Message: Clone + 'a>(
 
     let zentrierter_vorschau_inhalt = container(spalte).max_width(Pixels(860.0)).width(Fill);
 
+    let mut gesamt = column![].height(Fill).width(Fill);
+    if mit_kopf {
+        gesamt = gesamt.push(kopf);
+    }
     container(
-        column![
-            kopf,
+        gesamt.push(
             container(scrollable(zentrierter_vorschau_inhalt).height(Fill))
                 .center_x(Fill)
                 .padding(Padding::from([10, 20]))
                 .height(Fill)
                 .width(Fill),
-        ]
-        .height(Fill)
-        .width(Fill),
+        ),
     )
     .style(thema::editor_bereich_stil)
     .width(Fill)

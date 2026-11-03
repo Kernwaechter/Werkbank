@@ -31,20 +31,32 @@ pub struct SatzVorschau {
 }
 
 pub fn ansicht<'a>(v: &'a SatzVorschau, pandoc_da: bool) -> Element<'a, Message> {
-    let kopf = row![
-        text("SATZVORSCHAU").size(11).color(thema::akzent()),
-        text(if v.quelle.is_empty() { "wird gesetzt …".to_string() } else { format!("{} · {} Seiten", v.quelle, v.seitenzahl) })
-            .size(11)
-            .color(thema::text_gedimmt()),
-        space::horizontal(),
-        text(if v.laeuft { "setze …" } else { "" }).size(11).color(thema::warnung_orange()),
-        button(text("Text-Vorschau").size(11))
-            .padding([2, 8])
-            .style(thema::sekundaer_knopf_stil)
-            .on_press(Message::VorschauText(true)),
+    // Zwei ruhige Zeilen statt einer gedrängten: oben Titel und Umschalter, darunter der Stand
+    let kopf = column![
+        row![
+            thema::abschnitt_titel("Satzvorschau"),
+            space::horizontal(),
+            crate::ui::navigation::tooltip_knopf(
+                button(text("Text").size(11).wrapping(iced::widget::text::Wrapping::None))
+                    .padding([2, 8])
+                    .style(thema::sekundaer_knopf_stil)
+                    .on_press(Message::VorschauText(true)),
+                "Zur schnellen Text-Vorschau wechseln",
+            ),
+        ]
+        .spacing(8)
+        .align_y(Alignment::Center),
+        text(if v.laeuft {
+            "setze …".to_string()
+        } else if v.quelle.is_empty() {
+            "wird gesetzt …".to_string()
+        } else {
+            format!("{} · {} Seiten", v.quelle, v.seitenzahl)
+        })
+        .size(11)
+        .color(if v.laeuft { thema::warnung_orange() } else { thema::text_gedimmt() }),
     ]
-    .spacing(10)
-    .align_y(Alignment::Center);
+    .spacing(4);
 
     let mut seiten = column![].spacing(14).width(Fill);
     if let Some(f) = &v.fehler {

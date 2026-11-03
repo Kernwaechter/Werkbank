@@ -1,9 +1,8 @@
 //! # Navigationsleiste der Werkbank
 //!
-//! Die zweizeilige Leiste am oberen Fensterrand organisiert das Programm übersichtlich:
-//! In der oberen Zeile befinden sich Logo, Buchauswahl, Öffnen, Speicherstatus und Lizenzhinweis;
-//! in der unteren Zeile der Wechsel zwischen den Kernbereichen (Schreiben, Bauen, Prüfen, Zahlen, Cover),
-//! die Befehlspalette (`Strg+K`) sowie die Ansichts-Schalter.
+//! Eine einzige, ruhige Zeile am oberen Fensterrand: links der Band (mit Öffnen), in der Mitte die
+//! Arbeitsbereiche als Segment-Schalter, rechts Speicherzustand, Suche (`Strg+K`) und – nur beim
+//! Schreiben – die Ansichts-Schalter. Was gerade nicht gebraucht wird, erscheint nicht.
 
 use crate::thema;
 use iced::widget::{column, container, pick_list, row, space, text, tooltip};
@@ -64,7 +63,8 @@ pub struct Aktionen<Message> {
     pub einstellungen: Message,
 }
 
-/// Erzeugt die obere Navigationsleiste.
+/// Erzeugt die obere Navigationsleiste: eine ruhige Zeile mit Band links, den Bereichen als
+/// Segment-Schalter in der Mitte und Suche, Speichern und Ansichts-Schaltern rechts.
 #[allow(clippy::too_many_arguments)]
 pub fn kopfleiste<'a, Message: Clone + 'a, Quelle: ToString + PartialEq + Clone + 'a>(
     aktiver_bereich: Arbeitsbereich,
@@ -78,159 +78,107 @@ pub fn kopfleiste<'a, Message: Clone + 'a, Quelle: ToString + PartialEq + Clone 
     aktionen: Aktionen<Message>,
     test_hinweis: Option<(String, Message)>,
 ) -> Element<'a, Message> {
-    // Logo und Buchauswahl links
+    let schreiben = aktiver_bereich == Arbeitsbereich::Schreiben;
+
+    // Links: Seitenleisten-Schalter (nur beim Schreiben), Band und Öffnen
     let wechsel = std::rc::Rc::new(on_buch_wechsel);
     let wechsel2 = wechsel.clone();
     let optionen = buecher.clone();
     let buch_auswahl = liste_mit_pfeilen(
         pick_list(buecher, Some(aktuelles_buch.clone()), move |b| wechsel(b))
-            .text_size(12)
-            .padding([4, 8])
-            .style(thema::auswahl_stil)
+            .text_size(13)
+            .padding([5, 10])
+            .style(thema::band_auswahl_stil)
             .menu_style(thema::auswahl_menue_stil),
         optionen,
         Some(aktuelles_buch),
         move |b| wechsel2(b),
     );
+    let mut links = row![].spacing(6).align_y(Alignment::Center);
+    if schreiben {
+        links = links.push(symbol_schalter("◧", ansicht.seitenleiste, "Bibliothek und Blattliste  ·  Strg+B", aktionen.seitenleiste));
+    }
+    links = links.push(buch_auswahl).push(tooltip_knopf(
+        button(text("Öffnen …").size(12))
+            .padding([5, 8])
+            .style(thema::symbol_knopf_stil(false))
+            .on_press(aktionen.oeffnen),
+        "Ordner mit Buchprojekt öffnen  ·  Strg+O",
+    ));
 
-    let logo_bereich = row![
-        text("WERKBANK").size(17).color(thema::akzent()),
-        buch_auswahl,
-        tooltip_knopf(
-            button(text("Öffnen …").size(12))
+    // Mitte: die Arbeitsbereiche als Segment-Schalter
+    let mut segmente = row![].spacing(2);
+    for b in [Arbeitsbereich::Schreiben, Arbeitsbereich::Bauen, Arbeitsbereich::Pruefen, Arbeitsbereich::Zahlen, Arbeitsbereich::Cover] {
+        segmente = segmente.push(
+            button(text(b.titel()).size(13).center())
+                .padding([4, 16])
+                .style(thema::segment_stil(b == aktiver_bereich))
+                .on_press(on_bereich_wechsel(b)),
+        );
+    }
+    let mitte = container(segmente).padding(2).style(thema::segment_rahmen_stil);
+
+    // Rechts: Hinweise, Speicherzustand, Suche, Ansichten, Einstellungen
+    let mut rechts = row![].spacing(6).align_y(Alignment::Center);
+    if let Some((beschriftung, nachricht)) = test_hinweis {
+        rechts = rechts.push(
+            button(text(beschriftung).size(11).color(thema::warnung_orange()))
                 .padding([4, 8])
                 .style(thema::symbol_knopf_stil(false))
-                .on_press(aktionen.oeffnen),
-            "Ordner mit Buchprojekt öffnen  ·  Strg+O",
-        ),
-    ]
-    .spacing(8)
-    .align_y(Alignment::Center);
-
-    // Haupt-Reiter in der Mitte
-    let tabs = row![
-        bereichs_tab(
-            Arbeitsbereich::Schreiben,
-            aktiver_bereich,
-            on_bereich_wechsel
-        ),
-        bereichs_tab(Arbeitsbereich::Bauen, aktiver_bereich, on_bereich_wechsel),
-        bereichs_tab(Arbeitsbereich::Pruefen, aktiver_bereich, on_bereich_wechsel),
-        bereichs_tab(Arbeitsbereich::Zahlen, aktiver_bereich, on_bereich_wechsel),
-        bereichs_tab(Arbeitsbereich::Cover, aktiver_bereich, on_bereich_wechsel),
-    ]
-    .spacing(4)
-    .align_y(Alignment::Center);
-
-    // Speichern: ein deutlicher Knopf, der immer da ist. Jedes Speichern legt die alte Fassung
-    // als nummerierte Sicherung ab; der Status daneben sagt, was zuletzt passiert ist.
-    let (speicher_text, speicher_farbe) = if ist_geaendert {
-        ("● Ungespeichert".to_string(), thema::warnung_orange())
-    } else if !speicher_zeitstempel.is_empty() {
-        (speicher_zeitstempel.to_string(), thema::erfolg_gruen())
-    } else {
-        ("Gespeichert".to_string(), thema::erfolg_gruen())
-    };
-
-    let status = text(speicher_text).size(11).color(speicher_farbe);
-    let speichern_knopf = tooltip_knopf(
-        button(text("Speichern").size(12))
-            .padding([5, 14])
-            .style(if ist_geaendert { thema::primaer_knopf_stil } else { thema::sekundaer_knopf_stil })
-            .on_press(aktionen.speichern),
-        "Speichern und die alte Fassung als nummerierte Sicherung ablegen  ·  Strg+S",
-    );
-
-    // Befehlspalette als Suchfeld: der schnellste Weg zu jeder Funktion
-    let palette = button(
-        row![
-            text("Befehl oder Kapitel suchen …").size(12),
-            space::horizontal(),
-            text("Strg+K").size(11),
-        ]
-        .align_y(Alignment::Center),
-    )
-    .padding([5, 10])
-    .width(250)
-    .style(thema::suchfeld_knopf_stil)
-    .on_press(aktionen.palette);
-
-    let schalter = row![
-        symbol_schalter(
-            "◧",
-            ansicht.seitenleiste,
-            "Seitenleisten  ·  Strg+B",
-            aktionen.seitenleiste
-        ),
-        symbol_schalter(
-            "◫",
-            ansicht.vorschau,
-            "Live-Vorschau  ·  Strg+P",
-            aktionen.vorschau
-        ),
-        symbol_schalter(
-            "◨",
-            ansicht.inspektor,
-            "Details  ·  Strg+I",
-            aktionen.inspektor
-        ),
-        symbol_schalter("◎", ansicht.fokus, "Fokus-Modus  ·  F11", aktionen.fokus),
-        symbol_schalter("⚙", false, "Einstellungen  ·  Strg+,", aktionen.einstellungen),
-    ]
-    .spacing(2)
-    .align_y(Alignment::Center);
-
-    // Obere Zeile (Zeile 1): Projekt- und Dateiebene
-    // Links: Logo ("WERKBANK"), Buchauswahl, Öffnen-Knopf
-    // Rechts: Testversionshinweis (falls vorhanden), Speicherstatus, Speichern-Knopf
-    let mut zeile1_rechts = row![].spacing(10).align_y(Alignment::Center);
-    if let Some((beschriftung, nachricht)) = test_hinweis {
-        zeile1_rechts = zeile1_rechts.push(
-            button(text(beschriftung).size(11).color(thema::warnung_orange()))
-                .padding([3, 8])
-                .style(thema::sekundaer_knopf_stil)
                 .on_press(nachricht),
         );
     }
-    let zeile1_rechts = zeile1_rechts.push(status).push(speichern_knopf);
+    // Speichern: bei Änderungen ein deutlicher Knopf, sonst nur ein leiser Zustand
+    let speichern: Element<'a, Message> = if ist_geaendert {
+        tooltip_knopf(
+            button(text("● Speichern").size(12))
+                .padding([5, 12])
+                .style(thema::primaer_knopf_stil)
+                .on_press(aktionen.speichern),
+            "Speichern und die alte Fassung als nummerierte Sicherung ablegen  ·  Strg+S",
+        )
+    } else {
+        let status = if speicher_zeitstempel.is_empty() { "Gespeichert" } else { speicher_zeitstempel };
+        tooltip_knopf(
+            button(text(status).size(11).color(thema::text_gedimmt()).wrapping(iced::widget::text::Wrapping::None))
+                .padding([5, 8])
+                .style(thema::symbol_knopf_stil(false))
+                .on_press(aktionen.speichern),
+            "Alles gespeichert. Klick speichert erneut  ·  Strg+S",
+        )
+    };
+    rechts = rechts.push(container(speichern).max_width(300));
+    rechts = rechts.push(tooltip_knopf(
+        button(
+            row![text("⌕").size(14), text("Suchen").size(12), space::horizontal().width(18), text("Strg+K").size(10)]
+                .spacing(6)
+                .align_y(Alignment::Center),
+        )
+        .padding([4, 10])
+        .style(thema::suchfeld_knopf_stil)
+        .on_press(aktionen.palette),
+        "Befehl, Kapitel oder Einstellung finden  ·  Strg+K",
+    ));
+    if schreiben {
+        rechts = rechts
+            .push(symbol_schalter("◫", ansicht.vorschau, "Live-Vorschau  ·  Strg+P", aktionen.vorschau))
+            .push(symbol_schalter("◨", ansicht.inspektor, "Inspektor  ·  Strg+I", aktionen.inspektor))
+            .push(symbol_schalter("◎", ansicht.fokus, "Fokus-Modus  ·  F11", aktionen.fokus));
+    }
+    rechts = rechts.push(symbol_schalter("⚙", false, "Einstellungen  ·  Strg+,", aktionen.einstellungen));
 
-    let zeile1 = row![
-        logo_bereich,
-        space::horizontal(),
-        zeile1_rechts,
+    let zeile = row![
+        container(links).width(Fill),
+        mitte,
+        container(rechts).width(Fill).align_x(iced::alignment::Horizontal::Right),
     ]
-    .align_y(Alignment::Center)
-    .width(Fill);
-
-    // Untere Zeile (Zeile 2): Arbeitsbereiche & Werkzeuge
-    // Links: Haupt-Reiter (Schreiben, Bauen, Prüfen, Zahlen, Cover)
-    // Rechts: Befehlspalette / Suchfeld (Strg+K) und Ansichtsschalter
-    let zeile2_rechts = row![
-        palette,
-        schalter,
-    ]
-    .spacing(8)
+    .spacing(12)
     .align_y(Alignment::Center);
 
-    let zeile2 = row![
-        tabs,
-        space::horizontal(),
-        zeile2_rechts,
+    column![
+        container(zeile).padding(Padding::from([7, 12])).width(Fill).style(thema::flaeche_stil),
+        thema::trennlinie(),
     ]
-    .align_y(Alignment::Center)
-    .width(Fill);
-
-    container(
-        column![
-            zeile1,
-            zeile2,
-        ]
-        .spacing(6)
-        .width(Fill),
-    )
-    .padding(Padding::from([6, 14]))
-    .style(thema::kopfleiste_stil)
-    .width(Fill)
     .into()
 }
 
@@ -264,18 +212,4 @@ pub fn tooltip_knopf<'a, Message: Clone + 'a>(
     )
     .gap(4)
     .into()
-}
-
-/// Hilfsfunktion zum Rendern eines einzelnen Tabs.
-fn bereichs_tab<'a, Message: Clone + 'a>(
-    bereich: Arbeitsbereich,
-    aktiver_bereich: Arbeitsbereich,
-    on_click: impl Fn(Arbeitsbereich) -> Message + 'a,
-) -> Element<'a, Message> {
-    let aktiv = bereich == aktiver_bereich;
-    button(text(bereich.titel()).size(13))
-        .padding([6, 14])
-        .style(thema::tab_knopf_stil(aktiv))
-        .on_press(on_click(bereich))
-        .into()
 }

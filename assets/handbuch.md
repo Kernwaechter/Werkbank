@@ -4,7 +4,7 @@ Die Werkbank ist ein Schreibwerkzeug für technische Bücher. Sie liest und schr
 
 ## Erste Schritte
 
-Starte die Werkbank und öffne mit `Strg+O` den Ordner deines Buches. Das kann ein einzelnes Buch sein, eine Reihe mit Unterordnern wie `Band 1`, `Band 2` oder ein einzelner Bandordner. Die Auswahlliste oben links wechselt zwischen den Bänden. Beim nächsten Start öffnet sich der zuletzt benutzte Ordner wieder.
+Starte die Werkbank und öffne mit `Strg+O` den Ordner deines Buches. Das kann ein einzelnes Buch sein, eine Reihe mit Unterordnern wie `Band 1`, `Band 2` oder ein einzelner Bandordner. Die Band-Auswahl oben links in der Kopfleiste wechselt zwischen den Bänden; in der Mitte der Kopfleiste wählst du den Bereich (Schreiben, Bauen, Prüfen, Zahlen, Cover). Beim nächsten Start öffnet sich der zuletzt benutzte Ordner wieder.
 
 Die Werkbank schreibt in deinen Ordner nur dann, wenn du etwas änderst. Alles, was sie selbst anlegt, liegt im Unterordner `.werkbank/` (Sicherungen, Statistik, Einstellungen des Bandes).
 
@@ -12,9 +12,9 @@ Die Werkbank schreibt in deinen Ordner nur dann, wenn du etwas änderst. Alles, 
 
 ## Schreiben
 
-Links stehen die Teile deines Buches, daneben die Kapitel des gewählten Teils, in der Mitte der Text. Rechts zeigen die Details Status, Wortziel, Zahlen, Gliederung, Notizen, Querverweise und Hinweise zur Sprache.
+Links stehen in der Bibliothek die Teile deines Buches, daneben die Kapitel des gewählten Teils mit einer kurzen Vorschau, ihrem Bearbeitungsstand und dem Wortziel, in der Mitte der Text. Rechts zeigt der Inspektor Wortziel, Stand, Zahlen, Gliederung, Notizen, Querverweise und Hinweise zur Sprache. Die Schalter oben rechts blenden Seitenleisten, Vorschau und Inspektor ein und aus.
 
-- **Speichern:** `Strg+S`. Außerdem speichert die Werkbank nach acht Sekunden Pause von selbst. Eine Datei wird nur geschrieben, wenn sich ihr Text wirklich geändert hat, und zwar atomar: Es entsteht nie eine halbe Datei.
+- **Speichern:** `Strg+S` oder der Knopf „● Speichern“ oben rechts, der erscheint, sobald es Ungespeichertes gibt. Außerdem speichert die Werkbank nach acht Sekunden Pause von selbst. Eine Datei wird nur geschrieben, wenn sich ihr Text wirklich geändert hat, und zwar atomar: Es entsteht nie eine halbe Datei.
 - **Sicherungen:** Vor dem Überschreiben legt die Werkbank einen Stand in `.werkbank/snapshots/` ab. Mit `Strg+H` holst du ein Kapitel aus einem früheren Stand zurück. Der aktuelle Stand bleibt dabei ebenfalls erhalten.
 - **Kapitel und Teile:** Neues Kapitel `Strg+Umschalt+N`, Umbenennen `F2`, Verschieben `Alt+Umschalt+↑/↓`. Löschen und Entfernen findest du in der Befehlspalette. Entfernte Teile landen im Papierkorb `.werkbank/papierkorb/`.
 - **Suchen und Ersetzen:** `Strg+F` im Kapitel, `Strg+Umschalt+F` in allen Bänden des Buchs, `F3` zum nächsten Treffer. Oben wählst du den Umfang (Kapitel, ganzer Band, alle Bände), dazu Groß-/Kleinschreibung, ganzes Wort und reguläre Ausdrücke (`$1` im Ersatz setzt Gruppen ein). Die Trefferliste zeigt jede Zeile vorher und nachher. „Alle ersetzen“ nennt zuerst die Anzahl und führt erst beim zweiten Klick aus. Die alte Fassung bleibt als nummerierte Sicherung erhalten.
@@ -24,31 +24,31 @@ Links stehen die Teile deines Buches, daneben die Kapitel des gewählten Teils, 
 
 ## Details, Tempo und Stil
 
-Rechts im Inspektor stehen vier Reiter:
+Oben im Inspektor wählst du eine von vier Ansichten:
 
-- **Details:** Wortziel, Bearbeitungsstand, Textzahlen, Querverweise.
+- **Details:** Wortziel (groß, mit Regler), Bearbeitungsstand (ein Klick auf Entwurf, In Arbeit, Überarbeitet oder Fertig), Textzahlen, Querverweise.
 - **Tempo:** Fortschritt zum Wortziel, **Schreibzeit und Tempo in diesem Kapitel** (netto, Pausen über fünf Minuten zählen nicht), geschätzte Zeit bis zum Ziel, Lesedauer und der **Satzrhythmus** als Säulendiagramm.
 - **Stil:** Ein Wert von 0 bis 100, **wie lebendig oder steril der Text klingt**: Satz- und Absatzrhythmus, Füllformeln, Verbindungswörter, Wortschatz, Satzanfänge, persönliche Stimme, Gedankenstriche, Dreierreihen. Schwache Merkmale kommen mit einem Rat zum Überarbeiten, gefundene Füllformeln lassen sich per Klick suchen. **Das ist kein KI-Detektor**, es gibt kein verlässliches Verfahren dafür; der Wert zeigt nur, wie abwechslungsreich und persönlich geschrieben wird.
 - **Text:** Gliederung, Notizen, Rechtschreibung, Sprachprüfung.
 
 ## Die Befehlspalette
 
-`Strg+K` öffnet ein Suchfeld für alle Funktionen, Kapitel, Überschriften und Bände. Tippe ein paar Buchstaben, wähle mit den Pfeiltasten und bestätige mit Enter. Hinter jedem Befehl steht sein Tastenkürzel.
+`Strg+K` oder „Suchen“ oben rechts öffnet ein Suchfeld für alle Funktionen, Kapitel, Überschriften, Bände und Einstellungsseiten (z. B. „Einstellungen: Editor“). Tippe ein paar Buchstaben, wähle mit den Pfeiltasten und bestätige mit Enter. Hinter jedem Befehl steht sein Tastenkürzel.
 
 ## Tastatur statt Maus
 
 - `F6` (und in Fenstern `Tab`) wandert über alle Knöpfe, Schalter, Regler und Felder; der grüne Rahmen zeigt, wo du bist. `Enter` oder die Leertaste betätigt, die Pfeiltasten stellen Regler und Listen ein.
-- Alle Kürzel lassen sich ändern: Einstellungen (`Strg+,` oder `F10`), Abschnitt „Tastenkürzel“, **Ändern**, gewünschte Tasten drücken. Hat ein anderer Befehl das Kürzel schon, verliert er es.
+- Alle Kürzel lassen sich ändern: Einstellungen (`Strg+,` oder `F10`), Seite „Tastenkürzel“, **Ändern**, gewünschte Tasten drücken. Hat ein anderer Befehl das Kürzel schon, verliert er es.
 
 ## Vorschau
 
-`Strg+P` zeigt das Kapitel **so, wie es gesetzt wird**: Markdown → Pandoc → Typst → Seiten (wie die Bauskripte), mit B5-Format, Libertinus und farbigem Code. Sie erneuert sich kurz nach dem Tippen. Ohne Pandoc setzt der eingebaute Übersetzer. Ob Pandoc und Ghostscript installiert sind, siehst du unter Einstellungen → Externe Werkzeuge; das Symbol ⓘ erklärt die Installation für Windows, macOS, Debian/Ubuntu, Fedora und Arch. „Text-Vorschau“ schaltet auf die schnelle Textdarstellung um.
+`Strg+P` zeigt das Kapitel **so, wie es gesetzt wird**: Markdown → Pandoc → Typst → Seiten (wie die Bauskripte), mit B5-Format, Libertinus und farbigem Code. Sie erneuert sich kurz nach dem Tippen. Ohne Pandoc setzt der eingebaute Übersetzer. Ob Pandoc und Ghostscript installiert sind, siehst du unter Einstellungen → Werkzeuge; das Symbol ⓘ erklärt die Installation für Windows, macOS, Debian/Ubuntu, Fedora und Arch. „Text-Vorschau“ schaltet auf die schnelle Textdarstellung um.
 
 ## Sprache prüfen
 
 Unbekannte Wörter markiert die Werkbank sofort rot und unterschlängelt, mit einem Hunspell-Wörterbuch auf deinem Rechner (ohne Internet). Ein Klick auf ein Wort in den Details merkt es als richtig, für den ganzen Band.
 
-Für Grammatik und Stil nutzt die Werkbank **LanguageTool**, das du selbst betreibst (Anleitung: Einstellungen, Symbol ⓘ). Code, Verweise und Adressen werden dabei nicht geprüft. `Strg+L` prüft das Kapitel; die Hinweise erscheinen orange im Text und in den Details.
+Für Grammatik und Stil nutzt die Werkbank **LanguageTool**, das du selbst betreibst (Anleitung: Einstellungen → Prüfung, Symbol ⓘ). Code, Verweise und Adressen werden dabei nicht geprüft. `Strg+L` prüft das Kapitel; die Hinweise erscheinen orange im Text und in den Details.
 
 ## Prüfen
 
@@ -91,10 +91,10 @@ Der Bereich **Cover** bietet eine Vorlage mit Titel, Untertitel, Bandzeile, Auto
 
 ## Lizenz
 
-Die Werkbank läuft 28 Tage lang mit vollem Funktionsumfang. Danach trägst du unter Einstellungen (Zahnrad oder `Strg+,`) im Abschnitt „Lizenz“ die E-Mail-Adresse deines Kaufs und den Lizenzschlüssel ein (oder wählst eine Lizenzdatei). Ohne Schlüssel bleibt nur „Speichern und beenden“, deine Dateien bleiben unverändert. Unter „Über die Werkbank“ siehst du den Lizenzstatus und die Lizenzen der verwendeten Bausteine.
+Die Werkbank läuft 28 Tage lang mit vollem Funktionsumfang. Danach trägst du unter Einstellungen (Zahnrad oder `Strg+,`) auf der Seite „Allgemein“ die E-Mail-Adresse deines Kaufs und den Lizenzschlüssel ein (oder wählst eine Lizenzdatei). Ohne Schlüssel bleibt nur „Speichern und beenden“, deine Dateien bleiben unverändert. Unter „Über die Werkbank“ siehst du den Lizenzstatus und die Lizenzen der verwendeten Bausteine.
 
 ## Hilfe bei Problemen
 
-- **Nichts wird markiert:** Ist unter Einstellungen → Rechtschreibung ein Wörterbuch geladen? Auf Linux hilft das Paket `hunspell-de-de`.
-- **LanguageTool nicht erreichbar:** Einstellungen → Sprachprüfung → Verbindung testen; die Anleitung steht hinter dem Symbol ⓘ.
+- **Nichts wird markiert:** Ist unter Einstellungen → Prüfung ein Wörterbuch geladen? Auf Linux hilft das Paket `hunspell-de-de`.
+- **LanguageTool nicht erreichbar:** Einstellungen → Prüfung → Verbindung testen; die Anleitung steht hinter dem Symbol ⓘ.
 - **Eine Datei hat sich unerwartet geändert:** Öffne den Verlauf (`Strg+H`) oder sieh in `.werkbank/snapshots/` nach.

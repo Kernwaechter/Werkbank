@@ -310,6 +310,22 @@ pub fn primaer_knopf_stil(_theme: &Theme, status: button::Status) -> button::Sty
     }
 }
 
+/// Knopf für zerstörerische Aktionen (Löschen, Verwerfen): rote Schrift auf neutraler Fläche,
+/// beim Überfahren rot gefüllt.
+pub fn gefahr_knopf_stil(_theme: &Theme, status: button::Status) -> button::Style {
+    let rot = fehler_rot();
+    let (bg, schrift) = match status {
+        button::Status::Hovered | button::Status::Pressed => (Color { a: 0.85, ..rot }, auf_akzent()),
+        _ => (knopf_flaeche(), rot),
+    };
+    button::Style {
+        background: Some(Background::Color(bg)),
+        text_color: schrift,
+        border: Border { color: Color { a: 0.6, ..rot }, width: 1.0, radius: 6.0.into() },
+        ..Default::default()
+    }
+}
+
 /// Stil für Navigations-Tabs oben.
 pub fn tab_knopf_stil(aktiv: bool) -> impl Fn(&Theme, button::Status) -> button::Style {
     move |_theme, status| {
@@ -360,7 +376,7 @@ pub fn infobox_stil(_theme: &Theme) -> container::Style {
     container::Style {
         background: Some(Background::Color(karte_hintergrund())),
         border: Border {
-            color: rahmen_farbe(),
+            color: linie_farbe(),
             width: 1.0,
             radius: 10.0.into(),
         },
@@ -560,6 +576,21 @@ pub fn auswahl_stil(_theme: &Theme, status: pick_list::Status) -> pick_list::Sty
     }
 }
 
+/// Band-Auswahl in der Kopfleiste: flach wie ein Titel, Rahmen erst beim Überfahren.
+pub fn band_auswahl_stil(_theme: &Theme, status: pick_list::Status) -> pick_list::Style {
+    let (bg, rahmen) = match status {
+        pick_list::Status::Hovered | pick_list::Status::Opened { .. } => (hover_flaeche(), linie_farbe()),
+        pick_list::Status::Active => (Color::TRANSPARENT, Color::TRANSPARENT),
+    };
+    pick_list::Style {
+        text_color: text_hell(),
+        placeholder_color: text_gedimmt(),
+        handle_color: text_gedimmt(),
+        background: Background::Color(bg),
+        border: Border { color: rahmen, width: 1.0, radius: 6.0.into() },
+    }
+}
+
 /// Aufklappmenü der Auswahlliste.
 pub fn auswahl_menue_stil(_theme: &Theme) -> menu::Style {
     menu::Style {
@@ -605,6 +636,189 @@ pub fn regler_stil(_theme: &Theme, status: slider::Status) -> slider::Style {
 }
 
 
+// ---------------------------------------------------------------- Bausteine der ruhigen Oberfläche
+//
+// Angelehnt an reduzierte Schreibprogramme: flache Listen statt Karten, Auswahl als weiche Fläche,
+// Segment-Schalter statt Reitern, Dialoge mit Titel, Erklärung und Knopfleiste rechts unten.
+
+/// Fette Variante der Oberflächenschrift (Titel in Listen und Köpfen).
+pub fn fett() -> iced::Font {
+    iced::Font { weight: iced::font::Weight::Semibold, ..iced::Font::DEFAULT }
+}
+
+/// Zahl mit schmalem Tausenderabstand, z. B. `54 756`.
+pub fn tausender(n: usize) -> String {
+    let s = n.to_string();
+    let mut aus = String::new();
+    for (i, c) in s.chars().enumerate() {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
+            aus.push('\u{202F}');
+        }
+        aus.push(c);
+    }
+    aus
+}
+
+/// Weiche Trennlinie (halbtransparent, damit sie auf jeder Fläche gleich zurückhaltend wirkt).
+pub fn linie_farbe() -> Color {
+    let c = rahmen_farbe();
+    Color { a: 0.55, ..c }
+}
+
+/// Eine 1 px hohe Trennlinie über die volle Breite.
+pub fn trennlinie<'a, M: 'a>() -> iced::Element<'a, M> {
+    container(iced::widget::space().height(1).width(iced::Fill))
+        .style(|_| container::Style { background: Some(Background::Color(linie_farbe())), ..Default::default() })
+        .into()
+}
+
+/// Eine 1 px breite senkrechte Trennlinie über die volle Höhe.
+pub fn trennlinie_senkrecht<'a, M: 'a>() -> iced::Element<'a, M> {
+    container(iced::widget::space().width(1).height(iced::Fill))
+        .style(|_| container::Style { background: Some(Background::Color(linie_farbe())), ..Default::default() })
+        .into()
+}
+
+/// Kleine Abschnittsüberschrift in Versalien (z. B. „TEILE“, „ZIEL“).
+pub fn abschnitt_titel<'a, M: 'a>(titel: &str) -> iced::Element<'a, M> {
+    iced::widget::text(titel.to_uppercase()).size(10).color(text_gedimmt()).into()
+}
+
+/// Bibliothek (linke Spalte): eine Spur dunkler als die Blattliste, wie ein Regal hinter dem Pult.
+pub fn bibliothek_hintergrund() -> Color {
+    waehle(rgb(33, 38, 45), rgb(236, 235, 230))
+}
+
+/// Flächenstil der Bibliothek.
+pub fn bibliothek_stil(_theme: &Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(bibliothek_hintergrund())),
+        text_color: Some(text_hell()),
+        ..Default::default()
+    }
+}
+
+/// Flächenstil von Blattliste, Inspektor und Kopfleiste (ohne Rahmen; Trennung über Linien).
+pub fn flaeche_stil(_theme: &Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(panel_hintergrund())),
+        text_color: Some(text_hell()),
+        ..Default::default()
+    }
+}
+
+/// Eintrag einer flachen Liste (Bibliothek, Blattliste): Auswahl als weiche Akzentfläche, kein Rahmen.
+pub fn listen_eintrag_stil(aktiv: bool) -> impl Fn(&Theme, button::Status) -> button::Style {
+    move |_theme, status| {
+        let bg = match (aktiv, status) {
+            (true, _) => akzent_flaeche(),
+            (false, button::Status::Hovered) => hover_flaeche(),
+            (false, button::Status::Pressed) => gedrueckt_flaeche(),
+            _ => Color::TRANSPARENT,
+        };
+        button::Style {
+            background: Some(Background::Color(bg)),
+            text_color: text_hell(),
+            border: Border { color: Color::TRANSPARENT, width: 0.0, radius: 7.0.into() },
+            ..Default::default()
+        }
+    }
+}
+
+/// Rahmen eines Segment-Schalters (Gruppe gleichwertiger Ansichten).
+pub fn segment_rahmen_stil(_theme: &Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(code_hintergrund())),
+        border: Border { color: linie_farbe(), width: 1.0, radius: 8.0.into() },
+        ..Default::default()
+    }
+}
+
+/// Ein Feld des Segment-Schalters; das aktive hebt sich als erhabene Fläche ab.
+pub fn segment_stil(aktiv: bool) -> impl Fn(&Theme, button::Status) -> button::Style {
+    move |_theme, status| {
+        let bg = match (aktiv, status) {
+            (true, _) => karte_hover(),
+            (false, button::Status::Hovered) => hover_flaeche(),
+            _ => Color::TRANSPARENT,
+        };
+        button::Style {
+            background: Some(Background::Color(bg)),
+            text_color: if aktiv { text_hell() } else { text_gedimmt() },
+            border: Border { color: Color::TRANSPARENT, width: 0.0, radius: 6.0.into() },
+            shadow: if aktiv {
+                Shadow { color: Color::from_rgba8(0, 0, 0, 0.25), offset: iced::Vector::new(0.0, 1.0), blur_radius: 2.0 }
+            } else {
+                Shadow::default()
+            },
+            ..Default::default()
+        }
+    }
+}
+
+/// Farbe eines Bearbeitungsstands (Entwurf grau, in Arbeit orange, überarbeitet Akzent, fertig grün).
+pub fn status_farbe(status: werkbank_kern::KapitelStatus) -> Color {
+    use werkbank_kern::KapitelStatus as S;
+    match status {
+        S::Entwurf => text_gedimmt(),
+        S::InArbeit => warnung_orange(),
+        S::Ueberarbeitet => akzent(),
+        S::Fertig => erfolg_gruen(),
+    }
+}
+
+/// Kleine Marke (Pille) in einer Signalfarbe, z. B. für den Bearbeitungsstand.
+pub fn marke_stil(farbe: Color) -> impl Fn(&Theme) -> container::Style {
+    move |_| container::Style {
+        background: Some(Background::Color(Color { a: 0.16, ..farbe })),
+        border: Border { color: Color::TRANSPARENT, width: 0.0, radius: 9.0.into() },
+        text_color: Some(farbe),
+        ..Default::default()
+    }
+}
+
+/// Schreibfläche ohne Rahmen: der Text steht frei auf dem Pult.
+pub fn schreibflaeche_stil(_theme: &Theme, status: crate::editor::Status) -> crate::editor::Style {
+    let _ = status;
+    crate::editor::Style {
+        background: Background::Color(Color::TRANSPARENT),
+        border: Border { color: Color::TRANSPARENT, width: 0.0, radius: 0.0.into() },
+        placeholder: text_gedimmt(),
+        value: text_hell(),
+        selection: Color { a: 0.45, ..akzent_fuell() },
+    }
+}
+
+/// Schwebender Dialog: weich gerundet, mit tiefem Schatten.
+pub fn dialog_stil(_theme: &Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(panel_hintergrund())),
+        border: Border { color: linie_farbe(), width: 1.0, radius: 14.0.into() },
+        shadow: Shadow { color: Color::from_rgba8(0, 0, 0, 0.55), offset: iced::Vector::new(0.0, 12.0), blur_radius: 40.0 },
+        text_color: Some(text_hell()),
+        ..Default::default()
+    }
+}
+
+/// Fußleiste eines Dialogs (eine Spur abgesetzt, Knöpfe rechts).
+pub fn dialog_fuss_stil(_theme: &Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(bibliothek_hintergrund())),
+        border: Border { color: Color::TRANSPARENT, width: 0.0, radius: Radius { top_left: 0.0, top_right: 0.0, bottom_right: 14.0, bottom_left: 14.0 } },
+        ..Default::default()
+    }
+}
+
+/// Gruppe zusammengehöriger Einstellungen (wie eine Tafel mit abgerundeten Ecken).
+pub fn gruppe_stil(_theme: &Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(karte_hintergrund())),
+        border: Border { color: linie_farbe(), width: 1.0, radius: 10.0.into() },
+        text_color: Some(text_hell()),
+        ..Default::default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -635,11 +849,12 @@ mod tests {
             let flaechen = [
                 ("Schreibbereich", dunkel_hintergrund()),
                 ("Seitenleiste", panel_hintergrund()),
+                ("Bibliothek", bibliothek_hintergrund()),
                 ("Karte", karte_hintergrund()),
                 ("aktive Karte", karte_aktiv()),
             ];
             for (name, f) in flaechen {
-                let mindest = if name == "Schreibbereich" || name == "Seitenleiste" { 10.0 } else { 7.0 };
+                let mindest = if matches!(name, "Schreibbereich" | "Seitenleiste" | "Bibliothek") { 10.0 } else { 7.0 };
                 assert!(kontrast(text_hell(), f) >= mindest, "{modus}: Haupttext auf {name}: {:.1}", kontrast(text_hell(), f));
                 assert!(kontrast(text_gedimmt(), f) >= 4.5, "{modus}: Sekundärtext auf {name}: {:.1}", kontrast(text_gedimmt(), f));
                 assert!(kontrast(akzent(), f) >= 4.5, "{modus}: Akzent auf {name}: {:.1}", kontrast(akzent(), f));
@@ -660,7 +875,7 @@ mod tests {
         // Hintergründe bleiben nahezu neutral (Abstand der Kanäle gering): kein „Bonbon“-Farbton
         for hell in [false, true] {
             hell_setzen(hell);
-            for f in [dunkel_hintergrund(), panel_hintergrund(), karte_hintergrund(), rahmen_farbe(), code_hintergrund()] {
+            for f in [dunkel_hintergrund(), panel_hintergrund(), bibliothek_hintergrund(), karte_hintergrund(), rahmen_farbe(), code_hintergrund()] {
                 let spanne = f.r.max(f.g).max(f.b) - f.r.min(f.g).min(f.b);
                 // Schiefergrau darf leicht ins Blaue gehen, nie aber ins Grüne
                 assert!(spanne < 0.10, "Fläche zu bunt: {f:?}");

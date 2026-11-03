@@ -27,7 +27,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
 }
 
 fn abschnitt<'a>(titel: &'a str, inhalt: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
-    column![text(titel).size(12).color(thema::text_gedimmt()), inhalt.into()].spacing(6).into()
+    column![thema::abschnitt_titel(titel), inhalt.into()].spacing(8).into()
 }
 
 fn zeile<'a>(name: &'a str, wert: String) -> Element<'a, Message> {
@@ -217,7 +217,7 @@ fn text_tab<'a>(state: &'a AppState, k: &'a Kapitel) -> Element<'a, Message> {
     let mut spalte = column![].spacing(12).width(Fill);
 
     // Gliederung
-    let mut gliederung = column![text("Gliederung").size(12).color(thema::text_gedimmt())].spacing(1);
+    let mut gliederung = column![thema::abschnitt_titel("Gliederung")].spacing(2);
     let ueberschriften = markdown::ueberschriften(&k.inhalt);
     if ueberschriften.is_empty() {
         gliederung = gliederung.push(text("Keine Überschriften").size(11).color(thema::text_gedimmt()));
@@ -238,7 +238,7 @@ fn text_tab<'a>(state: &'a AppState, k: &'a Kapitel) -> Element<'a, Message> {
     // Notizen
     spalte = spalte.push(
         column![
-            text("Notizen zum Kapitel").size(12).color(thema::text_gedimmt()),
+            thema::abschnitt_titel("Notizen zum Kapitel"),
             container(
                 text_editor::TextEditor::new(&state.notizen_content)
                     .placeholder("Schreibabsicht, offene Punkte …")
@@ -257,7 +257,7 @@ fn text_tab<'a>(state: &'a AppState, k: &'a Kapitel) -> Element<'a, Message> {
     {
         let eigene: std::collections::HashSet<String> = state.ausnahmen.woerter.iter().cloned().collect();
         let unbekannt = crate::rechtschreibung::unbekannte_woerter(wb, &k.inhalt, &eigene);
-        let mut box_ = column![text(format!("Rechtschreibung ({} unbekannte Wörter)", unbekannt.len())).size(12).color(thema::text_gedimmt())].spacing(2);
+        let mut box_ = column![thema::abschnitt_titel(&format!("Rechtschreibung · {} unbekannt", unbekannt.len()))].spacing(2);
         if unbekannt.is_empty() {
             box_ = box_.push(text("Alles bekannt.").size(11).color(thema::erfolg_gruen()));
         }

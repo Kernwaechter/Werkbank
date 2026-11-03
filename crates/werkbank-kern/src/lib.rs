@@ -131,13 +131,26 @@ impl Kapitel {
 
     /// Liefert die ersten Zeichen als Vorschautext für die Blattliste.
     pub fn vorschautext(&self, max_zeichen: usize) -> String {
-        let flach: String = self
-            .inhalt
-            .lines()
-            .filter(|zeile| !zeile.starts_with('#') && !zeile.trim().is_empty())
-            .collect::<Vec<_>>()
-            .join(" ");
-
+        let mut teile: Vec<String> = Vec::new();
+        let mut im_code = false;
+        for zeile in self.inhalt.lines() {
+            let t = zeile.trim();
+            if t.starts_with("```") || t.starts_with("~~~") {
+                im_code = !im_code;
+                continue;
+            }
+            if im_code || t.is_empty() || t.starts_with('#') || t.starts_with('|') || t.starts_with("---") {
+                continue;
+            }
+            let rein = lesetext(t);
+            if !rein.is_empty() {
+                teile.push(rein);
+            }
+            if teile.iter().map(|s| s.chars().count()).sum::<usize>() > max_zeichen {
+                break;
+            }
+        }
+        let flach = teile.join(" ");
         if flach.chars().count() <= max_zeichen {
             flach
         } else {
@@ -425,9 +438,75 @@ impl Projekt {
     }
 }
 
+/// Macht aus einer Markdown-Zeile lesbaren Text für Vorschauen: ohne HTML-Tags, Auszeichnungen,
+/// Listenzeichen, Zitatzeichen und Link-Ziele (`[Text](url)` → `Text`).
+pub fn lesetext(zeile: &str) -> String {
+    let mut t = zeile.trim_start();
+    for p in ["> ", ">", "- ", "* ", "+ "] {
+        if let Some(r) = t.strip_prefix(p) {
+            t = r.trim_start();
+        }
+    }
+    // Nummerierte Listen: „1. “
+    if let Some(pos) = t.find(". ")
+        && pos > 0
+        && pos <= 3
+        && t[..pos].chars().all(|c| c.is_ascii_digit())
+    {
+        t = &t[pos + 2..];
+    }
+    let mut aus = String::with_capacity(t.len());
+    let zeichen: Vec<char> = t.chars().collect();
+    let mut i = 0;
+    while i < zeichen.len() {
+        let c = zeichen[i];
+        match c {
+            // HTML-Tags überspringen
+            '<' => {
+                if let Some(ende) = zeichen[i..].iter().position(|&z| z == '>') {
+                    i += ende + 1;
+                    continue;
+                }
+                aus.push(c);
+            }
+            // Bilder ganz weglassen, Links auf ihren Text kürzen
+            '!' if zeichen.get(i + 1) == Some(&'[') => {
+                if let Some(ende) = zeichen[i..].iter().position(|&z| z == ')') {
+                    i += ende + 1;
+                    continue;
+                }
+            }
+            ']' if zeichen.get(i + 1) == Some(&'(') => {
+                if let Some(ende) = zeichen[i..].iter().position(|&z| z == ')') {
+                    i += ende + 1;
+                    continue;
+                }
+            }
+            '*' | '_' | '`' | '[' | ']' | '~' => {}
+            _ => aus.push(c),
+        }
+        i += 1;
+    }
+    let aus = aus.split_whitespace().collect::<Vec<_>>().join(" ");
+    // Leerzeichen vor Satzzeichen, die durch weggelassene Bilder entstehen
+    aus.replace(" .", ".").replace(" ,", ",").replace(" :", ":")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn vorschau_ohne_auszeichnungen() {
+        let k = Kapitel::neu(
+            "k",
+            "K",
+            "k.md",
+            "## Titel\n\n**Volker Dähn** </div> <div class=\"x\">\n\n```dart\nfinal x = 1;\n```\n\n- Ein `Text`-Widget mit [Link](https://x.de) und ![Bild](a.png).\n",
+        );
+        assert_eq!(k.vorschautext(200), "Volker Dähn Ein Text-Widget mit Link und.");
+        assert_eq!(lesetext("1. Schritt *eins*"), "Schritt eins");
+    }
 
     #[test]
     fn test_kapitel_wortzaehlung() {

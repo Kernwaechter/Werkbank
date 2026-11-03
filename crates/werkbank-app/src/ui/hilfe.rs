@@ -19,12 +19,12 @@ pub fn handbuch() -> Element<'static, Message> {
     fenster(
         column![
             row![
-                text("Handbuch").size(16).color(thema::text_hell()),
+                text("Handbuch").size(18).font(thema::fett()).color(thema::text_hell()),
                 space::horizontal(),
                 text("Esc schließt").size(11).color(thema::text_gedimmt()),
             ]
             .align_y(Alignment::Center),
-            container(crate::ui::vorschau::ansicht(HANDBUCH, usize::MAX, |_, _| Message::Nichts))
+            container(crate::ui::vorschau::lesetext(HANDBUCH, Message::Nichts))
                 .height(Length::Fixed(620.0))
                 .width(Fill),
         ]
@@ -117,7 +117,7 @@ pub fn ueber<'a>(status: &'a LizenzStatus, email: &'a str, schluessel: &'a str, 
 pub fn gesperrt<'a>(email: &'a str, schluessel: &'a str, meldung: Option<&'a str>, ungespeichert: bool) -> Element<'a, Message> {
     let box_ = container(
         column![
-            text("Die Testzeit ist abgelaufen").size(20).color(thema::text_hell()),
+            text("Die Testzeit ist abgelaufen").size(22).font(thema::fett()).color(thema::text_hell()),
             text("Du hast die Werkbank vier Wochen lang ausprobiert. Mit einem Lizenzschlüssel arbeitest du ohne Einschränkung weiter. Deine Texte bleiben unverändert auf deinem Rechner.")
                 .size(13)
                 .color(thema::text_gedimmt()),

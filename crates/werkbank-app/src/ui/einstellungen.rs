@@ -1,8 +1,8 @@
 //! # Einstellungen
 //!
-//! Schwebendes Fenster (`Strg+,`) zur Verwaltung der Sprachprüfung:
-//! Server-Adresse, lokaler LanguageTool-Server, Ausnahmen und – über das
-//! Info-Symbol – eine Installationsanleitung für Linux, Windows und macOS.
+//! Schwebendes Fenster (`Strg+,`) mit fünf Seiten: Allgemein (Lizenz, Speichern, Pensum),
+//! Editor (Darstellung), Prüfung (Rechtschreibung, LanguageTool, Ausnahmen – mit
+//! Installationsanleitung über das Info-Symbol), Werkzeuge und Tastenkürzel.
 
 use crate::Message;
 use crate::einstellungen::{Einstellungen, SPRACHEN};
@@ -55,9 +55,20 @@ pub struct Fenster {
     pub info_offen: bool,
     /// Welches System die Anleitung zeigt.
     pub system: Betriebssystem,
-    /// Installationshinweise für ein Werkzeug: 0 = keine, 1 = Pandoc, 2 = Ghostscript.
+    /// Installationshinweise für ein Werkzeug: 0 = keine, 1 = Pandoc, 2 = Ghostscript, 3 = Rust, 4 = Dart/Flutter.
     pub werkzeug_info: u8,
+    /// Gewählte Seite (siehe [`SEITEN`]).
+    pub seite: u8,
 }
+
+/// Seiten des Einstellungsfensters: (Titel, Kurzbeschreibung für die Befehlssuche).
+pub const SEITEN: [(&str, &str); 5] = [
+    ("Allgemein", "Lizenz, automatisch speichern, Tagespensum"),
+    ("Editor", "Design, Schrift, Zeilenabstand, Spaltenbreite"),
+    ("Prüfung", "Rechtschreibung, LanguageTool, Ausnahmen"),
+    ("Werkzeuge", "Pandoc, Ghostscript, Rust, Dart/Flutter"),
+    ("Tastenkürzel", "Kürzel ändern und zurücksetzen"),
+];
 
 impl Default for Fenster {
     fn default() -> Self {
@@ -65,6 +76,7 @@ impl Default for Fenster {
             info_offen: false,
             system: Betriebssystem::aktuell(),
             werkzeug_info: 0,
+            seite: 0,
         }
     }
 }
@@ -169,7 +181,12 @@ fn schriftart_kennung(name: &str) -> &'static str {
 }
 
 fn abschnitt<'a>(titel: &'a str) -> Element<'a, Message> {
-    text(titel).size(12).color(thema::text_gedimmt()).into()
+    thema::abschnitt_titel(titel)
+}
+
+/// Eine Tafel zusammengehöriger Einstellungen.
+fn tafel<'a>(inhalt: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
+    container(inhalt).padding(16).width(Fill).style(thema::gruppe_stil).into()
 }
 
 fn beschriftet<'a>(
@@ -193,7 +210,7 @@ pub struct LizenzFelder<'a> {
 fn lizenz_abschnitt<'a>(l: LizenzFelder<'a>) -> Element<'a, Message> {
     use werkbank_kern::lizenz::LizenzStatus;
     let (status_text, farbe) = crate::ui::hilfe::status_text(l.status);
-    let mut spalte = column![text("Lizenz").size(14).color(thema::text_hell()), text(status_text).size(12).color(farbe)].spacing(8);
+    let mut spalte = column![abschnitt("Lizenz"), text(status_text).size(13).color(farbe)].spacing(8);
     if matches!(l.status, LizenzStatus::Gueltig { .. } | LizenzStatus::NichtEingerichtet) {
         if let Some(m) = l.meldung {
             spalte = spalte.push(text(m).size(12).color(thema::text_gedimmt()));
@@ -240,14 +257,29 @@ pub fn ansicht<'a>(
     lizenz: LizenzFelder<'a>,
 ) -> Element<'a, Message> {
     let titelzeile = row![
-        text("Einstellungen").size(18).color(thema::text_hell()),
+        text("Einstellungen").size(18).font(thema::fett()).color(thema::text_hell()),
         space::horizontal(),
-        button(text("Schließen  Esc").size(11))
-            .padding([3, 8])
-            .style(thema::sekundaer_knopf_stil)
-            .on_press(Message::EinstellungenSchliessen),
+        crate::ui::navigation::tooltip_knopf(
+            button(text("✕").size(13))
+                .padding([3, 9])
+                .style(thema::symbol_knopf_stil(false))
+                .on_press(Message::EinstellungenSchliessen),
+            "Schließen  ·  Esc",
+        ),
     ]
     .align_y(Alignment::Center);
+
+    let mut seiten = row![].spacing(2);
+    for (nr, (name, _)) in SEITEN.iter().enumerate() {
+        let nr = nr as u8;
+        seiten = seiten.push(
+            button(text(*name).size(13).center())
+                .padding([5, 14])
+                .style(thema::segment_stil(fenster.seite == nr))
+                .on_press(Message::EinstellungenSeite(nr)),
+        );
+    }
+    let seiten = container(container(seiten).padding(2).style(thema::segment_rahmen_stil)).center_x(Fill);
 
     let (status_text, status_farbe) = match status {
         ServerStatus::Unbekannt => ("● Noch nicht geprüft".to_string(), thema::text_gedimmt()),
@@ -258,7 +290,7 @@ pub fn ansicht<'a>(
     };
 
     let ueberschrift = row![
-        text("Sprachprüfung (LanguageTool)").size(14).color(thema::text_hell()),
+        abschnitt("Sprachprüfung (LanguageTool)"),
         crate::ui::navigation::tooltip_knopf(
             button(text("ⓘ").size(15))
                 .padding([0, 6])
@@ -613,19 +645,45 @@ pub fn ansicht<'a>(
         ausnahmen_spalte = ausnahmen_spalte.push(beschriftet("Eigene Wörter", chips.wrap()));
     }
 
-    let mut inhalt = column![titelzeile, lizenz_abschnitt(lizenz), darstellung, editor, werkzeug_spalte, tasten, rechtschreibung, ueberschrift, allgemein, verbindung, lokal, ausnahmen_spalte]
-        .spacing(16)
-        .width(Fill);
-
-    if fenster.info_offen {
-        inhalt = inhalt.push(info_panel(fenster.system));
+    // Seiteninhalt: jede Seite zeigt nur ihre Tafeln
+    let mut seite = column![].spacing(14).width(Fill);
+    match fenster.seite {
+        1 => seite = seite.push(tafel(darstellung)),
+        2 => {
+            seite = seite
+                .push(tafel(rechtschreibung))
+                .push(tafel(column![ueberschrift, allgemein].spacing(8)))
+                .push(tafel(verbindung))
+                .push(tafel(lokal));
+            if fenster.info_offen {
+                seite = seite.push(info_panel(fenster.system));
+            }
+            seite = seite.push(tafel(ausnahmen_spalte));
+        }
+        3 => seite = seite.push(tafel(werkzeug_spalte)),
+        4 => seite = seite.push(tafel(tasten)),
+        _ => seite = seite.push(tafel(lizenz_abschnitt(lizenz))).push(tafel(editor)),
     }
 
-    let box_ = container(scrollable(container(inhalt).padding(Padding::ZERO.right(14))).height(iced::Length::Shrink))
-        .padding(18)
-        .max_width(700)
-        .max_height(760)
-        .style(thema::palette_box_stil);
+    let fuss = row![
+        text("Änderungen gelten sofort · Esc schließt").size(11).color(thema::text_gedimmt()),
+        space::horizontal(),
+        button(text("Fertig").size(13)).padding([6, 18]).style(thema::primaer_knopf_stil).on_press(Message::EinstellungenSchliessen),
+    ]
+    .align_y(Alignment::Center);
+
+    let box_ = container(
+        column![
+            container(column![titelzeile, seiten].spacing(14)).padding(Padding::from([18, 22]).bottom(10)),
+            container(scrollable(container(seite).padding(Padding::from([4, 22]).right(26))).height(Fill)).height(Fill),
+            container(fuss).padding([12, 16]).width(Fill).style(thema::dialog_fuss_stil),
+        ]
+        .height(Fill),
+    )
+    .max_width(720)
+    .max_height(700)
+    .height(Fill)
+    .style(thema::dialog_stil);
 
     mouse_area(
         container(opaque(box_))

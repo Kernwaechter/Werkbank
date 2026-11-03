@@ -52,7 +52,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     let seiten = projekt.buchseiten_schaetzung() as u32;
 
     let kopf = column![
-        text("Verlags- und Build-Pipeline").size(20).color(thema::text_hell()),
+        text("Verlags- und Build-Pipeline").size(22).font(thema::fett()).color(thema::text_hell()),
         text("Die vorhandenen Bauskripte des Bandes laufen im Hintergrund; Ausgabe und Ergebnis erscheinen hier.")
             .size(13)
             .color(thema::text_gedimmt()),
@@ -65,7 +65,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
         let (ub, uh) = p.umschlag_mm(seiten);
         portale = portale.push(karte(
             column![
-                text(&p.name).size(15).color(thema::text_hell()),
+                text(&p.name).size(14).font(thema::fett()).color(thema::text_hell()),
                 text(&p.beschreibung).size(12).color(thema::text_gedimmt()),
                 text(format!(
                     "Druck {:.0} × {:.0} mm · Cover E-Book {} × {} px",
@@ -91,7 +91,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
         let pfad = crate::bau::programm_finden(name);
         (name, pfad.is_some(), pfad.map_or("nicht gefunden".to_string(), |p| p.display().to_string()))
     };
-    let mut werkzeuge = column![text("Voraussetzungen").size(13).color(thema::text_hell())].spacing(4);
+    let mut werkzeuge = column![text("Voraussetzungen").size(14).font(thema::fett()).color(thema::text_hell())].spacing(4);
     for (n, ok, pfad) in [werkzeug("python3"), werkzeug("typst"), werkzeug("pandoc")] {
         werkzeuge = werkzeuge.push(punkt(n, pfad, ok));
     }
@@ -99,7 +99,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     // Befehle
     let mut befehle = column![
         row![
-            text("Bauen").size(15).color(thema::text_hell()),
+            text("Bauen").size(14).font(thema::fett()).color(thema::text_hell()),
             space::horizontal(),
             if bau.laeuft.is_some() {
                 button(text("Abbrechen").size(12)).padding([6, 14]).style(thema::sekundaer_knopf_stil).on_press(Message::BauAbbrechen)
@@ -138,7 +138,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     // Nativer Satz
     let mut satz = column![
         row![
-            text("Nativer Satz (Typst und EPUB, ohne Skripte)").size(13).color(thema::text_hell()),
+            text("Nativer Satz (Typst und EPUB, ohne Skripte)").size(14).font(thema::fett()).color(thema::text_hell()),
             space::horizontal(),
             button(text(if bau.satz_laeuft { "Setze …" } else { "Buch nativ setzen" }).size(12))
                 .padding([6, 14])
@@ -221,7 +221,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
         log = log.push(text(z).size(11).font(Font::MONOSPACE));
     }
     let ausgabe = column![
-        row![text("Ausgabe").size(13).color(thema::text_hell()), space::horizontal(), text(status.0).size(11).color(status.1)],
+        row![text("Ausgabe").size(14).font(thema::fett()).color(thema::text_hell()), space::horizontal(), text(status.0).size(11).color(status.1)],
         container(scrollable(log).anchor_bottom().width(Fill).height(Length::Fixed(260.0)))
             .padding(8)
             .style(thema::codeblock_container_stil)
@@ -230,7 +230,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     .spacing(6);
 
     // Ergebnisdateien
-    let mut dateien = column![text("Erzeugte Dateien").size(13).color(thema::text_hell())].spacing(3);
+    let mut dateien = column![text("Erzeugte Dateien").size(14).font(thema::fett()).color(thema::text_hell())].spacing(3);
     if bau.dateien.is_empty() {
         dateien = dateien.push(text("Nach einem Lauf erscheinen hier die neuen Dateien aus out/.").size(11).color(thema::text_gedimmt()));
     }
@@ -263,7 +263,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
         .filter(|id| projekt.kapitel_finden(id).is_none())
         .count();
     let vor = column![
-        text("Vorprüfung vor dem Satz").size(13).color(thema::text_hell()),
+        text("Vorprüfung vor dem Satz").size(14).font(thema::fett()).color(thema::text_hell()),
         punkt("Codezeilen-Länge", if zu_lang == 0 { format!("alle ≤ {grenze} Zeichen") } else { format!("{zu_lang} Zeilen länger als {grenze} Zeichen (Prüfen → Druckregeln)") }, zu_lang == 0),
         punkt("Querverweise", if fehlende == 0 { "alle @kap:-Ziele vorhanden".to_string() } else { format!("{fehlende} Verweise ohne Ziel") }, fehlende == 0),
         punkt("Gliederung", format!("{} Teile, {} Kapitel", projekt.teile.len(), projekt.kapitel_anzahl()), true),

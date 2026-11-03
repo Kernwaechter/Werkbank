@@ -46,7 +46,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     let code = &state.code;
 
     let kopf = column![
-        text("Prüfstand").size(20).color(thema::text_hell()),
+        text("Prüfstand").size(22).font(thema::fett()).color(thema::text_hell()),
         text("Codebeispiele werden geprüft (Rust mit rustc, Dart/Flutter mit dart analyze), Texte mit LanguageTool, Druckregeln gegen die Portalwerte.")
             .size(13)
             .color(thema::text_gedimmt()),
@@ -72,7 +72,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
 
     let mut code_spalte = column![
         row![
-            text("Code-Prüfer").size(15).color(thema::text_hell()),
+            text("Code-Prüfer").size(14).font(thema::fett()).color(thema::text_hell()),
             space::horizontal(),
             button(text(if code.laeuft { "Prüfe …" } else { "Alle Codebeispiele prüfen" }).size(12))
                 .padding([6, 14])
@@ -132,7 +132,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     let s = &state.buch_sprache;
     let mut sprache_spalte = column![
         row![
-            text("Sprachprüfung im ganzen Buch").size(15).color(thema::text_hell()),
+            text("Sprachprüfung im ganzen Buch").size(14).font(thema::fett()).color(thema::text_hell()),
             space::horizontal(),
             button(text(if s.laeuft { "Prüfe …" } else { "Ganzes Buch prüfen" }).size(12))
                 .padding([6, 14])
@@ -162,7 +162,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     // ---- Druckregeln
     let grenze = state.portale.code_zeilenlaenge;
     let mut druck = column![
-        text(format!("Druckregeln: Codezeilen höchstens {grenze} Zeichen")).size(15).color(thema::text_hell()),
+        text(format!("Druckregeln: Codezeilen höchstens {grenze} Zeichen")).size(14).font(thema::fett()).color(thema::text_hell()),
     ]
     .spacing(4);
     let mut zu_lang = 0;

@@ -8,7 +8,7 @@ use crate::Message;
 use crate::thema;
 use crate::ui::dialog::fenster;
 use crate::ui::fokus::{button, toggler};
-use iced::widget::{Id, column, row, scrollable, space, text, text_input};
+use iced::widget::{container, Id, column, row, scrollable, space, text, text_input};
 use iced::{Alignment, Element, Fill, Length};
 use werkbank_kern::suche::{BandFund, Fund, Optionen};
 
@@ -73,7 +73,7 @@ pub fn feld_id() -> Id {
 const SICHTBAR: usize = 150;
 
 fn umfang_knopf(name: &'static str, aktiv: bool, u: Umfang) -> Element<'static, Message> {
-    button(text(name).size(12)).padding([4, 10]).style(thema::tab_knopf_stil(aktiv)).on_press(Message::SucheUmfang(u)).into()
+    button(text(name).size(12)).padding([4, 10]).style(thema::segment_stil(aktiv)).on_press(Message::SucheUmfang(u)).into()
 }
 
 fn eintrag<'a>(i: usize, auswahl: usize, kopf: String, f: &'a Fund, mit_vorschau: bool) -> Element<'a, Message> {
@@ -157,13 +157,21 @@ pub fn ansicht(s: &Suche) -> Element<'_, Message> {
 
     fenster(
         column![
-            text("Suchen und Ersetzen").size(16).color(thema::text_hell()),
             row![
-                umfang_knopf("Kapitel", s.umfang == Umfang::Kapitel, Umfang::Kapitel),
-                umfang_knopf("Ganzer Band", s.umfang == Umfang::Band, Umfang::Band),
-                umfang_knopf("Alle Bände", s.umfang == Umfang::Buch, Umfang::Buch),
+                text("Suchen und Ersetzen").size(18).font(thema::fett()).color(thema::text_hell()),
+                space::horizontal(),
+                container(
+                    row![
+                        umfang_knopf("Kapitel", s.umfang == Umfang::Kapitel, Umfang::Kapitel),
+                        umfang_knopf("Ganzer Band", s.umfang == Umfang::Band, Umfang::Band),
+                        umfang_knopf("Alle Bände", s.umfang == Umfang::Buch, Umfang::Buch),
+                    ]
+                    .spacing(2),
+                )
+                .padding(2)
+                .style(thema::segment_rahmen_stil),
             ]
-            .spacing(4),
+            .align_y(Alignment::Center),
             text_input("Suchen …", &s.muster)
                 .id(feld_id())
                 .on_input(Message::SucheMuster)

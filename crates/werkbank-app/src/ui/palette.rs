@@ -5,7 +5,7 @@
 //! ausführen. Ersetzt die Flut einzelner Knöpfe durch einen Ort für alles.
 
 use crate::thema;
-use iced::widget::{Id, column, container, mouse_area, opaque, row, scrollable, space, text, text_input};
+use iced::widget::{Id, column, container, mouse_area, opaque, row, scrollable, text, text_input};
 use crate::ui::fokus::{button};
 use iced::{Alignment, Element, Fill, Length};
 
@@ -34,8 +34,8 @@ pub fn ansicht<'a, Message: Clone + 'a>(
         .id(feld_id())
         .on_input(on_suche)
         .on_submit(on_ausfuehren)
-        .size(16)
-        .padding([10, 12]);
+        .size(17)
+        .padding([11, 14]);
 
     let mut liste = column![].spacing(2);
     if treffer.is_empty() {
@@ -47,32 +47,34 @@ pub fn ansicht<'a, Message: Clone + 'a>(
         liste = liste.push(
             button(
                 row![
-                    text(z.titel).size(13),
-                    space::horizontal(),
+                    text(z.titel).size(13).width(Fill),
                     text(z.hinweis).size(11).color(thema::text_gedimmt()),
                 ]
+                .spacing(12)
                 .align_y(Alignment::Center),
             )
             .width(Fill)
             .padding([7, 12])
-            .style(thema::palette_eintrag_stil(i == auswahl))
+            .style(thema::listen_eintrag_stil(i == auswahl))
             .on_press(on_waehlen(i)),
         );
     }
 
     let fenster = container(
         column![
-            feld,
-            scrollable(liste).height(Length::Shrink),
-            text("↑↓ wählen   ⏎ ausführen   Esc schließen")
-                .size(10)
-                .color(thema::text_gedimmt()),
-        ]
-        .spacing(8),
+            container(column![feld, container(scrollable(liste).height(Length::Shrink)).max_height(440)].spacing(10)).padding(12),
+            container(
+                text("↑↓ wählen   ⏎ ausführen   Esc schließt")
+                    .size(11)
+                    .color(thema::text_gedimmt()),
+            )
+            .padding([8, 14])
+            .width(Fill)
+            .style(thema::dialog_fuss_stil),
+        ],
     )
-    .padding(12)
-    .max_width(560)
-    .style(thema::palette_box_stil);
+    .max_width(600)
+    .style(thema::dialog_stil);
 
     // Klick neben das Fenster schließt die Palette; das Fenster selbst schluckt Klicks.
     mouse_area(

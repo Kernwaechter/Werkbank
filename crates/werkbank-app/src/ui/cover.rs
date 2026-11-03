@@ -247,7 +247,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     .spacing(8);
 
     let formular = column![
-        text("Cover-Vorlage").size(16).color(thema::text_hell()),
+        text("Cover-Vorlage").size(22).font(thema::fett()).color(thema::text_hell()),
         abschnitt("Texte", texte),
         abschnitt("Farben", farben),
         abschnitt("Hintergrundbild", column![bild, aufloesung].spacing(10)),
@@ -257,7 +257,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     .width(Length::Fixed(470.0));
 
     // ---- Prüfung gegen das Portal
-    let mut pruefung = column![text("Prüfung").size(13).color(thema::text_hell())].spacing(3);
+    let mut pruefung = column![text("Prüfung").size(14).font(thema::fett()).color(thema::text_hell())].spacing(3);
     if let Some(p) = state.portale.portale.get(c.portal) {
         let (ub, uh) = p.umschlag_mm(seiten);
         let ruecken = p.ruecken_mm(seiten);
@@ -323,7 +323,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
         );
     }
 
-    container(scrollable(row![formular, rechts.width(Fill)].spacing(24)).height(Fill))
+    container(scrollable(container(row![formular, rechts.width(Fill)].spacing(24)).padding(Padding::ZERO.right(16))).height(Fill))
         .padding(Padding::from([20, 30]))
         .style(thema::editor_bereich_stil)
         .width(Fill)

@@ -616,6 +616,8 @@ pub enum Message {
     EinstellungenOeffnen,
     /// Öffnet die Einstellungen mit der LanguageTool-Installationsanleitung.
     AnleitungOeffnen,
+    /// Öffnet die Einstellungen auf einer bestimmten Seite (oder wechselt dorthin).
+    EinstellungenSeite(u8),
     /// Schließt das Einstellungsfenster (`Esc`).
     EinstellungenSchliessen,
     /// Blendet die Installationsanleitung ein oder aus.
@@ -2433,8 +2435,15 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
             state.palette = None;
             state.einstellungen_fenster = Some(ui::einstellungen::Fenster {
                 info_offen: true,
+                seite: 2,
                 ..Default::default()
             });
+        }
+
+        Message::EinstellungenSeite(seite) => {
+            state.palette = None;
+            let f = state.einstellungen_fenster.get_or_insert_with(ui::einstellungen::Fenster::default);
+            f.seite = seite;
         }
 
         Message::EinstellungenSchliessen => {
@@ -3139,8 +3148,8 @@ fn alle_befehle(state: &AppState) -> Vec<Befehl> {
         befehl("Kapitel auf Sprache prüfen", "Strg+L", Message::KapitelPruefen),
         befehl("Einstellungen …", "Strg+, oder F10", Message::EinstellungenOeffnen),
         befehl("LanguageTool installieren – Anleitung", "Linux, Windows, macOS", Message::AnleitungOeffnen),
-        befehl("LanguageTool-Server starten", "Einstellungen", Message::LtServerStarten),
-        befehl("LanguageTool-Server stoppen", "Einstellungen", Message::LtServerStoppen),
+        befehl("LanguageTool-Server starten", "Einstellungen · Prüfung", Message::LtServerStarten),
+        befehl("LanguageTool-Server stoppen", "Einstellungen · Prüfung", Message::LtServerStoppen),
         befehl("Neues Kapitel", "Strg+Umschalt+N", Message::NeuesKapitel),
         befehl("Im Kapitel suchen und ersetzen", "Strg+F", Message::SucheOeffnen(false)),
         befehl("In allen Bänden suchen und ersetzen", "Strg+Umschalt+F", Message::SucheOeffnen(true)),
@@ -3148,7 +3157,7 @@ fn alle_befehle(state: &AppState) -> Vec<Befehl> {
         befehl("Vorheriger Suchtreffer", "Umschalt+F3", Message::SucheNaechste(-1)),
         befehl("Kapitel umbenennen", "F2", Message::KapitelUmbenennenDialog),
         befehl("Handbuch öffnen", "", Message::HandbuchOeffnen),
-        befehl("Lizenz eingeben", "Einstellungen", Message::EinstellungenOeffnen),
+        befehl("Lizenz eingeben", "Einstellungen · Allgemein", Message::EinstellungenSeite(0)),
         befehl("Über die Werkbank (Lizenz, Bausteine)", "", Message::UeberOeffnen),
         befehl("Kapitel löschen", "", Message::KapitelLoeschenFrage),
         befehl("Kapitel nach oben schieben", "Alt+Umschalt+↑", Message::KapitelVerschieben(-1)),
@@ -3204,6 +3213,14 @@ fn alle_befehle(state: &AppState) -> Vec<Befehl> {
         befehl("Ganzes Buch auf Sprache prüfen", "Prüfen", Message::BuchSpracheStarten),
         befehl("Portalregeln als Datei anlegen", "Bauen", Message::PortaleAnlegen),
     ];
+    // Jede Einstellungsseite ist direkt über die Suche erreichbar
+    for (nr, (name, inhalt)) in ui::einstellungen::SEITEN.iter().enumerate() {
+        liste.push(Befehl {
+            titel: format!("Einstellungen: {name}"),
+            hinweis: inhalt.to_string(),
+            aktion: Message::EinstellungenSeite(nr as u8),
+        });
+    }
 
     for band in &state.baende {
         if *band != state.band {
