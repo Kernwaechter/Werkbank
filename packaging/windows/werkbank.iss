@@ -1,7 +1,7 @@
 ; Inno Setup 6 – baut den Windows-Installer (Setup.exe).
 ; Aufruf unter Windows:  iscc packaging\windows\werkbank.iss
 ; Erwartet target\x86_64-pc-windows-msvc\release\werkbank-app.exe (siehe windows-bauen.sh).
-#define Version "1.1.0"
+#define Version "1.2.0"
 
 [Setup]
 AppId={{5D0B6C4A-7E1F-4B7E-9A55-DAEHN-WERKBANK}

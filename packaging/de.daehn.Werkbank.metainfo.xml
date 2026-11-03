@@ -43,6 +43,11 @@
     <control>pointing</control>
   </supports>
   <releases>
+    <release version="1.2.0" date="2026-11-03">
+      <description>
+        <p>Neue, ruhigere Oberfläche: einzeilige Kopfleiste, flache Bibliothek und Blattliste mit lesbarer Vorschau, rahmenloser Editor, Einstellungen in Seiten, einheitliche Dialoge. Hinweise zu markierten Wörtern beim Überfahren mit der Maus, Rechtsklick merkt Wörter, Kontextmenüs für Kapitel und Teile, blasse Markdown-Zeichen. Code-Prüfer jetzt auch für Dart und Flutter.</p>
+      </description>
+    </release>
     <release version="1.1.0" date="2026-11-03">
       <description>
         <p>Deutlich schnellerer Editor: Die Korrekturvorschläge im Rechtschreib-Kasten des Inspektors werden zwischengespeichert, statt bei jedem Tastendruck neu berechnet zu werden.</p>
