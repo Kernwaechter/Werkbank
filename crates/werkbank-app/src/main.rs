@@ -262,6 +262,10 @@ pub struct AppState {
     pub vorschau_sichtbar: bool,
     /// Geöffnete Befehlspalette (`None` = geschlossen).
     pub palette: Option<Palette>,
+    /// Offenes Kontextmenü (Rechtsklick auf Kapitel oder Teil).
+    pub kontext: Option<ui::kontext::Kontext>,
+    /// Aktuelle Fenstergröße (damit schwebende Menüs im Fenster bleiben).
+    pub fenster_groesse: Size,
     /// Teile mit Änderungen, die noch nicht auf der Platte stehen.
     pub dirty: HashSet<String>,
     /// Kapitel- oder Teilstruktur wurde geändert (`reihenfolge.txt` nachführen).
@@ -616,6 +620,14 @@ pub enum Message {
     EinstellungenOeffnen,
     /// Öffnet die Einstellungen mit der LanguageTool-Installationsanleitung.
     AnleitungOeffnen,
+    /// Rechtsklick auf ein Kapitel oder einen Teil: wählt es aus und öffnet das Kontextmenü.
+    KontextOeffnen(ui::kontext::Ziel, iced::Point),
+    /// Eintrag des Kontextmenüs: schließt das Menü und führt die Aktion aus.
+    KontextAktion(Box<Message>),
+    /// Schließt das Kontextmenü.
+    KontextSchliessen,
+    /// Das Fenster hat eine neue Größe.
+    FensterGroesse(Size),
     /// Öffnet die Einstellungen auf einer bestimmten Seite (oder wechselt dorthin).
     EinstellungenSeite(u8),
     /// Schließt das Einstellungsfenster (`Esc`).
@@ -748,6 +760,8 @@ fn new() -> (AppState, Task<Message>) {
         inspektor_sichtbar: true,
         vorschau_sichtbar: false,
         palette: None,
+        kontext: None,
+        fenster_groesse: Size::new(1380.0, 880.0),
         inspektor_tab: 0,
         inspektor_zieht: false,
         inspektor_maus_x: None,
@@ -2440,6 +2454,24 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
             });
         }
 
+        Message::KontextOeffnen(ziel, position) => {
+            let auswahl = match &ziel {
+                ui::kontext::Ziel::Kapitel(id) => update(state, Message::KapitelAusgewaehlt(id.clone())),
+                ui::kontext::Ziel::Teil(id) => update(state, Message::TeilAusgewaehlt(id.clone())),
+            };
+            state.kontext = Some(ui::kontext::Kontext { ziel, position });
+            return auswahl;
+        }
+
+        Message::KontextAktion(aktion) => {
+            state.kontext = None;
+            return update(state, *aktion);
+        }
+
+        Message::KontextSchliessen => state.kontext = None,
+
+        Message::FensterGroesse(groesse) => state.fenster_groesse = groesse,
+
         Message::EinstellungenSeite(seite) => {
             state.palette = None;
             let f = state.einstellungen_fenster.get_or_insert_with(ui::einstellungen::Fenster::default);
@@ -2849,6 +2881,10 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
                 return Task::none();
             }
 
+            if key == Key::Named(Named::Escape) && state.kontext.is_some() {
+                state.kontext = None;
+                return Task::none();
+            }
             if key == Key::Named(Named::Escape) {
                 if state.dialog.is_some() || state.eingabe.is_some() || state.verlauf.is_some() || state.suche_offen || state.meta_entwurf.is_some() || state.handbuch_offen || state.ueber_offen {
                     return update(state, Message::DialogSchliessen);
@@ -3349,6 +3385,9 @@ fn view(state: &AppState) -> Element<'_, Message> {
             Message::InspektorZiehen(true),
             hl_einstellung(state),
             vorschau_element(state),
+            erklaerung(state),
+            Message::WortMerken,
+            Message::KontextOeffnen,
         ),
         Arbeitsbereich::Bauen => ui::bauen::ansicht(state),
         Arbeitsbereich::Pruefen => ui::pruefen::ansicht(state),
@@ -3363,6 +3402,8 @@ fn view(state: &AppState) -> Element<'_, Message> {
 
     let overlay: Option<Element<'_, Message>> = if gesperrt(state) {
         Some(ui::hilfe::gesperrt(&state.lizenz_email, &state.lizenz_schluessel, state.lizenz_meldung.as_deref(), dateien::hat_ungespeichertes(state)))
+    } else if let Some(k) = &state.kontext {
+        Some(ui::kontext::menue(k, &state.projekt.teile, state.fenster_groesse))
     } else if state.handbuch_offen {
         Some(ui::hilfe::handbuch())
     } else if state.ueber_offen {
@@ -3442,6 +3483,44 @@ fn vorschau_element(state: &AppState) -> Element<'_, Message> {
     } else {
         ui::satzvorschau::ansicht(&state.satz_vorschau, state.werkzeuge.pandoc_brauchbar())
     }
+}
+
+/// Text der Hinweisblase, die beim Überfahren einer unterschlängelten Stelle erscheint.
+fn erklaerung(state: &AppState) -> text_editor::Erklaerung<'_> {
+    let woerterbuch = state.woerterbuch.clone();
+    let treffer = &state.treffer;
+    Box::new(move |zeile, wort, art, spalte| {
+        if art == markierung::WELLE_RECHTSCHREIBUNG {
+            let wb = woerterbuch.as_ref()?;
+            let vorschlag = wb
+                .erster_vorschlag(wort)
+                .map(|v| format!("Vorschlag: {v}\n"))
+                .unwrap_or_default();
+            Some(format!(
+                "Rechtschreibung: „{wort}“ steht nicht im Wörterbuch ({}).\n{vorschlag}Rechtsklick merkt das Wort als richtig (für den ganzen Band).",
+                wb.name
+            ))
+        } else {
+            let t = treffer.iter().find(|t| {
+                (t.zeile, t.spalte) <= (zeile, spalte) && (zeile, spalte) < (t.ende_zeile, t.ende_spalte.max(t.spalte + 1))
+            })?;
+            let art = match t.kategorie_id.as_str() {
+                "TYPOS" => "Tippfehler",
+                "GRAMMAR" => "Grammatik",
+                "PUNCTUATION" => "Zeichensetzung",
+                "STYLE" | "REDUNDANCY" | "COLLOQUIALISMS" => "Stil",
+                "CASING" => "Groß- und Kleinschreibung",
+                "TYPOGRAPHY" => "Typografie",
+                _ => "Sprachprüfung",
+            };
+            let ersatz = if t.ersetzungen.is_empty() {
+                String::new()
+            } else {
+                format!("\nVorschlag: {}", t.ersetzungen.iter().take(3).cloned().collect::<Vec<_>>().join(" · "))
+            };
+            Some(format!("{art}: {}{ersatz}\nAnnehmen oder ignorieren: Inspektor › Text.", t.meldung))
+        }
+    })
 }
 
 /// Markierungs-Einstellung für den Editor; wird nur neu gebaut, wenn sich etwas Relevantes ändert.
@@ -3535,6 +3614,7 @@ fn subscription(state: &AppState) -> Subscription<Message> {
         Subscription::none()
     };
     let schliessen = iced::window::close_requests().map(Message::FensterSchliessen);
+    let groesse = iced::window::resize_events().map(|(_, g)| Message::FensterGroesse(g));
 
     // Nur während des Ziehens mitlesen, wohin die Maus wandert
     let ziehen = if state.inspektor_zieht {
@@ -3547,7 +3627,7 @@ fn subscription(state: &AppState) -> Subscription<Message> {
         Subscription::none()
     };
 
-    Subscription::batch([tasten, takt, schliessen, ziehen])
+    Subscription::batch([tasten, takt, schliessen, ziehen, groesse])
 }
 
 /// Das Iced-Thema folgt der Werkbank-Palette (hell: „Papier“, dunkel: „Dämmerung“).

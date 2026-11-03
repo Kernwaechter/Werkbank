@@ -96,9 +96,15 @@ pub use text::editor::{
 ///     }
 /// }
 /// ```
-/// Geteilte Liste der Unterschlängelungen je Zeile: Byte-Bereich und Farbe.
+/// Geteilte Liste der Unterschlängelungen je Zeile: Byte-Bereich, Farbe und Art (für den Hinweis beim Überfahren).
 /// Der Markierer schreibt sie beim Hervorheben, der Editor zeichnet sie.
-pub type Wellen = std::sync::Arc<std::sync::Mutex<Vec<Vec<(std::ops::Range<usize>, Color)>>>>;
+pub type Wellen = std::sync::Arc<std::sync::Mutex<Vec<Vec<(std::ops::Range<usize>, Color, u8)>>>>;
+
+/// Erklärt eine unterschlängelte Stelle: (Zeile, Wort, Art, Spalte) → Hinweistext.
+pub type Erklaerung<'a> = Box<dyn Fn(usize, &str, u8, usize) -> Option<String> + 'a>;
+
+/// Unterschlängelte Stelle unter dem Mauszeiger: Zeile, Byte-Bereich, Art und Rechteck (relativ zum Text).
+type Schwebe = (usize, std::ops::Range<usize>, u8, Rectangle);
 
 #[allow(clippy::type_complexity)]
 pub struct TextEditor<
@@ -135,6 +141,8 @@ pub struct TextEditor<
     last_status: Option<Status>,
     schreibmaschine: bool,
     wellen: Option<Wellen>,
+    erklaerung: Option<Erklaerung<'a>>,
+    on_rechtsklick: Option<Box<dyn Fn(String, u8) -> Option<Message> + 'a>>,
 }
 
 impl<'a, Message, Theme, Renderer>
@@ -168,6 +176,8 @@ where
             last_status: None,
             schreibmaschine: false,
             wellen: None,
+            erklaerung: None,
+            on_rechtsklick: None,
         }
     }
 
@@ -296,6 +306,8 @@ where
             last_status: self.last_status,
             schreibmaschine: self.schreibmaschine,
             wellen: self.wellen,
+            erklaerung: self.erklaerung,
+            on_rechtsklick: self.on_rechtsklick,
         }
     }
 
@@ -308,6 +320,18 @@ where
     /// Zeichnet Wellenlinien unter den angegebenen Bereichen.
     pub fn wellen(mut self, wellen: Wellen) -> Self {
         self.wellen = Some(wellen);
+        self
+    }
+
+    /// Rechtsklick auf eine unterschlängelte Stelle: (Wort, Art) → Nachricht (z. B. Wort merken).
+    pub fn rechtsklick(mut self, f: impl Fn(String, u8) -> Option<Message> + 'a) -> Self {
+        self.on_rechtsklick = Some(Box::new(f));
+        self
+    }
+
+    /// Hinweistext für unterschlängelte Stellen, der beim Überfahren mit der Maus erscheint.
+    pub fn erklaerung(mut self, f: impl Fn(usize, &str, u8, usize) -> Option<String> + 'a) -> Self {
+        self.erklaerung = Some(Box::new(f));
         self
     }
 
@@ -568,6 +592,7 @@ pub struct State<Highlighter: text::Highlighter> {
     highlighter_settings: Highlighter::Settings,
     highlighter_format_address: usize,
     letzter_cursor: std::cell::Cell<(usize, usize)>,
+    schwebe: RefCell<Option<Schwebe>>,
 }
 
 #[derive(Debug, Clone)]
@@ -647,6 +672,7 @@ where
             highlighter_settings: self.highlighter_settings.clone(),
             highlighter_format_address: self.highlighter_format as usize,
             letzter_cursor: std::cell::Cell::new((usize::MAX, 0)),
+            schwebe: RefCell::new(None),
         })
     }
 
@@ -732,6 +758,60 @@ where
         };
 
         let state = tree.state.downcast_mut::<State<Highlighter>>();
+
+        // Welche unterschlängelte Stelle liegt unter dem Mauszeiger? Ändert sie sich, neu zeichnen.
+        if self.erklaerung.is_some()
+            && matches!(event, Event::Mouse(mouse::Event::CursorMoved { .. } | mouse::Event::CursorLeft))
+        {
+            let text_bounds = layout.bounds().shrink(self.padding);
+            let neu = cursor.position().and_then(|p| {
+                let internal = self.content.0.borrow();
+                let wellen = self.wellen.as_ref()?.lock().ok()?;
+                let editor = (&internal.editor as &dyn std::any::Any).downcast_ref::<iced_graphics::text::Editor>()?;
+                let p = p - (text_bounds.position() - Point::ORIGIN);
+                for lauf in editor.buffer().layout_runs() {
+                    if p.y < lauf.line_top || p.y > lauf.line_top + lauf.line_height {
+                        continue;
+                    }
+                    for (bereich, _, art) in wellen.get(lauf.line_i)? {
+                        let (mut x0, mut x1) = (f32::MAX, f32::MIN);
+                        for g in lauf.glyphs.iter().filter(|g| g.start < bereich.end && g.end > bereich.start) {
+                            x0 = x0.min(g.x);
+                            x1 = x1.max(g.x + g.w);
+                        }
+                        if x0 <= p.x && p.x <= x1 {
+                            let r = Rectangle { x: x0, y: lauf.line_top, width: x1 - x0, height: lauf.line_height };
+                            return Some((lauf.line_i, bereich.clone(), *art, r));
+                        }
+                    }
+                }
+                None
+            });
+            let alt = state.schwebe.borrow().as_ref().map(|(z, b, a, _)| (*z, b.clone(), *a));
+
+            if alt != neu.as_ref().map(|(z, b, a, _)| (*z, b.clone(), *a)) {
+                *state.schwebe.borrow_mut() = neu;
+                shell.request_redraw();
+            }
+        }
+        if let Some(f) = &self.on_rechtsklick
+            && matches!(event, Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right)))
+            && let Some((zeile, bereich, art, rechteck)) = state.schwebe.borrow().clone()
+            && cursor.is_over(rechteck + (layout.bounds().shrink(self.padding).position() - Point::ORIGIN))
+        {
+            let wort = {
+                let internal = self.content.0.borrow();
+                (&internal.editor as &dyn std::any::Any)
+                    .downcast_ref::<iced_graphics::text::Editor>()
+                    .and_then(|e| e.buffer().lines.get(zeile).and_then(|l| l.text().get(bereich.clone()).map(str::to_string)))
+            };
+            if let Some(nachricht) = wort.and_then(|w| f(w, art)) {
+                *state.schwebe.borrow_mut() = None;
+                shell.publish(nachricht);
+                shell.capture_event();
+                return;
+            }
+        }
         let is_redraw = matches!(
             event,
             Event::Window(window::Event::RedrawRequested(_now)),
@@ -993,7 +1073,7 @@ where
         theme: &Theme,
         _defaults: &renderer::Style,
         layout: Layout<'_>,
-        _cursor: mouse::Cursor,
+        cursor: mouse::Cursor,
         _viewport: &Rectangle,
     ) {
         let bounds = layout.bounds();
@@ -1103,7 +1183,7 @@ where
         {
             for lauf in editor.buffer().layout_runs() {
                 let Some(liste) = wellen.get(lauf.line_i) else { continue };
-                for (bereich, farbe) in liste {
+                for (bereich, farbe, _art) in liste {
                     let (mut x0, mut x1) = (f32::MAX, f32::MIN);
                     for g in lauf.glyphs.iter().filter(|g| g.start < bereich.end && g.end > bereich.start) {
                         x0 = x0.min(g.x);
@@ -1177,6 +1257,19 @@ where
                 }
                 Selection::Caret(_) => {}
             }
+        }
+
+        // Hinweis zur unterschlängelten Stelle unter dem Mauszeiger
+        if let Some(erklaerung) = &self.erklaerung
+            && let Some((zeile, bereich, art, rechteck)) = state.schwebe.borrow().clone()
+            && cursor.is_over(rechteck + translation)
+            && let Some(editor) = (&internal.editor as &dyn std::any::Any).downcast_ref::<iced_graphics::text::Editor>()
+            && let Some(linie) = editor.buffer().lines.get(zeile)
+            && let Some(wort) = linie.text().get(bereich.clone())
+            && let Some(hinweis) = erklaerung(zeile, wort, art, bereich.start)
+        {
+            let ui_schrift = renderer.default_font();
+            hinweis_zeichnen(renderer, &hinweis, rechteck + translation, bounds, ui_schrift);
         }
     }
 
@@ -1639,4 +1732,61 @@ pub(crate) fn convert_macos_shortcut(
     };
 
     Some(keyboard::Key::Named(key))
+}
+
+/// Zeichnet eine Hinweisblase unter (oder, wenn kein Platz ist, über) dem Wort.
+fn hinweis_zeichnen<Renderer: text::Renderer>(renderer: &mut Renderer, hinweis: &str, wort: Rectangle, grenzen: Rectangle, font: Renderer::Font) {
+    use iced_core::text::Paragraph as _;
+    let groesse = Pixels(13.0);
+    let max_breite = 380.0_f32.min(grenzen.width - 16.0).max(120.0);
+    let absatz = Renderer::Paragraph::with_text(text::Text {
+        content: hinweis,
+        bounds: Size::new(max_breite, f32::INFINITY),
+        size: groesse,
+        line_height: LineHeight::Relative(1.35),
+        font,
+        align_x: text::Alignment::Left,
+        align_y: alignment::Vertical::Top,
+        shaping: text::Shaping::Advanced,
+        wrapping: Wrapping::Word,
+    });
+    let innen = absatz.min_bounds();
+    let (rand_x, rand_y) = (12.0, 9.0);
+    let kasten_groesse = Size::new(innen.width + 2.0 * rand_x, innen.height + 2.0 * rand_y);
+    let x = wort.x.min(grenzen.x + grenzen.width - kasten_groesse.width - 8.0).max(grenzen.x + 8.0);
+    let unten = wort.y + wort.height + 6.0;
+    let y = if unten + kasten_groesse.height > grenzen.y + grenzen.height {
+        (wort.y - kasten_groesse.height - 6.0).max(grenzen.y)
+    } else {
+        unten
+    };
+    let kasten = Rectangle::new(Point::new(x, y), kasten_groesse);
+    renderer.with_layer(grenzen, |renderer| {
+        renderer.fill_quad(
+            renderer::Quad {
+                bounds: kasten,
+                border: Border { color: crate::thema::linie_farbe(), width: 1.0, radius: 8.0.into() },
+                shadow: iced::Shadow { color: Color::from_rgba8(0, 0, 0, 0.45), offset: iced::Vector::new(0.0, 4.0), blur_radius: 14.0 },
+                ..renderer::Quad::default()
+            },
+            Background::Color(crate::thema::karte_aktiv()),
+        );
+        // fill_text statt fill_paragraph: der Absatz oben dient nur zum Messen und lebt nicht bis zum Zeichnen
+        renderer.fill_text(
+            text::Text {
+                content: hinweis.to_string(),
+                bounds: Size::new(innen.width + 1.0, innen.height + 1.0),
+                size: groesse,
+                line_height: LineHeight::Relative(1.35),
+                font,
+                align_x: text::Alignment::Left,
+                align_y: alignment::Vertical::Top,
+                shaping: text::Shaping::Advanced,
+                wrapping: Wrapping::Word,
+            },
+            Point::new(x + rand_x, y + rand_y),
+            crate::thema::text_hell(),
+            kasten,
+        );
+    });
 }

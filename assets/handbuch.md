@@ -16,11 +16,12 @@ Links stehen in der Bibliothek die Teile deines Buches, daneben die Kapitel des 
 
 - **Speichern:** `Strg+S` oder der Knopf „● Speichern“ oben rechts, der erscheint, sobald es Ungespeichertes gibt. Außerdem speichert die Werkbank nach acht Sekunden Pause von selbst. Eine Datei wird nur geschrieben, wenn sich ihr Text wirklich geändert hat, und zwar atomar: Es entsteht nie eine halbe Datei.
 - **Sicherungen:** Vor dem Überschreiben legt die Werkbank einen Stand in `.werkbank/snapshots/` ab. Mit `Strg+H` holst du ein Kapitel aus einem früheren Stand zurück. Der aktuelle Stand bleibt dabei ebenfalls erhalten.
-- **Kapitel und Teile:** Neues Kapitel `Strg+Umschalt+N`, Umbenennen `F2`, Verschieben `Alt+Umschalt+↑/↓`. Löschen und Entfernen findest du in der Befehlspalette. Entfernte Teile landen im Papierkorb `.werkbank/papierkorb/`.
+- **Kapitel und Teile:** Neues Kapitel `Strg+Umschalt+N`, Umbenennen `F2`, Verschieben `Alt+Umschalt+↑/↓`. Ein **Rechtsklick** auf ein Kapitel oder einen Teil öffnet ein Menü mit Umbenennen, Verlauf, Verweis einfügen, Bearbeitungsstand, Verschieben und Löschen. Alles davon findest du auch in der Befehlspalette. Entfernte Teile landen im Papierkorb `.werkbank/papierkorb/`.
 - **Suchen und Ersetzen:** `Strg+F` im Kapitel, `Strg+Umschalt+F` in allen Bänden des Buchs, `F3` zum nächsten Treffer. Oben wählst du den Umfang (Kapitel, ganzer Band, alle Bände), dazu Groß-/Kleinschreibung, ganzes Wort und reguläre Ausdrücke (`$1` im Ersatz setzt Gruppen ein). Die Trefferliste zeigt jede Zeile vorher und nachher. „Alle ersetzen“ nennt zuerst die Anzahl und führt erst beim zweiten Klick aus. Die alte Fassung bleibt als nummerierte Sicherung erhalten.
 - **Verweise:** Mit `@kap:kennung` verweist du auf ein Kapitel. Fehlt das Ziel, erscheint der Verweis rot im Inspektor. Die Befehlspalette fügt Verweise für dich ein.
 - **Schreibmaschinen-Modus:** In den Einstellungen einschaltbar; die Cursorzeile bleibt in der Fenstermitte.
 - **Fokus-Modus:** `F11` blendet alles außer dem Text aus.
+- **Markdown bleibt leise:** Auszeichnungen wie `##`, `**`, Backticks, Listen- und Zitatzeichen sowie Link-Adressen erscheinen blass, damit der Text im Vordergrund steht.
 
 ## Details, Tempo und Stil
 
@@ -46,7 +47,7 @@ Oben im Inspektor wählst du eine von vier Ansichten:
 
 ## Sprache prüfen
 
-Unbekannte Wörter markiert die Werkbank sofort rot und unterschlängelt, mit einem Hunspell-Wörterbuch auf deinem Rechner (ohne Internet). Ein Klick auf ein Wort in den Details merkt es als richtig, für den ganzen Band.
+Unbekannte Wörter markiert die Werkbank sofort rot und unterschlängelt, mit einem Hunspell-Wörterbuch auf deinem Rechner (ohne Internet). Code, Verweise, Adressen und HTML-Tags prüft sie nicht. **Fährst du mit der Maus über eine markierte Stelle**, erklärt eine Blase, was nicht stimmt, mit Vorschlag. Ein **Rechtsklick** auf ein rot markiertes Wort merkt es als richtig, für den ganzen Band; ebenso ein Klick auf das Wort im Inspektor unter „Text“.
 
 Für Grammatik und Stil nutzt die Werkbank **LanguageTool**, das du selbst betreibst (Anleitung: Einstellungen → Prüfung, Symbol ⓘ). Code, Verweise und Adressen werden dabei nicht geprüft. `Strg+L` prüft das Kapitel; die Hinweise erscheinen orange im Text und in den Details.
 

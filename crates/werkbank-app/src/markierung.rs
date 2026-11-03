@@ -22,9 +22,16 @@ pub enum Art {
     Fett,
     Verweis,
     Code,
+    /// Markdown-Zeichen (`##`, `**`, Backticks, `>`, Listenzeichen, Zäune): treten optisch zurück.
+    Zeichen,
     Rechtschreibung,
     Sprache,
 }
+
+/// Art einer Wellenlinie: unbekanntes Wort (Hunspell).
+pub const WELLE_RECHTSCHREIBUNG: u8 = 0;
+/// Art einer Wellenlinie: Hinweis der Sprachprüfung (LanguageTool).
+pub const WELLE_SPRACHE: u8 = 1;
 
 /// Ein Hinweis der Sprachprüfung als Zeilenbereich (Zeile ab 0, Byte-Spalten).
 pub type Bereich = (usize, usize, usize, usize);
@@ -76,7 +83,7 @@ pub struct Markierer {
 }
 
 impl Markierer {
-    fn wellen_setzen(&self, nr: usize, liste: Vec<(Range<usize>, iced::Color)>) {
+    fn wellen_setzen(&self, nr: usize, liste: Vec<(Range<usize>, iced::Color, u8)>) {
         if let Ok(mut w) = self.einstellung.wellen.lock() {
             if w.len() <= nr {
                 w.resize(nr + 1, Vec::new());
@@ -130,8 +137,8 @@ impl highlighter::Highlighter for Markierer {
         let wellen = ergebnis
             .iter()
             .filter_map(|(r, a)| match a {
-                Art::Rechtschreibung => Some((r.clone(), thema::fehler_rot())),
-                Art::Sprache => Some((r.clone(), thema::warnung_orange())),
+                Art::Rechtschreibung => Some((r.clone(), thema::fehler_rot(), WELLE_RECHTSCHREIBUNG)),
+                Art::Sprache => Some((r.clone(), thema::warnung_orange(), WELLE_SPRACHE)),
                 _ => None,
             })
             .collect();
@@ -154,11 +161,11 @@ impl Markierer {
             match self.offen {
                 None if !(z == '`' && rest.contains('`')) => {
                     self.offen = Some((z, l));
-                    return vec![(0..zeile.len(), Art::Code)];
+                    return vec![(0..zeile.len(), Art::Zeichen)];
                 }
                 Some((oz, ol)) if oz == z && l >= ol && rest.trim().is_empty() => {
                     self.offen = None;
-                    return vec![(0..zeile.len(), Art::Code)];
+                    return vec![(0..zeile.len(), Art::Zeichen)];
                 }
                 _ => {}
             }
@@ -180,8 +187,22 @@ impl Markierer {
         let hashes = zeile.chars().take_while(|c| *c == '#').count();
         if (1..=6).contains(&hashes) && zeile[hashes..].starts_with(' ') {
             setze(0..zeile.len(), Art::Ueberschrift);
+            setze(0..hashes + 1, Art::Zeichen);
         } else if zeile.trim_start().starts_with('>') {
             setze(0..zeile.len(), Art::Zitat);
+            let p = zeile.find('>').unwrap_or(0);
+            setze(p..p + 1, Art::Zeichen);
+        }
+        // Listenzeichen am Zeilenanfang: „- “, „* “, „+ “, „1. “
+        let einzug = zeile.len() - zeile.trim_start().len();
+        let rest = &zeile[einzug..];
+        if rest.starts_with("- ") || rest.starts_with("* ") || rest.starts_with("+ ") {
+            setze(einzug..einzug + 1, Art::Zeichen);
+        } else if let Some(p) = rest.find(". ")
+            && (1..=3).contains(&p)
+            && rest[..p].chars().all(|c| c.is_ascii_digit())
+        {
+            setze(einzug..einzug + p + 1, Art::Zeichen);
         }
 
         // Inline-Code, Fettdruck, Verweise
@@ -189,7 +210,11 @@ impl Markierer {
         for (i, c) in zeile.char_indices() {
             if c == '`' {
                 match start.take() {
-                    Some(s) => setze(s..i + 1, Art::Code),
+                    Some(s) => {
+                        setze(s..i + 1, Art::Code);
+                        setze(s..s + 1, Art::Zeichen);
+                        setze(i..i + 1, Art::Zeichen);
+                    }
                     None => start = Some(i),
                 }
             }
@@ -200,6 +225,8 @@ impl Markierer {
             match zeile[von + 2..].find("**") {
                 Some(q) => {
                     setze(von..von + 2 + q + 2, Art::Fett);
+                    setze(von..von + 2, Art::Zeichen);
+                    setze(von + 2 + q..von + 2 + q + 2, Art::Zeichen);
                     s = von + 2 + q + 2;
                 }
                 None => break,
@@ -211,6 +238,17 @@ impl Markierer {
             let bis = zeile[von..].find(|c: char| c.is_whitespace() || ",;)".contains(c)).map_or(zeile.len(), |e| von + e);
             setze(von..bis, Art::Verweis);
             s = bis.max(von + 5);
+        }
+
+        // Links: „[Text](adresse)“ – Klammern und Adresse treten zurück, der Linktext bleibt
+        let mut s = 0;
+        while let Some(p) = zeile[s..].find("](") {
+            let mitte = s + p;
+            let Some(auf) = zeile[..mitte].rfind('[') else { s = mitte + 2; continue };
+            let Some(zu) = zeile[mitte + 2..].find(')').map(|e| mitte + 2 + e) else { break };
+            setze(auf..auf + 1, Art::Zeichen);
+            setze(mitte..zu + 1, Art::Zeichen);
+            s = zu + 1;
         }
 
         // Rechtschreibung
@@ -266,6 +304,7 @@ pub fn format(art: &Art, _theme: &Theme) -> Format<Font> {
             color: Some(if thema::ist_hell() { iced::Color::from_rgb8(135, 84, 20) } else { iced::Color::from_rgb8(222, 184, 135) }),
             font: None,
         },
+        Art::Zeichen => Format { color: Some(iced::Color { a: 0.5, ..thema::text_gedimmt() }), font: None },
         Art::Rechtschreibung => Format { color: Some(thema::fehler_rot()), font: None },
         Art::Sprache => Format { color: Some(thema::warnung_orange()), font: None },
     }
@@ -288,11 +327,11 @@ mod tests {
     #[test]
     fn ueberschrift_code_und_zaeune_ueber_zeilen() {
         let mut m = markierer(false, vec![]);
-        assert_eq!(zeile(&mut m, "## Titel"), [("## Titel".to_string(), Art::Ueberschrift)]);
-        assert_eq!(zeile(&mut m, "```rust")[0].1, Art::Code);
+        assert_eq!(zeile(&mut m, "## Titel"), [("## ".to_string(), Art::Zeichen), ("Titel".to_string(), Art::Ueberschrift)]);
+        assert_eq!(zeile(&mut m, "```rust")[0].1, Art::Zeichen);
         assert_eq!(zeile(&mut m, "## kein Titel"), [("## kein Titel".to_string(), Art::Code)]);
-        assert_eq!(zeile(&mut m, "```")[0].1, Art::Code);
-        assert_eq!(zeile(&mut m, "## wieder Titel")[0].1, Art::Ueberschrift);
+        assert_eq!(zeile(&mut m, "```")[0].1, Art::Zeichen);
+        assert_eq!(zeile(&mut m, "## wieder Titel")[1].1, Art::Ueberschrift);
     }
 
     #[test]
@@ -312,10 +351,21 @@ mod tests {
     fn inline_elemente_und_rechtschreibung() {
         let mut m = markierer(true, vec![]);
         let r = zeile(&mut m, "Das ist `x` ein **Hnud** siehe @kap:a");
-        assert!(r.contains(&("`x`".to_string(), Art::Code)));
+        assert!(r.contains(&("x".to_string(), Art::Code)));
+        assert!(r.contains(&("**".to_string(), Art::Zeichen)), "Fett-Zeichen treten zurück: {r:?}");
         assert!(r.contains(&("Hnud".to_string(), Art::Rechtschreibung)), "Rechtschreibung überdeckt Fett: {r:?}");
         assert!(r.contains(&("@kap:a".to_string(), Art::Verweis)));
         assert!(!r.iter().any(|(t, a)| t == "Hund" && *a == Art::Rechtschreibung));
+    }
+
+    #[test]
+    fn markdown_zeichen_treten_zurueck() {
+        let mut m = markierer(false, vec![]);
+        assert_eq!(zeile(&mut m, "- Punkt")[0], ("-".to_string(), Art::Zeichen));
+        assert_eq!(zeile(&mut m, "12. Schritt")[0], ("12.".to_string(), Art::Zeichen));
+        assert_eq!(zeile(&mut m, "> Zitat")[0], (">".to_string(), Art::Zeichen));
+        let r = zeile(&mut m, "Siehe [Doku](https://x.de) hier");
+        assert!(r.contains(&("[".to_string(), Art::Zeichen)) && r.contains(&("](https://x.de)".to_string(), Art::Zeichen)), "{r:?}");
     }
 
     #[test]

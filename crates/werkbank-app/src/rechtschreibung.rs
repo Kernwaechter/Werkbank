@@ -182,6 +182,19 @@ pub fn woerter_in_zeile(zeile: &str) -> Vec<Range<usize>> {
             start = von + muster.len();
         }
     }
+    // HTML-Tags samt Attributen: <div class="page-break">, </div>
+    let mut s = 0;
+    while let Some(p) = zeile[s..].find('<') {
+        let von = s + p;
+        let ist_tag = zeile[von + 1..].chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '/' || c == '!');
+        match zeile[von..].find('>') {
+            Some(q) if ist_tag => {
+                tabu.push(von..von + q + 1);
+                s = von + q + 1;
+            }
+            _ => s = von + 1,
+        }
+    }
     // Heading-Kennungen in eckigen Klammern: „Kapitel [werkzeug]: Titel“
     let mut s = 0;
     while let Some(p) = zeile[s..].find('[') {
@@ -260,6 +273,15 @@ pub fn unbekannte_woerter(wb: &Woerterbuch, text: &str, eigene: &HashSet<String>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn html_tags_werden_nicht_geprueft() {
+        let z = "<div class=\"page-break\"></div> Hallo Welt";
+        let woerter: Vec<&str> = woerter_in_zeile(z).into_iter().map(|r| &z[r]).collect();
+        assert_eq!(woerter, ["Hallo", "Welt"]);
+        let z = "a < b und c > d";
+        assert!(woerter_in_zeile(z).iter().any(|r| &z[r.clone()] == "und"), "Vergleiche sind keine Tags");
+    }
 
     fn wb() -> Woerterbuch {
         Woerterbuch::aus_texten("SET UTF-8\n", "5\nHund\nKatze\nist\nschön\nund\n")

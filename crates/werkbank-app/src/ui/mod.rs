@@ -10,6 +10,7 @@ pub mod navigation;
 pub mod einstellungen;
 pub mod fokus;
 pub mod hilfe;
+pub mod kontext;
 pub mod palette;
 pub mod pruefen;
 pub mod satzvorschau;

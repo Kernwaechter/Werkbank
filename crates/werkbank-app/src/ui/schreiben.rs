@@ -11,6 +11,7 @@ use crate::ui::navigation::tooltip_knopf;
 use iced::widget::{column, container, progress_bar, row, scrollable, slider, space, text};
 use crate::ui::fokus::{button, regler_mit_pfeilen};
 use crate::editor as text_editor;
+use crate::ui::kontext::{Ziel, rechtsklick};
 use iced::{Alignment, Element, Fill, Length, Padding, Pixels};
 use werkbank_kern::{KapitelStatus, Projekt};
 
@@ -46,12 +47,15 @@ pub fn ansicht<'a, Message: Clone + 'a>(
     on_inspektor_ziehen: Message,
     hl: crate::markierung::Einstellung,
     vorschau: Element<'a, Message>,
+    erklaerung: crate::editor::Erklaerung<'a>,
+    on_wort_merken: impl Fn(String) -> Message + 'a,
+    on_kontext: impl Fn(Ziel, iced::Point) -> Message + Copy + 'a,
 ) -> Element<'a, Message> {
     let mut haupt_reihe = row![].width(Fill).height(Fill);
 
     // Spalte 1 und 2 verschwinden im Fokus-Modus oder per Seitenleisten-Schalter
     if seitenleiste_sichtbar && !fokus_modus {
-        let bibliothek = spalte_bibliothek(projekt, aktiver_teil_id, on_teil_klick, on_neuer_teil);
+        let bibliothek = spalte_bibliothek(projekt, aktiver_teil_id, on_teil_klick, on_neuer_teil, on_kontext);
         haupt_reihe = haupt_reihe.push(bibliothek).push(thema::trennlinie_senkrecht());
 
         let blattliste = spalte_blattliste(
@@ -60,6 +64,7 @@ pub fn ansicht<'a, Message: Clone + 'a>(
             aktives_kapitel_id,
             on_kapitel_klick,
             on_neues_kapitel,
+            on_kontext,
         );
         haupt_reihe = haupt_reihe.push(blattliste).push(thema::trennlinie_senkrecht());
     }
@@ -75,6 +80,8 @@ pub fn ansicht<'a, Message: Clone + 'a>(
         on_springe_zu_zeile,
         hl,
         vorschau,
+        erklaerung,
+        on_wort_merken,
     );
     haupt_reihe = haupt_reihe.push(editor_spalte);
 
@@ -109,6 +116,7 @@ fn spalte_bibliothek<'a, Message: Clone + 'a>(
     aktiver_teil_id: &'a str,
     on_teil_klick: impl Fn(String) -> Message + 'a,
     on_neuer_teil: Message,
+    on_kontext: impl Fn(Ziel, iced::Point) -> Message + Copy + 'a,
 ) -> Element<'a, Message> {
     let buch_info = column![
         text(&projekt.metadaten.titel).size(15).font(thema::fett()).color(thema::text_hell()),
@@ -134,14 +142,22 @@ fn spalte_bibliothek<'a, Message: Clone + 'a>(
         ]
         .spacing(8)
         .align_y(Alignment::Center);
+        let id = teil.id.clone();
         teile_spalte = teile_spalte.push(
             tooltip_knopf_text(
-                button(eintrag)
-                    .padding([6, 8])
-                    .width(Fill)
-                    .style(thema::listen_eintrag_stil(aktiv))
-                    .on_press(on_teil_klick(teil.id.clone())),
-                format!("{} Wörter in {} Kapiteln", thema::tausender(teil.gesamtwortzahl()), teil.kapitel.len()),
+                rechtsklick(
+                    button(eintrag)
+                        .padding([6, 8])
+                        .width(Fill)
+                        .style(thema::listen_eintrag_stil(aktiv))
+                        .on_press(on_teil_klick(teil.id.clone())),
+                    move |p| on_kontext(Ziel::Teil(id.clone()), p),
+                ),
+                format!(
+                    "{} Wörter in {} Kapiteln  ·  Rechtsklick: Umbenennen, Verschieben …",
+                    thema::tausender(teil.gesamtwortzahl()),
+                    teil.kapitel.len()
+                ),
             ),
         );
     }
@@ -176,6 +192,7 @@ fn spalte_blattliste<'a, Message: Clone + 'a>(
     aktives_kapitel_id: &'a str,
     on_kapitel_klick: impl Fn(String) -> Message + 'a,
     on_neues_kapitel: Message,
+    on_kontext: impl Fn(Ziel, iced::Point) -> Message + Copy + 'a,
 ) -> Element<'a, Message> {
     let aktiver_teil = projekt
         .teile
@@ -235,13 +252,15 @@ fn spalte_blattliste<'a, Message: Clone + 'a>(
             .align_y(Alignment::Center),
         );
 
-        liste_spalte = liste_spalte.push(
+        let id = kapitel.id.clone();
+        liste_spalte = liste_spalte.push(rechtsklick(
             button(karte)
                 .padding([10, 10])
                 .width(Fill)
                 .style(thema::listen_eintrag_stil(aktiv))
                 .on_press(on_kapitel_klick(kapitel.id.clone())),
-        );
+            move |p| on_kontext(Ziel::Kapitel(id.clone()), p),
+        ));
     }
 
     container(
@@ -271,6 +290,8 @@ fn spalte_editor<'a, Message: Clone + 'a>(
     _on_springe_zu_zeile: impl Fn(usize, usize) -> Message + Copy + 'a,
     hl: crate::markierung::Einstellung,
     vorschau: Element<'a, Message>,
+    erklaerung: crate::editor::Erklaerung<'a>,
+    on_wort_merken: impl Fn(String) -> Message + 'a,
 ) -> Element<'a, Message> {
     let aktives_kapitel = projekt.kapitel_finden(aktives_kapitel_id);
 
@@ -330,6 +351,8 @@ fn spalte_editor<'a, Message: Clone + 'a>(
         .schreibmaschine(thema::schreibmaschine())
         .wellen(hl.wellen.clone())
         .style(thema::schreibflaeche_stil)
+        .erklaerung(erklaerung)
+        .rechtsklick(move |wort, art| (art == crate::markierung::WELLE_RECHTSCHREIBUNG).then(|| on_wort_merken(wort)))
         .highlight_with::<crate::markierung::Markierer>(hl, crate::markierung::format)
         .on_action(on_editor_aktion);
 
