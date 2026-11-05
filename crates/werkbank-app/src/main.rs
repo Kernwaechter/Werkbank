@@ -982,6 +982,27 @@ fn cover_vorschau(state: &mut AppState) -> Task<Message> {
     let ordner = state.band.ordner.clone();
     Task::perform(
         languagetool::im_hintergrund(move || {
+            // Hat der Band ein eigenes cover.png und noch keinen Entwurf im Cover-Designer, zeigt die Vorschau dieses Bild
+            if !umschlag
+                && let Some(o) = ordner.as_deref()
+                && !o.join(".werkbank").join("cover.json").is_file()
+                && let Ok(daten) = std::fs::read(o.join("cover.png"))
+                && let Ok(voll) = resvg::tiny_skia::Pixmap::decode_png(&daten)
+            {
+                let faktor = 520.0 / voll.width() as f32;
+                let (w, h) = (520u32, ((voll.height() as f32 * faktor).round() as u32).max(1));
+                if let Some(mut klein) = resvg::tiny_skia::Pixmap::new(w, h) {
+                    klein.draw_pixmap(
+                        0,
+                        0,
+                        voll.as_ref(),
+                        &resvg::tiny_skia::PixmapPaint { quality: resvg::tiny_skia::FilterQuality::Bilinear, ..Default::default() },
+                        resvg::tiny_skia::Transform::from_scale(faktor, faktor),
+                        None,
+                    );
+                    return Ok((w, h, Arc::new(klein.take())));
+                }
+            }
             let (svg, breite) = match (umschlag, &portal) {
                 (true, Some(p)) => {
                     let klappentext = ordner.as_deref().map(cover::klappentext_lesen).unwrap_or_default();
