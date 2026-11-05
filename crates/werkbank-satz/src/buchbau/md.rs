@@ -36,6 +36,13 @@ pub enum Knoten {
     Punkt(String),
     /// Codeblock mit Sprache aus dem Zaun.
     Code { sprache: String, code: String },
+    /// Zitat aus aufeinanderfolgenden `>`-Zeilen (Inline-Markdown; `<br />` markiert Zeilenumbrüche).
+    /// Das bisherige Skript kannte keine Zitate und setzte sie als Text mit „>“.
+    Zitat(String),
+    /// Beginn eines Kastens `::: art Titel` (Titel leer = Standardtitel der Art).
+    KastenAuf { art: String, titel: String },
+    /// Ende eines Kastens (`:::`).
+    KastenZu,
 }
 
 /// Ergebnis der Zerlegung einer Datei.
@@ -143,6 +150,9 @@ pub fn zerlegen(md: &str, id_prefix: &str, rubriken: &[(String, String)]) -> Abs
     let mut in_tabelle = false;
     let mut tabelle: Vec<Vec<String>> = Vec::new();
     let mut absatz: Vec<String> = Vec::new();
+    // Offenes Zitat (Zeilen) und Tiefe offener Kästen
+    let mut zitat: Vec<String> = Vec::new();
+    let mut kaesten = 0usize;
 
     fn absatz_leeren(absatz: &mut Vec<String>, out: &mut Vec<Knoten>) {
         if !absatz.is_empty() {
@@ -172,9 +182,53 @@ pub fn zerlegen(md: &str, id_prefix: &str, rubriken: &[(String, String)]) -> Abs
         tabelle.clear();
     }
 
+    fn zitat_leeren(zitat: &mut Vec<String>, out: &mut Vec<Knoten>) {
+        if !zitat.is_empty() {
+            out.push(Knoten::Zitat(zitat.join(" ")));
+            zitat.clear();
+        }
+    }
+
     for zeile in splitlines(md) {
         // Python `str.strip()` entfernt Leerraum an beiden Enden
         let s = zeile.trim();
+        if !im_code {
+            // Zitat: aufeinanderfolgende Zeilen mit „>“
+            if let Some(rest) = s.strip_prefix('>') {
+                absatz_leeren(&mut absatz, &mut out);
+                listen_schliessen(&mut in_ul, &mut in_ol, &mut out);
+                tabelle_leeren(&mut in_tabelle, &mut tabelle, &mut out);
+                let rest = rest.strip_prefix(' ').unwrap_or(rest);
+                if rest.trim().is_empty() {
+                    zitat.push("<br />".to_string());
+                } else if zeile.ends_with("  ") {
+                    zitat.push(format!("{}<br />", rest.trim()));
+                } else {
+                    zitat.push(rest.trim().to_string());
+                }
+                continue;
+            }
+            zitat_leeren(&mut zitat, &mut out);
+            // Kasten: „::: art Titel“ öffnet, „:::“ schließt
+            if let Some(rest) = s.strip_prefix(":::") {
+                let rest = rest.trim().trim_start_matches(':').trim();
+                absatz_leeren(&mut absatz, &mut out);
+                listen_schliessen(&mut in_ul, &mut in_ol, &mut out);
+                tabelle_leeren(&mut in_tabelle, &mut tabelle, &mut out);
+                if rest.is_empty() {
+                    if kaesten > 0 {
+                        kaesten -= 1;
+                        out.push(Knoten::KastenZu);
+                    }
+                } else {
+                    let rest = rest.trim_start_matches('{').trim_end_matches('}').trim_start_matches('.');
+                    let (art, titel) = rest.split_once(char::is_whitespace).unwrap_or((rest, ""));
+                    kaesten += 1;
+                    out.push(Knoten::KastenAuf { art: art.to_lowercase(), titel: titel.trim().trim_matches('"').to_string() });
+                }
+                continue;
+            }
+        }
 
         if s.starts_with("```") {
             absatz_leeren(&mut absatz, &mut out);
@@ -290,8 +344,12 @@ pub fn zerlegen(md: &str, id_prefix: &str, rubriken: &[(String, String)]) -> Abs
         }
     }
     absatz_leeren(&mut absatz, &mut out);
+    zitat_leeren(&mut zitat, &mut out);
     listen_schliessen(&mut in_ul, &mut in_ol, &mut out);
     tabelle_leeren(&mut in_tabelle, &mut tabelle, &mut out);
+    for _ in 0..kaesten {
+        out.push(Knoten::KastenZu);
+    }
 
     Abschnitt { knoten: out, toc }
 }
@@ -341,9 +399,32 @@ pub fn html(abschnitt: &Abschnitt, code_html: &dyn Fn(&str, &str) -> String) -> 
             Knoten::ListeZu(geordnet) => out.push(if *geordnet { "</ol>" } else { "</ul>" }.to_string()),
             Knoten::Punkt(t) => out.push(format!("<li>{}</li>", format_inline(t))),
             Knoten::Code { sprache, code } => out.push(code_html(code, sprache)),
+            Knoten::Zitat(t) => out.push(format!("<blockquote><p>{}</p></blockquote>", format_inline(t))),
+            Knoten::KastenAuf { art, titel } => {
+                let titel = if titel.is_empty() { kasten_titel(art) } else { format_inline(titel) };
+                out.push(format!("<div class=\"kasten kasten-{}\"><p class=\"kasten-titel\">{titel}</p>", escape(art)));
+            }
+            Knoten::KastenZu => out.push("</div>".to_string()),
         }
     }
     out.join("\n").replace("&lt;br /&gt;", "<br />")
+}
+
+/// Standardtitel eines Kastens nach seiner Art.
+pub fn kasten_titel(art: &str) -> String {
+    match art {
+        "info" => "Info".to_string(),
+        "hinweis" => "Hinweis".to_string(),
+        "merke" => "Merke".to_string(),
+        "tipp" => "Tipp".to_string(),
+        "wichtig" => "Wichtig".to_string(),
+        "warnung" => "Warnung".to_string(),
+        "beispiel" => "Beispiel".to_string(),
+        _ => {
+            let mut z = art.chars();
+            z.next().map(|c| c.to_uppercase().collect::<String>() + z.as_str()).map(|t| escape(&t)).unwrap_or_default()
+        }
+    }
 }
 
 /// Kopfzeile eines Codeblocks: Sprache in Großbuchstaben, sonst „CODE“.
@@ -395,5 +476,18 @@ mod tests {
         assert!(h.contains("<thead><tr>\n<th>A</th>\n<th>B</th>\n</tr></thead><tbody>\n<tr>\n<td>1</td>\n<td>2</td>\n</tr>\n</tbody></table>"), "{h}");
         assert!(h.contains("<figure class=\"book-figure\"><img src=\"images/a.png\" alt=\"Abb\" /><figcaption>Abb</figcaption></figure>"));
         assert!(h.contains("[dart:void main() {}]"));
+    }
+
+    #[test]
+    fn zitate_und_kaesten() {
+        let md = "Text\n> Erste **Zeile**\n> zweite\n\n::: tipp Gut zu wissen\nInnen\n:::\n\n::: warnung\n- a\n:::\n```\n> kein Zitat\n```\n";
+        let a = zerlegen(md, "s1_", &[]);
+        assert!(a.knoten.contains(&Knoten::Zitat("Erste **Zeile** zweite".into())), "{:?}", a.knoten);
+        assert!(a.knoten.contains(&Knoten::KastenAuf { art: "tipp".into(), titel: "Gut zu wissen".into() }));
+        assert_eq!(a.knoten.iter().filter(|k| **k == Knoten::KastenZu).count(), 2);
+        assert!(a.knoten.contains(&Knoten::Code { sprache: String::new(), code: "> kein Zitat".into() }));
+        let h = html(&a, &|c, _| c.to_string());
+        assert!(h.contains("<blockquote><p>Erste <strong>Zeile</strong> zweite</p></blockquote>"), "{h}");
+        assert!(h.contains("<div class=\"kasten kasten-warnung\"><p class=\"kasten-titel\">Warnung</p>\n<ul>"), "{h}");
     }
 }

@@ -8,17 +8,19 @@ use crate::markdown::zeichenkette;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-/// Gestaltbare Elemente: (Schlüssel, Anzeigename, hat Kasten/Rand, ist Kastenart).
-pub const ELEMENTE: [(&str, &str); 17] = [
+/// Gestaltbare Elemente: (Schlüssel, Anzeigename).
+pub const ELEMENTE: [(&str, &str); 19] = [
     ("text", "Fließtext"),
     ("h1", "Teil-Überschrift (H1)"),
     ("h2", "Kapitelüberschrift (H2)"),
     ("h3", "Abschnitt (H3)"),
     ("h4", "Unterabschnitt (H4)"),
+    ("rubrik", "Rubrik (H3 mit Balken, z. B. „Bughunter“)"),
     ("zitat", "Zitat (> …)"),
     ("codeblock", "Codeblock (``` …)"),
     ("code", "Code im Text (`…`)"),
     ("tabelle", "Tabelle"),
+    ("abbildung", "Abbildung (![…](…))"),
     ("info", "Kasten: info"),
     ("hinweis", "Kasten: hinweis"),
     ("tipp", "Kasten: tipp"),
@@ -46,11 +48,13 @@ fn kasten_titel(art: &str) -> &'static str {
 pub fn felder_von(element: &str) -> &'static [&'static str] {
     match element {
         "text" => &["schrift", "groesse", "textfarbe"],
-        "h1" => &["schrift", "textfarbe"],
+        "h1" => &["schrift", "groesse", "textfarbe", "fett", "kursiv", "rand", "rand_staerke"],
         "h2" | "h3" | "h4" => &["schrift", "groesse", "textfarbe", "fett", "kursiv"],
+        "rubrik" => &["textfarbe", "fuellung", "rand", "rand_staerke", "ecken"],
         "zitat" => &["schrift", "groesse", "textfarbe", "kursiv", "fuellung", "rand", "rand_staerke", "rand_seite", "innen", "ecken"],
-        "codeblock" => &["schrift", "groesse", "textfarbe", "fuellung", "rand", "rand_staerke", "innen", "ecken"],
-        "code" => &["schrift", "groesse", "textfarbe", "fuellung", "ecken"],
+        "codeblock" => &["schrift", "groesse", "fuellung", "rand", "rand_staerke", "innen", "ecken", "kopf", "kopf_fuellung", "kopf_farbe", "zeilennummern"],
+        "code" => &["schrift", "groesse", "textfarbe", "fuellung", "rand", "ecken"],
+        "abbildung" => &["breite", "rand", "rand_staerke", "ecken", "textfarbe"],
         "tabelle" => &["groesse", "fuellung", "rand", "rand_staerke", "innen"],
         "kaesten" => &["rand_staerke", "rand_seite", "innen", "ecken"],
         _ => &["fuellung", "rand"],
@@ -71,6 +75,11 @@ pub fn feld_name(feld: &str) -> (&'static str, &'static str) {
         "rand_seite" => ("Rand", "links / rundum / keine"),
         "innen" => ("Innenabstand in pt", "z. B. 6"),
         "ecken" => ("Eckenradius in pt", "z. B. 3"),
+        "kopf" => ("Kopfzeile mit Sprache", "ja / nein"),
+        "kopf_fuellung" => ("Kopfzeile: Hintergrund", "#rrggbb"),
+        "kopf_farbe" => ("Kopfzeile: Schrift", "#rrggbb"),
+        "zeilennummern" => ("Zeilennummern", "ja / nein"),
+        "breite" => ("Größte Breite in %", "der Satzbreite, z. B. 92"),
         _ => ("?", ""),
     }
 }
@@ -90,6 +99,11 @@ pub struct Format {
     pub rand_seite: String,
     pub innen: String,
     pub ecken: String,
+    pub kopf: String,
+    pub kopf_fuellung: String,
+    pub kopf_farbe: String,
+    pub zeilennummern: String,
+    pub breite: String,
 }
 
 impl Format {
@@ -107,6 +121,11 @@ impl Format {
             "rand_seite" => &self.rand_seite,
             "innen" => &self.innen,
             "ecken" => &self.ecken,
+            "kopf" => &self.kopf,
+            "kopf_fuellung" => &self.kopf_fuellung,
+            "kopf_farbe" => &self.kopf_farbe,
+            "zeilennummern" => &self.zeilennummern,
+            "breite" => &self.breite,
             _ => "",
         }
     }
@@ -125,6 +144,11 @@ impl Format {
             "rand_seite" => self.rand_seite = wert,
             "innen" => self.innen = wert,
             "ecken" => self.ecken = wert,
+            "kopf" => self.kopf = wert,
+            "kopf_fuellung" => self.kopf_fuellung = wert,
+            "kopf_farbe" => self.kopf_farbe = wert,
+            "zeilennummern" => self.zeilennummern = wert,
+            "breite" => self.breite = wert,
             _ => {}
         }
     }
@@ -154,7 +178,7 @@ pub fn farbe_lesen(s: &str) -> Option<(u8, u8, u8)> {
 }
 
 /// Typst-Farbe: farbig als `rgb`, sonst als Grauwert.
-fn farbe(s: &str, farbig: bool) -> Option<String> {
+pub fn farbe(s: &str, farbig: bool) -> Option<String> {
     let (r, g, b) = farbe_lesen(s)?;
     Some(if farbig {
         format!("rgb(\"#{r:02x}{g:02x}{b:02x}\")")
@@ -164,7 +188,8 @@ fn farbe(s: &str, farbig: bool) -> Option<String> {
     })
 }
 
-fn zahl(s: &str) -> Option<f32> {
+/// Zahl aus einem Feld (Komma oder Punkt, „pt“ erlaubt).
+pub fn zahl(s: &str) -> Option<f32> {
     s.trim().replace(',', ".").trim_end_matches("pt").trim().parse::<f32>().ok().filter(|z| *z >= 0.0 && *z < 500.0)
 }
 
@@ -283,7 +308,7 @@ impl Satzstil {
                 _ => format!("(left: {w}pt + {c})"),
             };
             let innen = zahl(&fm.innen).unwrap_or(8.0);
-            let fuell = farbe(&fm.fuellung, farbig).map_or("none".to_string(), |c| c);
+            let fuell = farbe(&fm.fuellung, farbig).unwrap_or_else(|| "none".to_string());
             let ecken = zahl(&fm.ecken).unwrap_or(0.0);
             let a = txt(&fm, false);
             t.push_str(&format!(
@@ -294,8 +319,7 @@ impl Satzstil {
         // Code: Schrift und Größe für alle Rohtexte, Rahmen getrennt
         let (cb, ci) = (f("codeblock"), f("code"));
         for (sel, fm) in [("true", &cb), ("false", &ci)] {
-            let mut a = txt(fm, false);
-            a = a.replace("size: ", "size: ");
+            let a = txt(fm, false);
             if !a.is_empty() {
                 t.push_str(&format!("#show raw.where(block: {sel}): set text({a})\n"));
             }
@@ -326,7 +350,7 @@ impl Satzstil {
             let c = farbe(&fm.rand, farbig).unwrap_or_else(|| "luma(120)".into());
             let w = zahl(&fm.rand_staerke).unwrap_or(0.4);
             let innen = zahl(&fm.innen).unwrap_or(5.0);
-            let kopf = farbe(&fm.fuellung, farbig).map_or("none".to_string(), |c| c);
+            let kopf = farbe(&fm.fuellung, farbig).unwrap_or_else(|| "none".to_string());
             t.push_str(&format!("#set table(inset: {innen}pt, stroke: {w}pt + {c}, fill: (x, y) => if y == 0 {{ {kopf} }} else {{ none }})\n"));
             if let Some(g) = zahl(&fm.groesse) {
                 t.push_str(&format!("#show table: set text(size: {g}pt)\n"));
@@ -367,10 +391,9 @@ impl Satzstil {
         t
     }
 
-    /// Typst-Dokument mit Beispielen aller gestaltbaren Elemente (für die Musterseite).
-    pub fn muster(&self, farbig: bool) -> String {
-        let md = "# Teil 1: Muster\n\n## Kapitel 1: Muster\n\nFließtext mit **fett**, *kursiv* und `Code im Text`. Ein zweiter Satz, damit der Absatz etwas länger wird.\n\n### Ein Abschnitt\n\n#### Ein Unterabschnitt\n\n> Ein Zitat über mehrere Wörter, damit man den Kasten und die Schrift sieht.\n\n```rust\nfn main() {\n    println!(\"Hallo\");\n}\n```\n\n| Spalte A | Spalte B |\n|---|---|\n| eins | zwei |\n| drei | vier |\n\n::: info\nEin Infokasten.\n:::\n\n::: tipp\nEin Tipp.\n:::\n\n::: warnung\nEine Warnung.\n:::\n\n::: wichtig\nWichtig!\n:::\n";
-        crate::vorschau::eingebaut_zu_typst_mit_stil(md, std::path::Path::new("."), &Default::default(), farbig, &self.zu_typst(farbig))
+    /// Musterseite aller gestaltbaren Elemente im Buchsatz: Typst-Quelltext und virtuelle Dateien.
+    pub fn muster(&self, farbig: bool) -> (String, std::collections::HashMap<String, Vec<u8>>) {
+        crate::buchbau::muster(self, farbig)
     }
 }
 
@@ -393,9 +416,12 @@ fn stil_aus(zeilen: &[(&str, &str, &str)]) -> Satzstil {
 pub fn vorlagen() -> Vec<Vorlage> {
     let klassisch = stil_aus(&[
         ("text", "textfarbe", "#1a1a1a"),
+        ("h1", "schrift", "Libertinus Serif"), ("h1", "textfarbe", "#000000"), ("h1", "rand", "#000000"), ("h1", "rand_staerke", "0.8"),
         ("h2", "schrift", "Libertinus Serif"), ("h2", "groesse", "20"), ("h2", "fett", "ja"), ("h2", "textfarbe", "#000000"),
-        ("h3", "groesse", "13"), ("h3", "fett", "ja"), ("h3", "textfarbe", "#1a1a1a"),
-        ("h4", "groesse", "11"), ("h4", "fett", "ja"), ("h4", "kursiv", "ja"),
+        ("h3", "schrift", "Libertinus Serif"), ("h3", "groesse", "13"), ("h3", "fett", "ja"), ("h3", "textfarbe", "#1a1a1a"),
+        ("h4", "schrift", "Libertinus Serif"), ("h4", "groesse", "11"), ("h4", "fett", "ja"), ("h4", "kursiv", "ja"), ("h4", "textfarbe", "#1a1a1a"),
+        ("rubrik", "fuellung", "#f4f1ea"), ("rubrik", "rand", "#5a5a5a"), ("rubrik", "textfarbe", "#1a1a1a"), ("rubrik", "ecken", "0"),
+        ("abbildung", "rand", "#9a9484"), ("abbildung", "ecken", "0"),
         ("zitat", "kursiv", "ja"), ("zitat", "rand", "#8a8a8a"), ("zitat", "rand_staerke", "1"), ("zitat", "rand_seite", "links"), ("zitat", "innen", "10"),
         ("codeblock", "groesse", "7.8"), ("codeblock", "fuellung", "#f4f1ea"), ("codeblock", "rand", "#d9d2c0"), ("codeblock", "rand_staerke", "0.6"), ("codeblock", "innen", "7"), ("codeblock", "ecken", "2"),
         ("code", "fuellung", "#f1ede4"), ("code", "textfarbe", "#3b3b3b"), ("code", "ecken", "2"),
@@ -413,6 +439,7 @@ pub fn vorlagen() -> Vec<Vorlage> {
         ("h2", "schrift", "Fira Sans"), ("h2", "groesse", "24"), ("h2", "fett", "ja"), ("h2", "textfarbe", "#0f766e"),
         ("h3", "schrift", "Fira Sans"), ("h3", "groesse", "14"), ("h3", "fett", "ja"), ("h3", "textfarbe", "#134e4a"),
         ("h4", "schrift", "Fira Sans"), ("h4", "groesse", "11.5"), ("h4", "fett", "ja"), ("h4", "kursiv", "nein"), ("h4", "textfarbe", "#0f766e"),
+        ("h1", "rand", "#14b8a6"), ("h1", "rand_staerke", "2"), ("abbildung", "rand", "#cbd5e1"), ("abbildung", "ecken", "6"),
         ("zitat", "kursiv", "nein"), ("zitat", "fuellung", "#f0fdfa"), ("zitat", "rand", "#14b8a6"), ("zitat", "rand_staerke", "3"), ("zitat", "rand_seite", "links"), ("zitat", "innen", "10"), ("zitat", "ecken", "4"),
         ("codeblock", "groesse", "7.6"), ("codeblock", "fuellung", "#f1f5f9"), ("codeblock", "rand", "#cbd5e1"), ("codeblock", "rand_staerke", "0.8"), ("codeblock", "innen", "8"), ("codeblock", "ecken", "5"),
         ("code", "fuellung", "#e8eef5"), ("code", "textfarbe", "#0f4c5c"), ("code", "ecken", "3"),
@@ -426,6 +453,7 @@ pub fn vorlagen() -> Vec<Vorlage> {
         ("kaesten", "rand_seite", "rundum"), ("kaesten", "rand_staerke", "1"), ("kaesten", "innen", "9"), ("kaesten", "ecken", "6"),
     ]);
     vec![
+        Vorlage { name: "Werkstatt – Technikbuch", beschreibung: "Das Layout der Werkstatt-Bücher: serifenlose Überschriften in Blau, Teile mit Linie, farbige Rubriken, Codeblöcke mit Kopfzeile, Abbildungen mit Rahmen. Leere Felder stehen für genau diese Gestaltung.", stil: Satzstil::default() },
         Vorlage { name: "Klassisch – Buchdruck", beschreibung: "Ruhig und zeitlos: Serifenschrift, schwarze Überschriften, helle Papiertöne für Code und Tabellen, Kästen mit schmalem Streifen links. Gut für Schwarzweißdruck.", stil: klassisch },
         Vorlage { name: "Modern – Technikbuch", beschreibung: "Frisch und sachlich: serifenlose Überschriften (Fira Sans) mit Akzentfarbe Petrol, abgerundete Kästen mit Rahmen, kühle Grautöne für Code. Wirkt am besten im Web-PDF; im Druck werden die Farben zu Grau.", stil: modern },
     ]
@@ -441,8 +469,8 @@ mod tests {
                 let wert = match *feld {
                     "schrift" => "DejaVu Sans Mono",
                     "groesse" => "11",
-                    "textfarbe" | "fuellung" | "rand" => "#336699",
-                    "fett" | "kursiv" => "ja",
+                    "textfarbe" | "fuellung" | "rand" | "kopf_fuellung" | "kopf_farbe" => "#336699",
+                    "fett" | "kursiv" | "kopf" | "zeilennummern" => "ja",
                     "rand_seite" => "rundum",
                     _ => "4",
                 };
@@ -464,12 +492,12 @@ mod tests {
     #[test]
     fn vorlagen_sind_gueltig_und_verschieden() {
         let v = vorlagen();
-        assert_eq!(v.len(), 2);
-        assert_ne!(v[0].stil, v[1].stil);
+        assert_eq!(v.len(), 3);
+        assert_ne!(v[1].stil, v[2].stil);
         for vl in &v {
             for farbig in [true, false] {
-                let q = vl.stil.muster(farbig);
-                crate::welt::typst_zu_pdf(q.clone(), None, Default::default()).unwrap_or_else(|f| panic!("{} (farbig={farbig}): {f}\n{q}", vl.name));
+                let (q, d) = vl.stil.muster(farbig);
+                crate::welt::typst_zu_pdf(q.clone(), None, d).unwrap_or_else(|f| panic!("{} (farbig={farbig}): {f}\n{q}", vl.name));
             }
         }
     }
@@ -482,8 +510,8 @@ mod tests {
     #[test]
     fn alles_gesetzt_wird_ein_pdf() {
         for farbig in [true, false] {
-            let q = voll().muster(farbig);
-            let e = crate::welt::typst_zu_pdf(q.clone(), None, Default::default()).unwrap_or_else(|f| panic!("{f}\n{q}"));
+            let (q, d) = voll().muster(farbig);
+            let e = crate::welt::typst_zu_pdf(q.clone(), None, d).unwrap_or_else(|f| panic!("{f}\n{q}"));
             assert!(e.bytes.starts_with(b"%PDF"));
         }
     }
@@ -493,10 +521,19 @@ mod tests {
         for (e, _) in ELEMENTE {
             let mut s = Satzstil::default();
             for feld in felder_von(e) {
-                s.setze(e, feld, if feld.contains("farbe") || *feld == "fuellung" || *feld == "rand" { "#aa5500".into() } else { "5".into() });
+                let wert = match *feld {
+                    f if f.contains("farbe") || f.contains("fuellung") || f == "rand" => "#aa5500",
+                    "kopf" | "zeilennummern" | "fett" | "kursiv" => "nein",
+                    "rand_seite" => "rundum",
+                    "schrift" => "Fira Sans, DejaVu Sans",
+                    _ => "5",
+                };
+                s.setze(e, feld, wert.into());
             }
-            let q = s.muster(true);
-            crate::welt::typst_zu_pdf(q.clone(), None, Default::default()).unwrap_or_else(|f| panic!("{e}: {f}\n{q}"));
+            for farbig in [true, false] {
+                let (q, d) = s.muster(farbig);
+                crate::welt::typst_zu_pdf(q.clone(), None, d).unwrap_or_else(|f| panic!("{e}: {f}\n{q}"));
+            }
         }
     }
 

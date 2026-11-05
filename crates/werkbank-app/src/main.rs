@@ -490,41 +490,20 @@ pub enum Message {
     SatzStilZuruecksetzen(bool),
     SatzStilMusterFarbig(bool),
     SatzMusterFertig(u64, Result<Arc<Vec<werkbank_satz::Seitenbild>>, String>),
-    /// Legt `.werkbank/satz-stil.typ` an (falls nötig) und öffnet sie.
-    SatzStilBearbeiten,
     /// Installiert ein Werkzeug unter Windows mit winget (Pandoc, Ghostscript, Python, Git).
     WerkzeugInstallieren(&'static str),
     /// Öffnet eine Webseite im Standardbrowser.
     LinkOeffnen(String),
-    /// Stellung der Seitenzahl im Satz (`aussen` oder `mitte`).
-    SatzSeitenzahl(String),
-    /// Zählweise im Satz (`roemisch` oder `durchgehend`).
-    SatzZaehlung(String),
-    /// Teile beginnen rechts.
-    SatzTeileRechts(bool),
-    /// Kapitel beginnen rechts.
-    SatzKapitelRechts(bool),
-    /// Seitenzahlen auf der Titelei.
-    SatzTitelei(bool),
-    /// Eigene Titelseite je Teil.
-    SatzTeiltitel(bool),
-    /// Gerade Gesamtseitenzahl.
-    SatzGerade(bool),
-    /// Setzt das Buch nativ mit Typst (PDF) und als EPUB.
+    /// Setzt das Buch: Druck-PDFs, EPUB, Verlagsordner (ein Ablauf für alle Bücher).
     SatzStarten,
-    /// Ergebnis des nativen Satzes (Dateien mit Beschreibung, Seitenzahl des ersten Druck-PDFs).
-    SatzFertig(Result<(Vec<(PathBuf, String)>, usize), String>),
+    /// Ergebnis des Satzes.
+    SatzFertig(Result<werkbank_satz::buchbau::Bericht, String>),
     /// Startet einen Bauschritt (Index in der Befehlsliste).
     BauStarten(usize),
-    /// Baut den Band nach `buchbau.yaml` (nativ, ohne Skripte).
-    BuchbauStarten,
-    /// Nächster Arbeitsschritt des Buchbaus bzw. des Satzes (für die Fortschrittsanzeige).
-    BuchbauSchritt(String),
+    /// Nächster Arbeitsschritt des Satzes (für die Fortschrittsanzeige).
     SatzSchritt(String),
     /// Takt der Arbeitsanzeige, solange gesetzt oder gebaut wird.
     Puls,
-    /// Ergebnis des Buchbaus.
-    BuchbauFertig(Result<werkbank_satz::buchbau::Bericht, String>),
     /// Eine Zeile Ausgabe des Bauprozesses.
     BauZeile(String),
     /// Der Bauprozess ist beendet (Exitcode, `None` = abgebrochen).
@@ -1420,19 +1399,6 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
             }
         }
 
-        Message::SatzStilBearbeiten => {
-            let datei = state.projekt.wurzelverzeichnis.join(".werkbank").join("satz-stil.typ");
-            if !datei.exists() {
-                let _ = std::fs::create_dir_all(datei.parent().unwrap_or(Path::new(".")));
-                if let Err(f) = std::fs::write(&datei, werkbank_satz::STIL_VORLAGE) {
-                    state.bau.satz_meldung = format!("Stildatei nicht angelegt: {f}");
-                    return Task::none();
-                }
-            }
-            bau::oeffnen(&datei);
-            state.bau.satz_meldung = format!("Stildatei: {} (nach dem Speichern neu setzen)", datei.display());
-        }
-
         Message::LinkOeffnen(url) => {
             if url.starts_with("https://") || url.starts_with("http://") {
                 bau::oeffnen(std::path::Path::new(&url));
@@ -1902,50 +1868,6 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
             state.speicher_zeitstempel = format!("Buch-Sprachprüfung: {n} Hinweise");
         }
 
-        Message::SatzSeitenzahl(w) => {
-            state.einstellungen.seitenzahl = w;
-            state.einstellungen.speichern();
-        }
-
-        Message::SatzZaehlung(w) => {
-            state.einstellungen.zaehlung = w;
-            state.einstellungen.speichern();
-        }
-
-        Message::SatzTeileRechts(an) => {
-            state.einstellungen.teile_rechts = an;
-            if !an {
-                state.einstellungen.kapitel_rechts = false;
-            }
-            state.einstellungen.speichern();
-        }
-
-        Message::SatzKapitelRechts(an) => {
-            state.einstellungen.kapitel_rechts = an;
-            if an {
-                state.einstellungen.teile_rechts = true;
-            }
-            state.einstellungen.speichern();
-        }
-
-        Message::SatzTeiltitel(an) => {
-            state.einstellungen.teil_titelseiten = an;
-            if an {
-                state.einstellungen.teile_rechts = true;
-            }
-            state.einstellungen.speichern();
-        }
-
-        Message::SatzGerade(an) => {
-            state.einstellungen.gerade_seitenzahl = an;
-            state.einstellungen.speichern();
-        }
-
-        Message::SatzTitelei(an) => {
-            state.einstellungen.titelei_zahlen = an;
-            state.einstellungen.speichern();
-        }
-
         Message::SatzStarten => {
             if state.bau.satz_laeuft {
                 return Task::none();
@@ -1954,64 +1876,34 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
                 state.bau.satz_meldung = "Das Demo-Buch hat keinen Ordner, in den gesetzt werden könnte.".to_string();
                 return Task::none();
             };
-            dateien::editor_in_modell(state);
-            state.bau.satz_laeuft = true;
-            let schritte = state.portale.portale.len() * if state.einstellungen.pdfx { 2 } else { 1 } + 2;
-            state.bau.satz_lauf = Some(ui::bauen::Lauf::neu(schritte, "Vorbereiten"));
-            state.bau.satz_meldung.clear();
-            state.bau.satz_dateien.clear();
-            state.aktiver_bereich = Arbeitsbereich::Bauen;
-            state.speicher_zeitstempel = "Das Buch wird gesetzt …".to_string();
-            let projekt = state.projekt.clone();
-            let portale = state.portale.portale.clone();
-            let cover_daten = state.cover.daten.clone();
-            let wahl = state.einstellungen.clone();
-            return Task::run(
-                mit_schritten(
-                    move |melde| satz_ausfuehren(&projekt, &portale, &cover_daten, &ordner, &wahl, melde),
-                    Message::SatzSchritt,
-                    Message::SatzFertig,
-                ),
-                |m| m,
-            );
-        }
-
-        Message::BuchbauStarten => {
-            let Some((buch, nummer, _)) = state.bau.buchbau.clone() else {
-                return Task::none();
-            };
-            if state.bau.buchbau_laeuft {
-                return Task::none();
-            }
-            // Der Bau liest die Dateien von der Platte: Ungespeichertes zuerst sichern
+            // Der Satz liest die Dateien von der Platte: Ungespeichertes zuerst sichern
             if dateien::hat_ungespeichertes(state)
                 && let Err(e) = dateien::speichern(state, dateien::SNAPSHOT_MANUELL)
             {
-                state.bau.buchbau_meldung = format!("Bauen abgebrochen, Speichern fehlgeschlagen: {e}");
+                state.bau.satz_meldung = format!("Setzen abgebrochen, Speichern fehlgeschlagen: {e}");
                 return Task::none();
             }
-            state.bau.buchbau_laeuft = true;
-            state.bau.buchbau_lauf = Some(ui::bauen::Lauf::neu(werkbank_satz::buchbau::SCHRITTE, "Vorbereiten"));
-            state.bau.buchbau_meldung = format!("Baue Band {nummer} …");
-            state.bau.buchbau_hinweise.clear();
-            state.bau.buchbau_dateien.clear();
+            let auftrag = match satz_auftrag(state, &ordner) {
+                Ok(a) => a,
+                Err(f) => {
+                    state.bau.satz_meldung = format!("Setzen nicht möglich: {f}");
+                    return Task::none();
+                }
+            };
+            state.bau.satz_laeuft = true;
+            let schritte = werkbank_satz::buchbau::SCHRITTE + usize::from(state.einstellungen.pdfx);
+            state.bau.satz_lauf = Some(ui::bauen::Lauf::neu(schritte, "Vorbereiten"));
+            state.bau.satz_meldung.clear();
+            state.bau.satz_hinweise.clear();
+            state.bau.satz_dateien.clear();
+            state.bau.satz_ziel = auftrag.buchordner.clone();
             state.aktiver_bereich = Arbeitsbereich::Bauen;
-            state.speicher_zeitstempel = format!("Band {nummer} wird gebaut …");
+            state.speicher_zeitstempel = "Das Buch wird gesetzt …".to_string();
+            let pdfx = state.einstellungen.pdfx;
             return Task::run(
-                mit_schritten(
-                    move |melde| werkbank_satz::buchbau::bauen(&buch, nummer, &|s| melde(s.to_string())),
-                    Message::BuchbauSchritt,
-                    Message::BuchbauFertig,
-                ),
+                mit_schritten(move |melde| satz_ausfuehren(auftrag, pdfx, melde), Message::SatzSchritt, Message::SatzFertig),
                 |m| m,
             );
-        }
-
-        Message::BuchbauSchritt(text) => {
-            if let Some(l) = state.bau.buchbau_lauf.as_mut() {
-                l.weiter(text);
-                state.speicher_zeitstempel = format!("Bauen {}/{}: {} …", l.schritt, l.von, l.text);
-            }
         }
 
         Message::SatzSchritt(text) => {
@@ -2023,36 +1915,22 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
 
         Message::Puls => state.bau.puls = state.bau.puls.wrapping_add(1),
 
-        Message::BuchbauFertig(ergebnis) => {
-            state.bau.buchbau_laeuft = false;
-            let dauer = state.bau.buchbau_lauf.take().map(|l| ui::bauen::dauer(l.start)).unwrap_or_default();
-            match ergebnis {
-                Ok(b) => {
-                    state.bau.buchbau_meldung =
-                        format!("Fertig nach {dauer}: {} Dateien, Buchblock (Graudruck) mit {} Seiten.", b.dateien.len(), b.seiten_grau);
-                    state.speicher_zeitstempel = format!("Buch gebaut ({dauer})");
-                    state.satz_seiten = Some(b.seiten_grau as u32);
-                    state.bau.buchbau_hinweise = b.hinweise;
-                    state.bau.buchbau_dateien = b.dateien;
-                }
-                Err(f) => {
-                    state.bau.buchbau_meldung = format!("Buchbau fehlgeschlagen: {f}");
-                    state.speicher_zeitstempel = "Bauen fehlgeschlagen".to_string();
-                }
-            }
-        }
-
         Message::SatzFertig(ergebnis) => {
             state.bau.satz_laeuft = false;
             let dauer = state.bau.satz_lauf.take().map(|l| ui::bauen::dauer(l.start)).unwrap_or_default();
-            state.speicher_zeitstempel = format!("Satz beendet ({dauer})");
             match ergebnis {
-                Ok((dateien, seiten)) => {
-                    state.bau.satz_meldung = format!("Fertig nach {dauer}: {} Dateien, Druck-PDF mit {seiten} Seiten.", dateien.len());
-                    state.bau.satz_dateien = dateien;
-                    state.satz_seiten = Some(seiten as u32);
+                Ok(b) => {
+                    state.bau.satz_meldung =
+                        format!("Fertig nach {dauer}: {} Dateien, Druckfassung mit {} Seiten.", b.dateien.len(), b.seiten_grau);
+                    state.speicher_zeitstempel = format!("Buch gesetzt ({dauer})");
+                    state.satz_seiten = Some(b.seiten_grau as u32);
+                    state.bau.satz_hinweise = b.hinweise;
+                    state.bau.satz_dateien = b.dateien;
                 }
-                Err(f) => state.bau.satz_meldung = format!("Satz fehlgeschlagen:\n{f}"),
+                Err(f) => {
+                    state.bau.satz_meldung = format!("Satz fehlgeschlagen:\n{f}");
+                    state.speicher_zeitstempel = "Setzen fehlgeschlagen".to_string();
+                }
             }
         }
 
@@ -3227,88 +3105,130 @@ fn stil_sichern(state: &mut AppState) {
 fn muster_setzen(state: &mut AppState) -> Task<Message> {
     state.bau.muster_version += 1;
     let version = state.bau.muster_version;
-    let typ = state.bau.stil.muster(state.bau.muster_farbig);
+    let (typ, dateien) = state.bau.stil.muster(state.bau.muster_farbig);
     Task::perform(
-        languagetool::im_hintergrund(move || werkbank_satz::typst_zu_seiten(typ, None, 1, 1.3).map(|(s, _, _)| Arc::new(s))),
+        languagetool::im_hintergrund(move || werkbank_satz::typst_zu_seiten_mit(typ, None, dateien, 1, 1.3).map(|(s, _, _)| Arc::new(s))),
         move |e| Message::SatzMusterFertig(version, e),
     )
 }
 
-/// Setzt Druck-PDFs je Portal, ein farbiges Lese-PDF und ein EPUB nach `.werkbank/satz/`.
-/// Liefert die Dateien und die Seitenzahl des ersten Druck-PDFs.
-fn satz_ausfuehren(
-    projekt: &Projekt,
-    portale: &[werkbank_kern::portale::Portal],
-    cover_daten: &werkbank_kern::cover::CoverDaten,
-    ordner: &Path,
-    wahl: &Einstellungen,
-    melde: &dyn Fn(String),
-) -> Result<(Vec<(PathBuf, String)>, usize), String> {
-    use werkbank_satz::{SatzOptionen, Seitenzahl, Zaehlung, epub_schreiben, pdf_setzen};
-    let stellung = if wahl.seitenzahl == "mitte" { Seitenzahl::Mitte } else { Seitenzahl::Aussen };
-    let zaehlung = if wahl.zaehlung == "durchgehend" { Zaehlung::Durchgehend } else { Zaehlung::VorspannRoemisch };
-    let ziel = ordner.join(".werkbank").join("satz");
-    std::fs::create_dir_all(&ziel).map_err(|e| e.to_string())?;
-    let mut dateien = Vec::new();
-    let mut seiten = 0;
-    // Eigener Stil des Bandes (Typst), siehe „Stil bearbeiten“ im Bereich Bauen
-    let datei_stil = std::fs::read_to_string(ordner.join(".werkbank").join("satz-stil.typ")).unwrap_or_default();
-    let gestaltung = werkbank_satz::gestaltung::Satzstil::laden(ordner);
-    let stil = format!("{}\n{datei_stil}", gestaltung.zu_typst(false));
-    let stil_farbig = format!("{}\n{datei_stil}", gestaltung.zu_typst(true));
+/// Alles, was der Satz eines Bandes braucht (im Hintergrund ausführbar).
+struct SatzAuftrag {
+    buchordner: PathBuf,
+    bandordner: PathBuf,
+    profil: werkbank_satz::buchbau::profil::Profil,
+    band: werkbank_satz::buchbau::profil::Band,
+    stil: werkbank_satz::gestaltung::Satzstil,
+    ersatz_cover: Option<Vec<u8>>,
+}
 
-    for (i, p) in portale.iter().enumerate() {
-        let opt = SatzOptionen::druck(p.druck_format_mm)
-            .mit_seitenzahl(stellung)
-            .mit_zaehlung(zaehlung)
-            .mit_rechten_seiten(wahl.teile_rechts, wahl.kapitel_rechts)
-            .mit_titelei_zahlen(wahl.titelei_zahlen)
-            .mit_teiltitelseiten(wahl.teil_titelseiten)
-            .mit_gerader_seitenzahl(wahl.gerade_seitenzahl);
-        melde(format!("Druck-PDF für {} setzen", p.name));
-        let e = pdf_setzen(projekt, &opt.mit_stil_zusatz(stil.clone()))?;
-        if i == 0 {
-            seiten = e.seiten;
+/// Stabile Kennung `urn:uuid:…` aus einem Text (gleiches Buch → gleiche Kennung für das E-Book).
+fn uuid_aus(text: &str) -> String {
+    use std::hash::{Hash, Hasher};
+    let teil = |salz: u8| {
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (salz, text).hash(&mut h);
+        h.finish()
+    };
+    let (a, b) = (teil(1), teil(2));
+    format!(
+        "urn:uuid:{:08x}-{:04x}-4{:03x}-{:04x}-{:012x}",
+        a >> 32,
+        (a >> 16) & 0xffff,
+        a & 0xfff,
+        0x8000 | ((b >> 48) & 0x3fff),
+        b & 0xffff_ffff_ffff
+    )
+}
+
+/// Profil und Band für den Satz: aus `buchbau.yaml`, wenn der Band dazugehört, sonst aus den
+/// Angaben des Bandes (Titel, Autor, Dateien, Format des ersten Portals) – dann landet alles in `.werkbank/satz/`.
+fn satz_auftrag(state: &AppState, ordner: &Path) -> Result<SatzAuftrag, String> {
+    use werkbank_satz::buchbau::profil::{Band, Profil, Raender};
+    let (buchordner, bandordner, profil, band) = match &state.bau.buchbau {
+        Some((buch, nummer, _)) => {
+            let profil = Profil::laden(buch)?;
+            let band = profil.band(*nummer).cloned().ok_or_else(|| format!("Band {nummer} fehlt in buchbau.yaml"))?;
+            (buch.clone(), buch.join(&band.ordner), profil, band)
         }
-        let datei = ziel.join(format!("buch-druck-{}.pdf", werkbank_kern::speicher::kennung_aus_titel(&p.name)));
-        std::fs::write(&datei, &e.bytes).map_err(|e| e.to_string())?;
-        dateien.push((datei.clone(), format!("Druck {:.0}×{:.0} mm, {} Seiten, {:.1} MB", p.druck_format_mm.0, p.druck_format_mm.1, e.seiten, e.bytes.len() as f32 / 1e6)));
-        // Am Ende des Weges: PDF/X-3 in Graustufen mit Ghostscript (wie tolino-print.py --pdfx)
-        if wahl.pdfx {
-            melde(format!("PDF/X-3 für {} (Ghostscript)", p.name));
-            let ziel_x = ziel.join(format!("buch-druck-{}-pdfx.pdf", werkbank_kern::speicher::kennung_aus_titel(&p.name)));
-            match werkzeuge::pdfx_erzeugen(&datei, &ziel_x, &projekt.metadaten.titel) {
-                Ok(()) => {
-                    let mb = std::fs::metadata(&ziel_x).map(|m| m.len()).unwrap_or(0) as f32 / 1e6;
-                    dateien.push((ziel_x, format!("PDF/X-3, Graustufen, {mb:.1} MB (diese Datei hochladen, wenn das Portal PDF/X verlangt)")));
+        None => {
+            let m = &state.projekt.metadaten;
+            let mut quellen: Vec<String> = Vec::new();
+            for t in &state.projekt.teile {
+                let d = t.dateipfad.to_string_lossy().replace('\\', "/");
+                if !quellen.contains(&d) {
+                    quellen.push(d);
                 }
-                Err(f) => dateien.push((datei.clone(), format!("PDF/X nicht erzeugt: {f}"))),
             }
+            let format = state.portale.portale.first().map_or([170.0, 240.0], |p| [p.druck_format_mm.0, p.druck_format_mm.1]);
+            let untertitel = [m.untertitel.as_str(), m.band_bezeichnung.as_str()].iter().find(|t| !t.trim().is_empty()).map_or(String::new(), |t| t.to_string());
+            let kurzname = werkbank_kern::speicher::kennung_aus_titel(&m.titel);
+            let band = Band {
+                nummer: 1,
+                ordner: ".".into(),
+                untertitel,
+                uuid: uuid_aus(&format!("{}|{}|{}", m.titel, m.band_bezeichnung, m.autor)),
+                kurzname: if kurzname.is_empty() { "buch".into() } else { kurzname },
+                umschlag: Default::default(),
+            };
+            let profil = Profil {
+                titel: m.titel.clone(),
+                autor: m.autor.clone(),
+                sprache: "de".into(),
+                verlag: m.autor.clone(),
+                format_mm: format,
+                raender_mm: Raender { innen: 22.0, aussen: 18.0, oben: 20.0, unten: 22.0 },
+                quellen,
+                rubriken: Vec::new(),
+                ausgabe: ".".into(),
+                webseiten: Vec::new(),
+                zeilennummern: false,
+                baende: vec![band.clone()],
+                reihe: Default::default(),
+            };
+            (ordner.join(".werkbank").join("satz"), ordner.to_path_buf(), profil, band)
+        }
+    };
+    // Ohne cover.png im Bandordner: Vorderseite aus dem Bereich „Cover“
+    let ersatz_cover = if bandordner.join("cover.png").is_file() {
+        None
+    } else {
+        let seiten = state.satz_seiten.unwrap_or(state.projekt.buchseiten_schaetzung() as u32);
+        let svg = werkbank_kern::cover::svg_ebook(&state.cover.daten, 1600.0, 2560.0, state.portale.portale.first().map(|p| (p, seiten)));
+        cover::rendern(&svg, 1600).ok().and_then(|(b, h, px)| {
+            let pixmap = resvg::tiny_skia::Pixmap::from_vec(px, resvg::tiny_skia::IntSize::from_wh(b, h)?)?;
+            pixmap.encode_png().ok()
+        })
+    };
+    let stil = werkbank_satz::gestaltung::Satzstil::laden(ordner);
+    Ok(SatzAuftrag { buchordner, bandordner, profil, band, stil, ersatz_cover })
+}
+
+/// Setzt den Band (PDFs, EPUB, Verlagsordner); auf Wunsch zusätzlich PDF/X-3 des Graudrucks.
+fn satz_ausfuehren(a: SatzAuftrag, pdfx: bool, melde: &dyn Fn(String)) -> Result<werkbank_satz::buchbau::Bericht, String> {
+    let auftrag = werkbank_satz::buchbau::Auftrag {
+        buchordner: &a.buchordner,
+        bandordner: &a.bandordner,
+        profil: &a.profil,
+        band: &a.band,
+        stil: &a.stil,
+        ersatz_cover: a.ersatz_cover.clone(),
+    };
+    let mut bericht = werkbank_satz::buchbau::setzen(&auftrag, &|s| melde(s.to_string()))?;
+    if pdfx {
+        melde("PDF/X-3 des Graudrucks (Ghostscript)".to_string());
+        let ausgabe = a.buchordner.join(&a.profil.ausgabe);
+        let grau = ausgabe.join(format!("{}-print-sw.pdf", a.band.kurzname));
+        let ziel = ausgabe.join(format!("{}-print-sw-pdfx.pdf", a.band.kurzname));
+        match werkzeuge::pdfx_erzeugen(&grau, &ziel, &a.profil.titel) {
+            Ok(()) => {
+                let groesse = std::fs::metadata(&ziel).map(|m| m.len()).unwrap_or(0);
+                bericht.dateien.push((ziel, groesse));
+            }
+            Err(f) => bericht.hinweise.push(format!("PDF/X-3 nicht erzeugt: {f}")),
         }
     }
-
-    melde("Lese-PDF in Farbe setzen".to_string());
-    let lesen = pdf_setzen(projekt, &SatzOptionen::lesen().mit_seitenzahl(stellung).mit_zaehlung(zaehlung).mit_titelei_zahlen(wahl.titelei_zahlen).mit_stil_zusatz(stil_farbig))?;
-    let datei = ziel.join("buch-lesen.pdf");
-    std::fs::write(&datei, &lesen.bytes).map_err(|e| e.to_string())?;
-    dateien.push((datei, format!("Lese-PDF farbig B5, {} Seiten, {:.1} MB", lesen.seiten, lesen.bytes.len() as f32 / 1e6)));
-
-    // EPUB mit Cover (Vorderseite als PNG)
-    melde("EPUB 3 mit Cover schreiben".to_string());
-    let cover_png = {
-        let svg = werkbank_kern::cover::svg_ebook(cover_daten, 1600.0, 2560.0, portale.first().map(|p| (p, seiten as u32)));
-        let (b, h, px) = cover::rendern(&svg, 800)?;
-        let mut png = Vec::new();
-        let pixmap = resvg::tiny_skia::Pixmap::from_vec(px, resvg::tiny_skia::IntSize::from_wh(b, h).ok_or("Größe")?).ok_or("Bild")?;
-        png.extend(pixmap.encode_png().map_err(|e| e.to_string())?);
-        png
-    };
-    let datei = ziel.join("buch.epub");
-    epub_schreiben(projekt, Some(cover_png), &datei)?;
-    let groesse = std::fs::metadata(&datei).map(|m| m.len()).unwrap_or(0);
-    dateien.push((datei, format!("EPUB 3, {:.1} MB", groesse as f32 / 1e6)));
-
-    Ok((dateien, seiten))
+    Ok(bericht)
 }
 
 /// Zahlungslink bei Stripe (`assets/kauf-url.txt`); solange sie fehlt, öffnet „Kaufen“ eine E-Mail.
@@ -3540,7 +3460,7 @@ fn alle_befehle(state: &AppState) -> Vec<Befehl> {
         befehl("Cover gestalten", "Strg+5", Message::BereichWechseln(Arbeitsbereich::Cover)),
         befehl("Cover exportieren (PNG/SVG, alle Portale)", "Cover", Message::CoverExportieren),
         befehl("Alle Fassungen bauen", "Bauen", Message::BauenStarten),
-        befehl("Buch nativ setzen (Typst: PDF und EPUB)", "Bauen", Message::SatzStarten),
+        befehl("Buch setzen (Druck-PDFs, EPUB, Verlagsordner)", "Bauen", Message::SatzStarten),
         befehl("Alle Prüfungen starten (Code und Sprache)", "Prüfen", Message::PrueflaufStarten),
         befehl("Codebeispiele prüfen (Rust, Dart/Flutter)", "Prüfen", Message::CodePruefungStarten),
         befehl("Ganzes Buch auf Sprache prüfen", "Prüfen", Message::BuchSpracheStarten),
@@ -3973,7 +3893,7 @@ fn subscription(state: &AppState) -> Subscription<Message> {
         Subscription::none()
     };
     let schliessen = iced::window::close_requests().map(Message::FensterSchliessen);
-    let puls = if state.bau.satz_laeuft || state.bau.buchbau_laeuft || state.bau.laeuft.is_some() {
+    let puls = if state.bau.satz_laeuft || state.bau.laeuft.is_some() {
         Subscription::run(puls_strom)
     } else {
         Subscription::none()

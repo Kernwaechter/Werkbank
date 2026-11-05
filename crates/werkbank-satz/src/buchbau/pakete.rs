@@ -72,6 +72,8 @@ pub struct Eingaben<'a> {
     pub grau_pdf: &'a Path,
     pub epub: &'a Path,
     pub seiten: usize,
+    /// Frontcover als Bild (sonst `cover.png` im Bandordner).
+    pub cover: Option<&'a Path>,
     /// Komplettumschlag je Plattform erzeugen: (Plattform, Zielpfad) → Ergebnis.
     pub umschlag: &'a dyn Fn(Plattform, &Path) -> Result<(), String>,
 }
@@ -108,7 +110,7 @@ pub fn schreiben(e: &Eingaben, hinweise: &mut Vec<String>) -> Result<Vec<PathBuf
         Err(_) => hinweise.push(format!("{}/klappentext.md fehlt – KLAPPENTEXT.md nicht geschrieben.", e.band.ordner)),
     }
 
-    let cover_png = e.bandordner.join("cover.png");
+    let cover_png = e.cover.map(Path::to_path_buf).unwrap_or_else(|| e.bandordner.join("cover.png"));
     let webseiten = match e.profil.webseiten.as_slice() {
         [] => "eure Webseite".to_string(),
         [eine] => format!("**`{eine}`**"),

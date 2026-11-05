@@ -17,7 +17,7 @@ pub mod welt;
 pub use epub::epub_schreiben;
 pub use markdown::{SatzOptionen, Seitenzahl, Zaehlung, buch_zu_typst, buch_zu_typst_mit_ende};
 pub use vorschau::{Seitenbild, VorschauErgebnis, hauptversion, pandoc_programm, pandoc_version, produktionsordner, programm_version, vorschau};
-pub use welt::{PdfErgebnis, pdf_setzen, svg_als_pdf, typst_selbsttest, typst_zu_pdf, typst_zu_seiten};
+pub use welt::{PdfErgebnis, pdf_setzen, svg_als_pdf, typst_selbsttest, typst_zu_pdf, typst_zu_seiten, typst_zu_seiten_mit};
 
 /// Vorlage für `.werkbank/satz-stil.typ`: eigener Typst-Text, der nach den Voreinstellungen des
 /// Satzes eingefügt wird und sie überschreibt. Alles ist auskommentiert (`//`); Zeilen einschalten, die gelten sollen.

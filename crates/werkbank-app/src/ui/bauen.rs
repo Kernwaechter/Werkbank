@@ -7,7 +7,7 @@ use crate::thema;
 use crate::{AppState, Message};
 use iced::font::Font;
 use iced::widget::{pick_list, column, container, row, scrollable, space, text};
-use crate::ui::fokus::{liste_mit_pfeilen, toggler, button};
+use crate::ui::fokus::{toggler, button};
 use iced::{Alignment, Element, Fill, Length, Padding, Pixels};
 use std::path::PathBuf;
 use std::time::SystemTime;
@@ -98,19 +98,17 @@ pub struct BauZustand {
     pub satz_laeuft: bool,
     /// Meldung zum letzten nativen Satzlauf.
     pub satz_meldung: String,
-    /// Erzeugte Dateien des nativen Satzes (Pfad, Beschreibung).
-    pub satz_dateien: Vec<(PathBuf, String)>,
-    /// Buchbau nach `buchbau.yaml`: (Buchordner, Bandnummer, Untertitel), wenn der Band dazu gehört.
+    /// Erzeugte Dateien des letzten Satzes (Pfad, Größe in Bytes) und Hinweise dazu.
+    pub satz_dateien: Vec<(PathBuf, u64)>,
+    pub satz_hinweise: Vec<String>,
+    /// Ordner, unter dem die Dateien des letzten Satzes liegen (für kurze Namen).
+    pub satz_ziel: PathBuf,
+    /// Buchprofil `buchbau.yaml`: (Buchordner, Bandnummer, Untertitel), wenn der Band dazu gehört.
     pub buchbau: Option<(PathBuf, u32, String)>,
-    pub buchbau_laeuft: bool,
-    /// Fortschritt des laufenden Buchbaus bzw. Satzes.
-    pub buchbau_lauf: Option<Lauf>,
+    /// Fortschritt des laufenden Satzes.
     pub satz_lauf: Option<Lauf>,
     /// Takt für die Bewegung der Arbeitsanzeige.
     pub puls: u32,
-    pub buchbau_meldung: String,
-    pub buchbau_hinweise: Vec<String>,
-    pub buchbau_dateien: Vec<(PathBuf, u64)>,
     /// Gestaltung der Markdown-Elemente (aus .werkbank/satzstil.json).
     pub stil: werkbank_satz::gestaltung::Satzstil,
     /// Gewähltes Element der Gestaltung (Schlüssel, leer = Fließtext).
@@ -154,31 +152,27 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
         .spacing(10)
         .into()
     };
-    let mut wege = column![text("Setzen, Bauen, Skripte – was ist der Unterschied?").size(14).font(thema::fett()).color(thema::text_hell())].spacing(8);
-    if bau.buchbau.is_some() {
-        wege = wege.push(erklaerung(
-            "Bauen",
-            "Erzeugt dein Buch in deinem festen Buchlayout (aus buchbau.yaml) und füllt die Verlagsordner tolino/, kdp/ und webpublishing/ mit allem, was du hochlädst: Druck-PDFs, EPUB, Umschläge, E-Book-Cover. Das ist der Weg für die Veröffentlichung.",
-        ));
-    }
-    wege = wege
-        .push(erklaerung(
-            "Setzen",
-            "Die Werkbank setzt jedes Buch in ihrer eigenen, einstellbaren Gestaltung (unten: Gestaltung, Stil) – ohne Vorbereitung. Ergebnis in .werkbank/satz/: Druck-PDF je Portal, Lese-PDF, EPUB. Gut zum Ausprobieren und für Bücher ohne eigenes Layout.",
-        ))
-        .push(erklaerung(
+    let wege = column![
+        text("So entsteht dein Buch").size(14).font(thema::fett()).color(thema::text_hell()),
+        erklaerung(
+            "Buch setzen",
+            "Ein Ablauf für alles: Druck-PDF in Farbe (Cover als erste Seite), Druck-PDF in Graustufen für Tolino und KDP (Seitenzahl durch 4 teilbar), EPUB 3 mit Cover und Abbildungen, dazu die Verlagsordner tolino/, kdp/ und webpublishing/. Ungespeichertes wird vorher gesichert.",
+        ),
+        erklaerung(
+            "Gestaltung",
+            "Bestimmt das Aussehen: Überschriften, Rubriken, Codeblöcke, Code im Text, Zitate, Tabellen, Abbildungen, Kästen. Die Vorlage „Werkstatt“ ist das Layout des bisherigen Buchbau-Skripts; jedes Feld lässt sich ändern, die Musterseite zeigt es sofort.",
+        ),
+        erklaerung(
             "Bauskripte",
-            "Startet eigene Programme des Bandes (z. B. Python-Skripte), falls vorhanden. Optional – Setzen und Bauen brauchen sie nicht.",
-        ))
-        .push(erklaerung(
+            "Startet eigene Programme des Bandes (z. B. Python-Skripte), falls vorhanden. Optional – das Setzen braucht sie nicht.",
+        ),
+        erklaerung(
             "Reihenfolge",
-            "Egal. Die drei Wege sind unabhängig, du brauchst nur einen. Jeder Lauf liest den Text neu (Bauen und Skripte speichern vorher). Einzige Verbindung: Der Bereich „Cover“ berechnet die Rückenbreite mit der Seitenzahl des letzten Laufs – vorher nur geschätzt.",
-        ));
-    let kopf = column![
-        text("Setzen und Bauen").size(22).font(thema::fett()).color(thema::text_hell()),
-        karte(wege),
+            "Erst die Gestaltung wählen (oder die Voreinstellung lassen), dann „Buch setzen“. Danach kennt der Bereich „Cover“ die echte Seitenzahl für die Rückenbreite.",
+        ),
     ]
-    .spacing(10);
+    .spacing(8);
+    let kopf = column![text("Setzen").size(22).font(thema::fett()).color(thema::text_hell()), karte(wege)].spacing(10);
 
     // Portale mit berechneter Rückenbreite
     let mut portale = row![].spacing(14);
@@ -212,7 +206,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
         let pfad = crate::bau::programm_finden(name);
         (name, pfad.is_some(), pfad.map_or("nicht gefunden".to_string(), |p| p.display().to_string()))
     };
-    let mut werkzeuge = column![text("Voraussetzungen der Bauskripte (nur für Skripte nötig, nicht für den nativen Satz)").size(14).font(thema::fett()).color(thema::text_hell())].spacing(4);
+    let mut werkzeuge = column![text("Voraussetzungen der Bauskripte (nur für Skripte nötig, nicht fürs Setzen)").size(14).font(thema::fett()).color(thema::text_hell())].spacing(4);
     for (n, ok, pfad) in [werkzeug("python3"), werkzeug("typst"), werkzeug("pandoc")] {
         let (ok, pfad) = if n == "python3" && cfg!(windows) {
             let (prog, vor) = crate::bau::programm_aufloesen("python3");
@@ -252,7 +246,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     }
     if bau.befehle.is_empty() {
         befehle = befehle.push(
-            text("Keine Bauskripte im Bandordner gefunden. Das ist in Ordnung: Setzen und Bauen oben brauchen keine. Skripte (build.sh, alle.py, build.py, scripts/build_book.py) oder eigene Befehle in .werkbank/bauen.json werden sonst hier angeboten.")
+            text("Keine Bauskripte im Bandordner gefunden. Das ist in Ordnung: „Buch setzen“ oben braucht keine. Skripte (build.sh, alle.py, build.py, scripts/build_book.py) oder eigene Befehle in .werkbank/bauen.json werden sonst hier angeboten.")
                 .size(12)
                 .color(thema::warnung_orange()),
         );
@@ -272,127 +266,57 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
         );
     }
 
-    // Buchbau nach buchbau.yaml (ersetzt das Bauskript des Buchs)
-    let buchbau: Option<Element<'_, Message>> = bau.buchbau.as_ref().map(|(buch, nummer, untertitel)| {
-        let mut spalte = column![
-            row![
-                text("Bauen: dein Buchlayout und die Verlagsordner").size(14).font(thema::fett()).color(thema::text_hell()),
-                space::horizontal(),
-                button(text(if bau.buchbau_laeuft { "Baue …".to_string() } else { format!("Band {nummer} bauen") }).size(12))
-                    .padding([6, 14])
-                    .style(thema::primaer_knopf_stil)
-                    .on_press_maybe((!bau.buchbau_laeuft).then_some(Message::BuchbauStarten)),
-            ]
-            .align_y(Alignment::Center),
-            text(format!(
-                "{untertitel}: Print-PDF in Farbe (mit Cover) und in Graustufen (Seitenzahl durch 4 teilbar), EPUB 3 und die Ordner tolino/, kdp/ und webpublishing/ mit Umschlägen, E-Book-Covern und Hinweisen. Alles nativ – ohne Python, Chrome oder Pygments; Ghostscript wird nur für CMYK-Umschläge genutzt, wenn es installiert ist."
-            ))
-            .size(11)
-            .color(thema::text_gedimmt()),
-        ]
-        .spacing(6);
-        if bau.buchbau_laeuft {
-            spalte = spalte.push(arbeitsanzeige(bau.buchbau_lauf.as_ref(), "Baue", std::time::Instant::now(), bau.puls));
-        } else if !bau.buchbau_meldung.is_empty() {
-            spalte = spalte.push(text(&bau.buchbau_meldung).size(11).color(thema::text_hell()));
-        }
-        for h in &bau.buchbau_hinweise {
-            spalte = spalte.push(text(h).size(11).color(thema::warnung_orange()));
-        }
-        for (p, groesse) in &bau.buchbau_dateien {
-            let name = p.strip_prefix(buch).unwrap_or(p).display().to_string();
-            spalte = spalte.push(
-                button(row![text(name).size(12), space::horizontal(), text(format!("{:.0} KB", *groesse as f64 / 1024.0)).size(11).color(thema::text_gedimmt())].align_y(Alignment::Center))
-                    .width(Fill)
-                    .padding([3, 8])
-                    .style(thema::symbol_knopf_stil(false))
-                    .on_press(Message::DateiOeffnen(p.clone())),
-            );
-        }
-        karte(spalte)
-    });
-
-    // Nativer Satz
+    // Setzen: ein Ablauf für alle Bücher
+    let (herkunft, ziel) = match &bau.buchbau {
+        Some((buch, nummer, untertitel)) => (
+            format!("Angaben aus buchbau.yaml: Band {nummer} – {untertitel} (Format, Ränder, Rubriken, Umschlagtexte)."),
+            format!("Ergebnis in {} (build/, tolino/, kdp/, webpublishing/).", buch.display()),
+        ),
+        None => (
+            format!(
+                "Angaben aus dem Band: „{}“ von {}, Format {} (erstes Portal), Dateien in Buchreihenfolge.",
+                projekt.metadaten.titel,
+                projekt.metadaten.autor,
+                state.portale.portale.first().map_or("170 × 240 mm".to_string(), |p| format!("{:.0} × {:.0} mm", p.druck_format_mm.0, p.druck_format_mm.1))
+            ),
+            "Ergebnis in .werkbank/satz/ des Bandes (mit den Verlagsordnern tolino/, kdp/, webpublishing/).".to_string(),
+        ),
+    };
     let mut satz = column![
         row![
-            text("Setzen: Werkbank-Satz in einstellbarer Gestaltung").size(14).font(thema::fett()).color(thema::text_hell()),
+            text("Buch setzen").size(14).font(thema::fett()).color(thema::text_hell()),
             space::horizontal(),
-            button(text("Stil bearbeiten …").size(12)).padding([6, 14]).style(thema::sekundaer_knopf_stil).on_press(Message::SatzStilBearbeiten),
             button(text(if bau.satz_laeuft { "Setze …" } else { "Buch setzen" }).size(12))
                 .padding([6, 14])
                 .style(thema::primaer_knopf_stil)
                 .on_press_maybe((!bau.satz_laeuft).then_some(Message::SatzStarten)),
         ]
         .align_y(Alignment::Center),
-        text("Setzt je Portal ein Schwarzweiß-Druck-PDF (mit PDF/X-3-Graustufen, wenn Ghostscript da ist), ein farbiges Lese-/Web-PDF und ein EPUB 3 in .werkbank/satz/. Kästen (::: info … :::) und Codeblöcke setzt der Stil; „Stil bearbeiten“ legt .werkbank/satz-stil.typ an (Schrift, Ränder, Überschriften, Kästen). Das Ergebnis ist nicht identisch mit der Ausgabe der Skripte.")
-            .size(11)
-            .color(thema::text_gedimmt()),
+        text(herkunft).size(11).color(thema::text_gedimmt()),
+        text("Cover: cover.png im Bandordner, sonst die Vorderseite aus dem Bereich „Cover“. Abbildungen werden eingebettet (im Graudruck in Graustufen umgerechnet).").size(11).color(thema::text_gedimmt()),
+        text(ziel).size(11).color(thema::text_gedimmt()),
     ]
     .spacing(6);
     satz = satz.push(gestaltung(state));
-    let e = &state.einstellungen;
-    const STELLUNGEN: [&str; 2] = ["Außen, abwechselnd (gerade links, ungerade rechts)", "Immer in der Mitte"];
-    const ZAEHLUNGEN: [&str; 2] = ["Titelei römisch, Haupttext beginnt mit 1", "Durchgehend ab dem Titelblatt"];
-    let stellung = if e.seitenzahl == "mitte" { STELLUNGEN[1] } else { STELLUNGEN[0] };
-    let zaehlung = if e.zaehlung == "durchgehend" { ZAEHLUNGEN[1] } else { ZAEHLUNGEN[0] };
-    let waehle = |s: &'static str| move |wahl: &str| Message::SatzSeitenzahl(if wahl == STELLUNGEN[1] { "mitte" } else { s }.to_string());
-    let waehle_z = move |wahl: &str| Message::SatzZaehlung(if wahl == ZAEHLUNGEN[1] { "durchgehend" } else { "roemisch" }.to_string());
     satz = satz.push(
-        column![
-            row![
-                column![
-                    text("Seitenzahl").size(11).color(thema::text_gedimmt()),
-                    liste_mit_pfeilen(
-                        pick_list(&STELLUNGEN[..], Some(stellung), waehle("aussen")).text_size(12).padding([4, 8]).style(thema::auswahl_stil).menu_style(thema::auswahl_menue_stil),
-                        STELLUNGEN.to_vec(),
-                        Some(stellung),
-                        waehle("aussen"),
-                    ),
-                ]
-                .spacing(3),
-                column![
-                    text("Zählung").size(11).color(thema::text_gedimmt()),
-                    liste_mit_pfeilen(
-                        pick_list(&ZAEHLUNGEN[..], Some(zaehlung), waehle_z).text_size(12).padding([4, 8]).style(thema::auswahl_stil).menu_style(thema::auswahl_menue_stil),
-                        ZAEHLUNGEN.to_vec(),
-                        Some(zaehlung),
-                        waehle_z,
-                    ),
-                ]
-                .spacing(3),
-            ]
-            .spacing(16),
-            toggler(e.teile_rechts).label("Teile beginnen auf einer rechten Seite (Leerseiten ohne Zahl)").size(15).text_size(12).on_toggle(Message::SatzTeileRechts),
-            toggler(e.kapitel_rechts).label("Auch Kapitel beginnen rechts").size(15).text_size(12).on_toggle(Message::SatzKapitelRechts),
-            toggler(e.pdfx).label(if state.werkzeuge.ghostscript.is_some() { "Am Ende PDF/X-3 erzeugen (Ghostscript, Graustufen)" } else { "Am Ende PDF/X-3 erzeugen (Ghostscript fehlt, siehe Einstellungen)" }).size(15).text_size(12).on_toggle(Message::SatzPdfx),
-            toggler(e.teil_titelseiten).label("Jeder Teil bekommt eine eigene Titelseite (Rückseite leer)").size(15).text_size(12).on_toggle(Message::SatzTeiltitel),
-            toggler(e.gerade_seitenzahl).label("Gerade Gesamtseitenzahl (Leerseite am Ende, wenn nötig)").size(15).text_size(12).on_toggle(Message::SatzGerade),
-            toggler(e.titelei_zahlen).label("Seitenzahl auch auf Schmutztitel, Titelblatt, Impressum und Teiltiteln").size(15).text_size(12).on_toggle(Message::SatzTitelei),
-            text("Seitenzahlen stehen auf jeder Textseite, auch auf Kapitelanfängen; Leerseiten bleiben leer. Das Inhaltsverzeichnis übernimmt immer die gedruckten Zahlen.")
-                .size(10)
-                .color(thema::text_gedimmt()),
-        ]
-        .spacing(6),
+        toggler(state.einstellungen.pdfx)
+            .label(if state.werkzeuge.ghostscript.is_some() { "Zusätzlich PDF/X-3 des Graudrucks erzeugen (Ghostscript)" } else { "Zusätzlich PDF/X-3 erzeugen (Ghostscript fehlt, siehe Einstellungen)" })
+            .size(15)
+            .text_size(12)
+            .on_toggle(Message::SatzPdfx),
     );
-    if cfg!(windows) && state.werkzeuge.ghostscript.is_none() {
-        satz = satz.push(
-            row![
-                text("Für PDF/X-3 (Graustufen-Druckdatei) fehlt Ghostscript (ghostscript.com, „choco install ghostscript“ oder „scoop install ghostscript“). Ohne es entstehen die Druck-PDFs trotzdem.").size(11).color(thema::warnung_orange()),
-                space::horizontal(),
-                button(text("Erneut prüfen").size(11)).padding([4, 10]).style(thema::sekundaer_knopf_stil).on_press(Message::WerkzeugePruefen),
-            ]
-            .spacing(8)
-            .align_y(Alignment::Center),
-        );
-    }
     if bau.satz_laeuft {
         satz = satz.push(arbeitsanzeige(bau.satz_lauf.as_ref(), "Setze", std::time::Instant::now(), bau.puls));
     } else if !bau.satz_meldung.is_empty() {
-        satz = satz.push(text(&bau.satz_meldung).size(11).color(thema::text_gedimmt()));
+        satz = satz.push(text(&bau.satz_meldung).size(11).color(thema::text_hell()));
     }
-    for (p, info) in &bau.satz_dateien {
+    for h in &bau.satz_hinweise {
+        satz = satz.push(text(h).size(11).color(thema::warnung_orange()));
+    }
+    for (p, groesse) in &bau.satz_dateien {
+        let name = p.strip_prefix(&bau.satz_ziel).unwrap_or(p).display().to_string();
         satz = satz.push(
-            button(row![text(p.file_name().and_then(|n| n.to_str()).unwrap_or("?")).size(12), space::horizontal(), text(info).size(11).color(thema::text_gedimmt())].align_y(Alignment::Center))
+            button(row![text(name).size(12), space::horizontal(), text(format!("{:.0} KB", *groesse as f64 / 1024.0)).size(11).color(thema::text_gedimmt())].align_y(Alignment::Center))
                 .width(Fill)
                 .padding([3, 8])
                 .style(thema::symbol_knopf_stil(false))
@@ -468,11 +392,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     ]
     .spacing(5);
 
-    let mut inhalt = column![kopf];
-    if let Some(b) = buchbau {
-        inhalt = inhalt.push(b);
-    }
-    let inhalt = inhalt.extend([karte(satz), portale.into(), karte(befehle), karte(werkzeuge), karte(ausgabe), karte(dateien), karte(vor)])
+    let inhalt = column![kopf].extend([karte(satz), portale.into(), karte(befehle), karte(werkzeuge), karte(ausgabe), karte(dateien), karte(vor)])
         .spacing(12)
         .max_width(Pixels(1000.0))
         .width(Fill);
@@ -490,7 +410,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
 fn gestaltung(state: &AppState) -> Element<'_, Message> {
     use werkbank_satz::gestaltung::{ELEMENTE, feld_name, felder_von};
     let bau = &state.bau;
-    let kopf = button(text(if bau.stil_offen { "▾ Gestaltung der Elemente (Zitate, Code, Überschriften, Kästen …)" } else { "▸ Gestaltung der Elemente (Zitate, Code, Überschriften, Kästen …)" }).size(13))
+    let kopf = button(text(if bau.stil_offen { "▾ Gestaltung (Überschriften, Rubriken, Code, Zitate, Tabellen, Abbildungen, Kästen …)" } else { "▸ Gestaltung (Überschriften, Rubriken, Code, Zitate, Tabellen, Abbildungen, Kästen …)" }).size(13))
         .padding([6, 10])
         .style(thema::sekundaer_knopf_stil)
         .on_press(Message::SatzStilOffen);
@@ -525,7 +445,7 @@ fn gestaltung(state: &AppState) -> Element<'_, Message> {
         let (name, hinweis) = feld_name(feld);
         let wert = format.feld(feld);
         let eingabe: Element<Message> = match *feld {
-            "fett" | "kursiv" | "rand_seite" => {
+            "fett" | "kursiv" | "rand_seite" | "kopf" | "zeilennummern" => {
                 let optionen: Vec<&'static str> = if *feld == "rand_seite" { vec!["Standard", "links", "rundum", "keine"] } else { vec!["Standard", "ja", "nein"] };
                 let aktuell = if wert.is_empty() { "Standard" } else { optionen.iter().copied().find(|o| *o == wert).unwrap_or("Standard") };
                 let f = *feld;
@@ -538,7 +458,7 @@ fn gestaltung(state: &AppState) -> Element<'_, Message> {
             }
             _ => {
                 let f = *feld;
-                let farbfeld = matches!(*feld, "textfarbe" | "fuellung" | "rand");
+                let farbfeld = matches!(*feld, "textfarbe" | "fuellung" | "rand" | "kopf_fuellung" | "kopf_farbe");
                 let gueltig = wert.trim().is_empty() || !farbfeld || werkbank_satz::gestaltung::farbe_lesen(wert).is_some();
                 let muster = werkbank_satz::gestaltung::farbe_lesen(wert).map_or(iced::Color::TRANSPARENT, |(r, g, b)| iced::Color::from_rgb8(r, g, b));
                 let eingabefeld = iced::widget::text_input("Standard", wert).on_input(move |t| Message::SatzStilFeld(f.to_string(), t)).size(12).padding(5);
@@ -594,7 +514,7 @@ fn gestaltung(state: &AppState) -> Element<'_, Message> {
         ]
         .spacing(8),
         toggler(bau.muster_farbig).label("Muster in Farbe (Web-PDF); aus = Graustufen wie im Druck").size(15).text_size(12).on_toggle(Message::SatzStilMusterFarbig),
-        text("Leere Felder behalten die Voreinstellung. Farben als #rrggbb; im Druck werden sie zu Grau. Gespeichert in .werkbank/satzstil.json. Mehr Möglichkeiten: „Stil bearbeiten“ (Typst).")
+        text("Leere Felder behalten das Werkstatt-Layout. Farben als #rrggbb; im Graudruck werden sie zu Grau. Gespeichert in .werkbank/satzstil.json und gilt für beide Druck-PDFs.")
             .size(10)
             .color(thema::text_gedimmt()),
     ]

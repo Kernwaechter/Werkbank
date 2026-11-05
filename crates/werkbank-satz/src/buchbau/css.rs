@@ -327,3 +327,15 @@ pub fn css(farbig: bool, epub: bool, breite_mm: f32, hoehe_mm: f32) -> String {
         ],
     )
 }
+
+/// Ergänzung für das EPUB: Zitate und Kästen (kannte das bisherige Skript nicht).
+pub const ZUSATZ_EPUB: &str = "
+blockquote { margin: 1em 0; padding: 0.4em 0.9em; border-left: 3px solid #1E3A8A; background: #F8FAFC; }
+.kasten { margin: 1em 0; padding: 0.6em 0.9em; border-left: 3px solid #334155; background: #F1F5F9; }
+.kasten-titel { font-weight: bold; margin: 0 0 0.3em 0; }
+.kasten-info, .kasten-merke { border-color: #1E3A8A; background: #EFF6FF; }
+.kasten-tipp { border-color: #0F766E; background: #F0FDFA; }
+.kasten-wichtig { border-color: #B45309; background: #FFFBEB; }
+.kasten-warnung { border-color: #B91C1C; background: #FEF2F2; }
+.kasten-beispiel { border-color: #6D28D9; background: #F5F3FF; }
+";

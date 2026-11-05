@@ -183,7 +183,19 @@ pub fn typst_zu_seiten(
     max_seiten: usize,
     pixel_pro_pt: f32,
 ) -> Result<(Vec<crate::vorschau::Seitenbild>, usize, Vec<String>), String> {
-    let welt = Welt::neu(quelltext, wurzel, HashMap::new());
+    typst_zu_seiten_mit(quelltext, wurzel, HashMap::new(), max_seiten, pixel_pro_pt)
+}
+
+/// Wie [`typst_zu_seiten`], mit virtuellen Dateien (Name → Inhalt).
+pub fn typst_zu_seiten_mit(
+    quelltext: String,
+    wurzel: Option<PathBuf>,
+    dateien: HashMap<String, Vec<u8>>,
+    max_seiten: usize,
+    pixel_pro_pt: f32,
+) -> Result<(Vec<crate::vorschau::Seitenbild>, usize, Vec<String>), String> {
+    let speicher = dateien.into_iter().map(|(k, v)| (k, Bytes::new(v))).collect();
+    let welt = Welt::neu(quelltext, wurzel, speicher);
     let ergebnis = typst::compile::<PagedDocument>(&welt);
     let warnungen: Vec<String> = ergebnis.warnings.iter().take(5).map(|w| fehlertext(&welt, w)).collect();
     let dokument = ergebnis

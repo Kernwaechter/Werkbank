@@ -195,23 +195,48 @@ impl Bericht {
     }
 }
 
-/// Anzahl der Schritte, die [`bauen`] über `fortschritt` meldet.
+/// Anzahl der Schritte, die [`setzen`] über `fortschritt` meldet.
 pub const SCHRITTE: usize = 5;
 
-/// Baut einen Band: `fortschritt(text)` meldet die [`SCHRITTE`] Arbeitsschritte.
+/// Ein Satzauftrag: welcher Band, mit welchem Profil und welcher Gestaltung.
+pub struct Auftrag<'a> {
+    /// Ordner, in dem Ausgabe (`profil.ausgabe`) und Verlagsordner (tolino/, kdp/, webpublishing/) entstehen.
+    pub buchordner: &'a Path,
+    /// Ordner mit den Markdown-Dateien des Bandes.
+    pub bandordner: &'a Path,
+    pub profil: &'a profil::Profil,
+    pub band: &'a profil::Band,
+    /// Gestaltung der Elemente (leer = Werkstatt-Layout).
+    pub stil: &'a crate::gestaltung::Satzstil,
+    /// Frontcover als PNG, falls im Bandordner kein `cover.png` liegt (z. B. aus dem Cover-Designer).
+    pub ersatz_cover: Option<Vec<u8>>,
+}
+
+/// Baut einen Band nach `buchbau.yaml` mit der Gestaltung aus seinem `.werkbank/satzstil.json`.
 pub fn bauen(buchordner: &Path, nummer: u32, fortschritt: &dyn Fn(&str)) -> Result<Bericht, String> {
     let profil = profil::Profil::laden(buchordner)?;
     let band = profil.band(nummer).ok_or_else(|| format!("Band {nummer} steht nicht in {}", profil::DATEI))?.clone();
     let bandordner = buchordner.join(&band.ordner);
+    let stil = crate::gestaltung::Satzstil::laden(&bandordner);
+    setzen(&Auftrag { buchordner, bandordner: &bandordner, profil: &profil, band: &band, stil: &stil, ersatz_cover: None }, fortschritt)
+}
+
+/// Setzt einen Band: Druck-PDF in Farbe (mit Cover) und in Graustufen, EPUB 3, Verlagsordner mit Umschlägen.
+/// `fortschritt(text)` meldet die [`SCHRITTE`] Arbeitsschritte.
+pub fn setzen(a: &Auftrag, fortschritt: &dyn Fn(&str)) -> Result<Bericht, String> {
+    let (profil, band, buchordner, bandordner) = (a.profil, a.band, a.buchordner, a.bandordner);
     if !bandordner.is_dir() {
         return Err(format!("Das Verzeichnis „{}“ existiert noch nicht.", bandordner.display()));
     }
-    let ausgabe = buchordner.join(&profil.ausgabe);
+    let ausgabe = match profil.ausgabe.trim() {
+        "" | "." => buchordner.to_path_buf(),
+        a => buchordner.join(a),
+    };
     std::fs::create_dir_all(&ausgabe).map_err(|e| format!("{}: {e}", ausgabe.display()))?;
 
     let mut bericht = Bericht::default();
     fortschritt("Texte lesen und übersetzen");
-    let abschnitte = abschnitte_lesen(&bandordner, &profil, &mut bericht.hinweise);
+    let abschnitte = abschnitte_lesen(bandordner, profil, &mut bericht.hinweise);
     if abschnitte.is_empty() {
         return Err(format!("Keine Markdown-Quelldateien in „{}“ gefunden.", bandordner.display()));
     }
@@ -223,7 +248,7 @@ pub fn bauen(buchordner: &Path, nummer: u32, fortschritt: &dyn Fn(&str)) -> Resu
         verlag: profil.verlag.clone(),
         uuid: band.uuid.clone(),
         kurzname: band.kurzname.clone(),
-        css_epub: css::css(true, true, profil.format_mm[0], profil.format_mm[1]),
+        css_epub: format!("{}{}", css::css(true, true, profil.format_mm[0], profil.format_mm[1]), css::ZUSATZ_EPUB),
     };
 
     // Gesamtes Markdown als Referenz
@@ -232,25 +257,36 @@ pub fn bauen(buchordner: &Path, nummer: u32, fortschritt: &dyn Fn(&str)) -> Resu
     std::fs::write(&gesamt, text).map_err(|e| format!("{}: {e}", gesamt.display()))?;
     bericht.notieren(&gesamt);
 
-
-    let cover_png = bandordner.join("cover.png");
+    // Frontcover: cover.png im Bandordner, sonst das mitgegebene Bild (Cover-Designer)
+    let cover_png = match (bandordner.join("cover.png"), &a.ersatz_cover) {
+        (p, _) if p.is_file() => Some(p),
+        (_, Some(daten)) => {
+            let p = ausgabe.join(format!("{}-cover.png", band.kurzname));
+            std::fs::write(&p, daten).map_err(|e| format!("{}: {e}", p.display()))?;
+            Some(p)
+        }
+        _ => {
+            bericht.hinweise.push("Kein Cover gefunden (cover.png im Bandordner oder Bereich „Cover“) – PDF und EPUB ohne Titelbild.".to_string());
+            None
+        }
+    };
     for fassung in [pdf::Fassung::Farbe, pdf::Fassung::Grau] {
         let (endung, cover) = match fassung {
-            pdf::Fassung::Farbe => ("print-farbe", cover_png.is_file().then_some("cover.png")),
+            pdf::Fassung::Farbe => ("print-farbe", cover_png.as_ref().map(|_| "cover.png")),
             pdf::Fassung::Grau => ("print-sw", None),
         };
-        let dateien = dateien_fuer_typst(&abschnitte, &bandordner, buchordner, fassung, cover.map(|_| cover_png.as_path()), &mut bericht.hinweise);
+        let dateien = dateien_fuer_typst(&abschnitte, bandordner, buchordner, fassung, cover.and(cover_png.as_deref()), &mut bericht.hinweise);
         fortschritt(match fassung {
             pdf::Fassung::Farbe => "Druck-PDF in Farbe setzen",
             pdf::Fassung::Grau => "Druck-PDF in Graustufen setzen",
         });
-        let quelle = pdf::dokument(&profil, &band.untertitel, &abschnitte, fassung, cover, 0);
-        let mut ergebnis = crate::welt::typst_zu_pdf(quelle, Some(bandordner.clone()), dateien.clone())?;
+        let quelle = pdf::dokument(profil, &band.untertitel, &abschnitte, fassung, cover, 0, a.stil);
+        let mut ergebnis = crate::welt::typst_zu_pdf(quelle, Some(bandordner.to_path_buf()), dateien.clone())?;
         // Graudruck: wie bisher mit Notizseiten auffüllen, bis die Seitenzahl durch 4 teilbar ist
         if fassung == pdf::Fassung::Grau && ergebnis.seiten % 4 != 0 {
             let fehlen = 4 - ergebnis.seiten % 4;
-            let quelle = pdf::dokument(&profil, &band.untertitel, &abschnitte, fassung, cover, fehlen);
-            ergebnis = crate::welt::typst_zu_pdf(quelle, Some(bandordner.clone()), dateien)?;
+            let quelle = pdf::dokument(profil, &band.untertitel, &abschnitte, fassung, cover, fehlen, a.stil);
+            ergebnis = crate::welt::typst_zu_pdf(quelle, Some(bandordner.to_path_buf()), dateien)?;
         }
         bericht.hinweise.extend(ergebnis.warnungen.iter().map(|w| format!("Satz ({endung}): {w}")));
         let ziel = ausgabe.join(format!("{}-{endung}.pdf", band.kurzname));
@@ -267,22 +303,28 @@ pub fn bauen(buchordner: &Path, nummer: u32, fortschritt: &dyn Fn(&str)) -> Resu
     fortschritt("EPUB 3 schreiben");
     let epub_pfad = ausgabe.join(format!("{}-ebook.epub", band.kurzname));
     let bilder = [bandordner.join("images"), buchordner.join("images")].into_iter().find(|p| p.is_dir());
-    let cover = cover_finden(&bandordner, buchordner);
+    let cover = cover_finden(bandordner, buchordner).or_else(|| cover_png.clone());
     epub::schreiben(&epub_pfad, &info, &abschnitte, bilder.as_deref(), cover.as_deref(), &jetzt_iso())?;
     bericht.notieren(&epub_pfad);
 
     fortschritt("Verlagsordner und Umschläge (tolino/, kdp/, webpublishing/)");
     let seiten = bericht.seiten_grau;
-    let umschlag = |plattform: pakete::Plattform, ziel: &Path| umschlag::schreiben(&profil, &band, &bandordner, plattform, seiten, ziel);
+    let umschlag = |plattform: pakete::Plattform, ziel: &Path| {
+        if profil.reihe.titel.trim().is_empty() {
+            return Err(format!("keine Umschlagtexte (Abschnitt „reihe“ in {}) – den Umschlag im Bereich „Cover“ exportieren", profil::DATEI));
+        }
+        umschlag::schreiben(profil, band, bandordner, plattform, seiten, ziel)
+    };
     let eingaben = pakete::Eingaben {
         buchordner,
-        bandordner: &bandordner,
-        profil: &profil,
-        band: &band,
+        bandordner,
+        profil,
+        band,
         farb_pdf: &ausgabe.join(format!("{}-print-farbe.pdf", band.kurzname)),
         grau_pdf: &ausgabe.join(format!("{}-print-sw.pdf", band.kurzname)),
         epub: &epub_pfad,
         seiten,
+        cover: cover_png.as_deref(),
         umschlag: &umschlag,
     };
     for d in pakete::schreiben(&eingaben, &mut bericht.hinweise)? {
@@ -292,8 +334,110 @@ pub fn bauen(buchordner: &Path, nummer: u32, fortschritt: &dyn Fn(&str)) -> Resu
     Ok(bericht)
 }
 
+/// Satz eines einzelnen Kapitels für die Vorschau – genau wie im Buch: Profil aus `buchbau.yaml`
+/// (falls der Band dazugehört), Gestaltung aus `.werkbank/satzstil.json`, farbig, Abbildungen eingebettet.
+pub fn vorschau_typst(md_text: &str, bandordner: &Path) -> (String, std::collections::HashMap<String, Vec<u8>>, Vec<String>) {
+    let (buchordner, profil) = profil::Profil::suchen(bandordner).unwrap_or_else(|| (bandordner.to_path_buf(), muster_profil()));
+    let stil = crate::gestaltung::Satzstil::laden(bandordner);
+    let abschnitt = md::zerlegen(md_text, "v_", &profil.rubriken_paare());
+    let daten = vec![Abschnittsdaten { datei: String::new(), markdown: String::new(), html: String::new(), abschnitt, ist_titelei: false }];
+    let mut hinweise = Vec::new();
+    let dateien = dateien_fuer_typst(&daten, bandordner, &buchordner, pdf::Fassung::Farbe, None, &mut hinweise);
+    let mut t = pdf::vorlage(&profil, pdf::Fassung::Farbe, "", &stil);
+    t.push_str(&pdf::knoten_typst(&daten[0].abschnitt.knoten, 38));
+    (t, dateien, hinweise)
+}
+
+/// Profil ohne `buchbau.yaml`: Werkstatt-Format 170 × 240 mm.
+fn muster_profil() -> profil::Profil {
+    profil::Profil {
+        titel: String::new(),
+        autor: String::new(),
+        sprache: "de".into(),
+        verlag: String::new(),
+        format_mm: [170.0, 240.0],
+        raender_mm: profil::Raender { innen: 22.0, aussen: 18.0, oben: 20.0, unten: 22.0 },
+        quellen: Vec::new(),
+        rubriken: Vec::new(),
+        ausgabe: String::new(),
+        webseiten: Vec::new(),
+        zeilennummern: false,
+        baende: Vec::new(),
+        reihe: Default::default(),
+    }
+}
+
+/// Musterseiten der Gestaltung im Werkstatt-Satz: Typst-Quelltext und virtuelle Dateien.
+pub fn muster(stil: &crate::gestaltung::Satzstil, farbig: bool) -> (String, std::collections::HashMap<String, Vec<u8>>) {
+    const MD: &str = "## Kapitel 1: Muster\n\nFließtext mit **fett**, *kursiv* und `Code im Text`. Ein zweiter Satz, damit der Absatz etwas länger wird und man den Blocksatz sieht.\n\n### Ein Abschnitt\n\n### Bughunter: Eine Rubrik\n\n#### Ein Unterabschnitt\n\n> Ein Zitat über mehrere Wörter, damit man den Kasten und die Schrift sieht.\n\n```dart\nvoid main() {\n  print('Hallo Werkstatt');\n}\n```\n\n| Spalte A | Spalte B |\n|---|---|\n| eins | zwei |\n\n::: tipp\nEin Tipp im Kasten.\n:::\n\n::: warnung\nEine Warnung.\n:::\n";
+    let profil = profil::Profil {
+        titel: "Muster".into(),
+        raender_mm: profil::Raender { innen: 16.0, aussen: 16.0, oben: 14.0, unten: 16.0 },
+        rubriken: vec![profil::Rubrik { titel: "Bughunter".into(), art: "bughunter".into() }],
+        ..muster_profil()
+    };
+    let fassung = if farbig { pdf::Fassung::Farbe } else { pdf::Fassung::Grau };
+    let abschnitt = md::zerlegen(MD, "m_", &profil.rubriken_paare());
+    let mut t = pdf::vorlage(&profil, fassung, "", stil);
+    // Ohne Seitenwechsel vor der Kapitelüberschrift, damit alles auf eine Seite passt
+    t.push_str("\n#show heading.where(level: 2): it => block(sticky: true, width: 100%, below: 12.45pt, h2text(it.body))\n");
+    t.push_str(&pdf::knoten_typst(&abschnitt.knoten, 38));
+    let mut dateien = std::collections::HashMap::new();
+    dateien.insert("werkstatt.tmTheme".to_string(), hervorhebung::typst_thema(farbig).into_bytes());
+    (t, dateien)
+}
+
 #[cfg(test)]
 mod tests {
+    /// Ein Band ohne `buchbau.yaml`: Profil aus den Angaben, Ersatzcover, Abbildung, Zitat, Kasten, eigene Gestaltung.
+    #[test]
+    fn band_ohne_profil_wird_gesetzt() {
+        use super::profil::*;
+        let o = std::env::temp_dir().join("werkbank-test-setzen");
+        let _ = std::fs::remove_dir_all(&o);
+        std::fs::create_dir_all(o.join("images")).unwrap();
+        let mut png = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(40, 30, image::Rgb([200, 30, 30]))).write_to(&mut png, image::ImageFormat::Png).unwrap();
+        let png = png.into_inner();
+        std::fs::write(o.join("images/bild.png"), &png).unwrap();
+        std::fs::write(o.join("titelei.md"), "<div class=\"half-title\">\n\n# Testbuch\n\n</div>\n").unwrap();
+        std::fs::write(
+            o.join("teil-1.md"),
+            "# Teil 1\n\n## Kapitel 1\n\nText mit `code`.\n\n> Ein Zitat\n\n::: tipp\nTipp\n:::\n\n![Ein Bild](images/bild.png)\n\n```rust\nfn main() {}\n```\n",
+        )
+        .unwrap();
+        let band = Band { nummer: 1, ordner: ".".into(), untertitel: "Band 1".into(), uuid: "urn:uuid:1".into(), kurzname: "test".into(), umschlag: Default::default() };
+        let profil = Profil {
+            titel: "Testbuch".into(),
+            autor: "A".into(),
+            sprache: "de".into(),
+            verlag: "A".into(),
+            format_mm: [150.0, 210.0],
+            raender_mm: Raender { innen: 20.0, aussen: 15.0, oben: 15.0, unten: 18.0 },
+            quellen: vec!["titelei.md".into(), "teil-1.md".into()],
+            rubriken: Vec::new(),
+            ausgabe: ".".into(),
+            webseiten: Vec::new(),
+            zeilennummern: false,
+            baende: vec![band.clone()],
+            reihe: Default::default(),
+        };
+        let mut stil = crate::gestaltung::Satzstil::default();
+        stil.setze("h1", "rand_staerke", "0".into());
+        stil.setze("codeblock", "kopf", "nein".into());
+        stil.setze("zitat", "fuellung", "#ffeecc".into());
+        let ziel = o.join(".werkbank").join("satz");
+        let a = super::Auftrag { buchordner: &ziel, bandordner: &o, profil: &profil, band: &band, stil: &stil, ersatz_cover: Some(png) };
+        let b = super::setzen(&a, &|_| {}).unwrap_or_else(|f| panic!("{f}"));
+        assert_eq!(b.seiten_grau % 4, 0);
+        for d in ["test-print-farbe.pdf", "test-print-sw.pdf", "test-ebook.epub", "test-cover.png", "kdp/test-kdp-kindle-cover-1600x2560.jpg", "webpublishing/test-cover.png"] {
+            assert!(ziel.join(d).is_file(), "{d} fehlt: {:?}", b.dateien);
+        }
+        // Umschlag ohne Umschlagtexte: Hinweis statt Fehler
+        assert!(b.hinweise.iter().any(|h| h.contains("Umschlag")), "{:?}", b.hinweise);
+        assert!(!b.hinweise.iter().any(|h| h.contains("Abbildung nicht gefunden")), "{:?}", b.hinweise);
+    }
+
     #[test]
     fn zeitstempel_hat_das_richtige_format() {
         let t = super::jetzt_iso();

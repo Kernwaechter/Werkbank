@@ -8,7 +8,7 @@ fn main() {
         Some(n) => werkbank_satz::gestaltung::vorlagen().remove(n.parse().unwrap()).stil,
         None => Satzstil::laden(std::path::Path::new(&a[0])),
     };
-    let (seiten, _, w) = werkbank_satz::typst_zu_seiten(stil.muster(a[1] == "farbig"), None, 1, 1.3).unwrap();
+    let (seiten, _, w) = { let (q, d) = stil.muster(a[1] == "farbig"); werkbank_satz::typst_zu_seiten_mit(q, None, d, 1, 1.3) }.unwrap();
     println!("{w:?}");
     let s = &seiten[0];
     // Rohes RGBA als PPM schreiben (ohne Zusatzbibliothek)

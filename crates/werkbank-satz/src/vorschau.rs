@@ -1,8 +1,8 @@
 //! Satzvorschau: Markdown wird wie in den Bauskripten gesetzt und als Seitenbilder angezeigt.
 //!
 //! Der Weg der Skripte lautet: Markdown → **Pandoc** (`-t typst`) → **Typst** → PDF (→ Ghostscript für PDF/X).
-//! Die Vorschau geht denselben Weg bis zu den Seiten, wenn Pandoc installiert ist; sonst setzt der
-//! eingebaute Übersetzer das Kapitel (gleiche Schriften und Seitengröße, aber nicht Pandocs Vorlage).
+//! Bände mit Pandoc-Kopfdatei (`pdf-header.typ`) gehen diesen Weg, wenn Pandoc installiert ist; sonst
+//! setzt der Buchsatz der Werkbank das Kapitel – genau wie „Buch setzen“ (Gestaltung, Format, Abbildungen).
 
 use crate::markdown::markdown_zu_typst;
 use std::collections::HashMap;
@@ -176,25 +176,30 @@ pub fn vorschau(
     // Verweise wie im Buchbau auflösen („Kapitel 12“)
     let md = crate::markdown::produktionsersetzung(md, nummern, teile);
 
-    let versuche: Vec<(&'static str, Result<String, String>)> = if pandoc {
-        vec![
-            ("Pandoc und Typst", pandoc_zu_typst(&md, &ordner)),
-            ("eingebauter Satz", Ok(eingebaut_zu_typst(&md, &ordner, nummern))),
-        ]
+    // Der eingebaute Weg ist derselbe Satz wie „Buch setzen“ (Gestaltung, Profil, Abbildungen)
+    let buchsatz = || {
+        let (t, d, h) = crate::buchbau::vorschau_typst(&md, wurzel);
+        Ok((t, d, h))
+    };
+    type Satz = Result<(String, HashMap<String, Vec<u8>>, Vec<String>), String>;
+    let versuche: Vec<(&'static str, Satz)> = if pandoc {
+        vec![("Pandoc und Typst", pandoc_zu_typst(&md, &ordner).map(|t| (t, HashMap::new(), Vec::new()))), ("Buchsatz der Werkbank", buchsatz())]
     } else {
-        vec![("eingebauter Satz", Ok(eingebaut_zu_typst(&md, &ordner, nummern)))]
+        vec![("Buchsatz der Werkbank", buchsatz())]
     };
 
     let mut letzter_fehler = String::new();
     for (quelle, typ) in versuche {
-        let typ = match typ {
+        let (typ, dateien, h) = match typ {
             Ok(t) => t,
             Err(f) => {
                 hinweise.push(format!("{quelle}: {f}"));
                 continue;
             }
         };
-        match crate::welt::typst_zu_seiten(typ, Some(ordner.clone()), max_seiten, pixel_pro_pt) {
+        hinweise.extend(h);
+        let wurzel_typst = if quelle == "Buchsatz der Werkbank" { wurzel.to_path_buf() } else { ordner.clone() };
+        match crate::welt::typst_zu_seiten_mit(typ, Some(wurzel_typst), dateien, max_seiten, pixel_pro_pt) {
             Ok((seiten, anzahl, warnungen)) => {
                 hinweise.extend(warnungen);
                 return Ok(VorschauErgebnis { seiten, seitenzahl: anzahl, quelle, hinweise });
@@ -226,7 +231,7 @@ mod tests {
         let md = format!("## Titel\n\nText mit `Code` und @kap:x.\n\n```rust\nfn main() {{}}\n```\n\n{}", "Ein Absatz. ".repeat(200));
         let nummern = HashMap::from([("x".to_string(), 4usize)]);
         let e = vorschau(&md, &o, &nummern, &HashMap::new(), false, 3, 1.0).unwrap();
-        assert_eq!(e.quelle, "eingebauter Satz");
+        assert_eq!(e.quelle, "Buchsatz der Werkbank", "{:?}", e.hinweise);
         assert!(!e.seiten.is_empty());
         let s = &e.seiten[0];
         assert_eq!(s.rgba.len(), (s.breite * s.hoehe * 4) as usize);
