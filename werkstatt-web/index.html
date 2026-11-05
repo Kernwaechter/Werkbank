@@ -445,11 +445,11 @@ section { padding-block: 84px 0; }
     <div class="kopf-abschnitt">
       <p class="marke">Satz und Export</p>
       <h2>Vom Markdown zum Buch, mit den Seitenzahlen, die ein Buch hat</h2>
-      <p class="lead">Die Werkbank setzt dein Buch über denselben Weg, den ein Verlag nimmt: Markdown, Pandoc, Typst, PDF/X-3. Das Ergebnis ist ein Druck-PDF, ein Lese-PDF und ein EPUB 3.</p>
+      <p class="lead">Die Werkbank setzt dein Buch in einem Ablauf: Markdown, eingebautes Typst, PDF, auf Wunsch PDF/X-3. Das Ergebnis ist ein Farb-PDF mit Cover, ein Graustufen-Druck-PDF, ein EPUB 3 und die fertigen Ordner für Tolino, KDP und Webpublishing. Nichts davon musst du dafür installieren.</p>
     </div>
     <div class="heft">
       <div class="kette" aria-label="Weg vom Text zur Druckdatei">
-        <span>Markdown</span><i>→</i><span>Pandoc</span><i>→</i><span>Typst</span><i>→</i><span>PDF</span><i>→</i><span class="ziel">PDF/X-3 mit ICC-Profil</span>
+        <span>Markdown</span><i>→</i><span>Typst (eingebaut)</span><i>→</i><span>PDF</span><i>→</i><span class="ziel">PDF/X-3 mit ICC-Profil</span>
       </div>
       <div class="flaeche">
         <p class="marke" style="margin-bottom:16px">Buchübliche Zählung, so wie die Werkbank sie setzt</p>
@@ -472,8 +472,8 @@ section { padding-block: 84px 0; }
         </ul>
         <ul class="liste" style="margin:0">
           <li><div><b>Inhaltsverzeichnis mit stimmenden Seitenzahlen.</b> <span>Der Satz läuft so oft, bis sich nichts mehr verschiebt. Schafft er das nicht, meldet er einen Fehler statt falscher Zahlen.</span></div></li>
-          <li><div><b>Live-Vorschau neben dem Editor.</b> <span>Die Seiten erscheinen auf demselben Weg wie im fertigen PDF. Ohne Pandoc setzt die Werkbank mit ihrem eingebauten Satz.</span></div></li>
-          <li><div><b>Typst steckt in der App.</b> <span>Schriften sind eingebettet. Du installierst keine TeX-Distribution.</span></div></li>
+          <li><div><b>Live-Vorschau neben dem Editor.</b> <span>Die Seiten erscheinen mit derselben Gestaltung wie im fertigen PDF, ohne dass ein weiteres Programm läuft.</span></div></li>
+          <li><div><b>Typst steckt in der App.</b> <span>Schriften sind eingebettet. Du installierst weder Typst noch Pandoc noch eine TeX-Distribution.</span></div></li>
         </ul>
       </div>
     </div>
@@ -617,7 +617,7 @@ section { padding-block: 84px 0; }
       <p class="lead">Dein Buch besteht aus Markdown-Dateien in einem Ordner. Die Werkbank liest und schreibt sie Byte für Byte so, wie du sie ablegst, und braucht kein Konto und keinen Server.</p>
     </div>
     <ul class="liste" style="max-width:760px">
-      <li><div><b>Hilfsmittel im Blick.</b> <span>Die Einstellungen zeigen, ob Pandoc, Ghostscript, Rust und Flutter/Dart installiert sind und in welcher Version, dazu Wörterbuch und LanguageTool. Wenn etwas fehlt, erklärt ein Info-Symbol die Installation für Windows, macOS, Debian, Fedora und Arch. Alles auf einer Seite: <a href="installation.html">Hilfsprogramme installieren</a>.</span></div></li>
+      <li><div><b>Hilfsmittel im Blick.</b> <span>Die Einstellungen zeigen, ob Ghostscript, Pandoc, Rust und Flutter/Dart installiert sind und in welcher Version, dazu Wörterbuch und LanguageTool. Wenn etwas fehlt, erklärt ein Info-Symbol die Installation für Windows, macOS, Debian, Fedora und Arch. Alles auf einer Seite: <a href="installation.html">Hilfsprogramme installieren</a>.</span></div></li>
       <li><div><b>Deutsch zuerst.</b> <span>Oberfläche, Handbuch und Sprachprüfung sind auf deutsche Fachbücher zugeschnitten.</span></div></li>
     </ul>
   </section>
@@ -630,33 +630,47 @@ section { padding-block: 84px 0; }
     </div>
     <div class="downloads">
       <div class="download">
+        <span class="marke">Windows 10 und 11 · 64 Bit</span>
+        <h3>Installationsprogramm</h3>
+        <a class="knopf" href="downloads/Werkbank-1.3.0-Setup.exe" download>Herunterladen</a>
+        <p>Doppelklick auf die Datei startet die Installation. Windows warnt beim ersten Start eventuell vor einem unbekannten Herausgeber: „Weitere Informationen“, dann „Trotzdem ausführen“.</p>
+        <code>SHA-256: 0b1dab1c33ec0210d47b3c095947c051f44936ba0bb75668744a4cf8b6d510dd</code>
+      </div>
+      <div class="download">
+        <span class="marke">macOS 12 oder neuer · Apple Silicon</span>
+        <h3>Disk-Image (.dmg)</h3>
+        <a class="knopf" href="downloads/Werkbank-1.3.0-macOS-arm64.dmg" download>Herunterladen</a>
+        <p>DMG öffnen und die Werkbank in „Programme“ ziehen. Beim ersten Start meldet macOS einen nicht verifizierten Entwickler: Rechtsklick auf die App, „Öffnen“, dann „Öffnen“ bestätigen (oder unter Systemeinstellungen → Datenschutz &amp; Sicherheit „Trotzdem öffnen“).</p>
+        <code>SHA-256: 8572097f6c04ebc99d5843ffb653d0949e3197efe88103ae842b814bbc67cb6d</code>
+      </div>
+      <div class="download">
         <span class="marke">Linux · Debian, Ubuntu, Mint</span>
         <h3>.deb-Paket</h3>
-        <a class="knopf" href="downloads/werkbank_1.2.2-1_amd64.deb" download>Herunterladen</a>
-        <p>Installieren mit <code>sudo apt install ./werkbank_1.2.2-1_amd64.deb</code></p>
-        <code>SHA-256: 67b8a07f9fd3ef193e62e3c1537d53eec6f873d0e8143e87ad592ffdee2f405e</code>
+        <a class="knopf" href="downloads/werkbank_1.3.0-1_amd64.deb" download>Herunterladen</a>
+        <p>Installieren mit <code>sudo apt install ./werkbank_1.3.0-1_amd64.deb</code></p>
+        <code>SHA-256: f60a94833b5d60fd5b4e8de97dd94c822c22733698cc416a9da6c64c4361d33f</code>
       </div>
       <div class="download">
         <span class="marke">Linux · Fedora, openSUSE</span>
         <h3>.rpm-Paket</h3>
-        <a class="knopf" href="downloads/werkbank-1.2.2-1.x86_64.rpm" download>Herunterladen</a>
-        <p>Installieren mit <code>sudo dnf install ./werkbank-1.2.2-1.x86_64.rpm</code></p>
-        <code>SHA-256: 6ddc52f5a7c51d0acb925384833b4f2801ef507037f49acbab7dd03e30d2695d</code>
+        <a class="knopf" href="downloads/werkbank-1.3.0-1.x86_64.rpm" download>Herunterladen</a>
+        <p>Installieren mit <code>sudo dnf install ./werkbank-1.3.0-1.x86_64.rpm</code></p>
+        <code>SHA-256: 01b13faf1e4755a0f4c976ca31ca0741c539eaf3ca022546a850f18d8c7912bd</code>
       </div>
     </div>
-    <p class="bildnotiz">Version 1.2.2, zunächst nur für Linux (64 Bit). Windows und macOS folgen. Nach der Installation startest du die Werkbank aus dem Anwendungsmenü. Die Prüfsummen kannst du mit <span class="tastatur">sha256sum</span> vergleichen.</p>
+    <p class="bildnotiz">Version 1.3.0 für Windows, macOS (Apple Silicon) und Linux (64 Bit). Nach der Installation startest du die Werkbank aus dem Startmenü bzw. Anwendungsmenü. Die Prüfsummen kannst du unter Linux mit <span class="tastatur">sha256sum</span>, unter macOS mit <span class="tastatur">shasum -a 256</span>, unter Windows in PowerShell mit <span class="tastatur">Get-FileHash</span> vergleichen.</p>
 
     <div class="brauchst" id="werkzeuge">
       <h3>Was du dazu brauchst</h3>
-      <p><b>Für Schreiben, Speichern, Statistik, Cover und den eingebauten Buchsatz: nichts weiter.</b> Typst und die Schriften sind in der Werkbank enthalten. Einzelne Funktionen nutzen Programme, die du selbst installierst:</p>
+      <p><b>Für Schreiben, Speichern, Statistik, Cover und den eingebauten Buchsatz: nichts weiter.</b> Typst, die Schriften, EPUB, Umschläge und der Satz mit Cover, Bildern und Gestaltung sind in der Werkbank enthalten. Python und Pandoc brauchst du nicht. Einzelne Funktionen nutzen Programme, die du selbst installierst:</p>
       <table class="werkzeug-tabelle">
         <thead><tr><th>Programm</th><th>Wofür</th><th></th></tr></thead>
         <tbody>
           <tr><td>Hunspell-Wörterbuch Deutsch</td><td>Rechtschreibung im Editor, offline</td><td><span class="stufe ja">empfohlen</span></td></tr>
-          <tr><td>Ghostscript</td><td>Druckdatei als PDF/X-3</td><td><span class="stufe druck">für den Druck</span></td></tr>
+          <tr><td>Ghostscript</td><td>PDF/X-3 für den Druck und CMYK-Umschläge</td><td><span class="stufe druck">für den Druck</span></td></tr>
           <tr><td>LanguageTool und Java 17+</td><td>Grammatik, Stil, Zeichensetzung</td><td><span class="stufe">optional</span></td></tr>
-          <tr><td>Pandoc 3+</td><td>Satzvorschau und Bauskripte bei Pandoc-Büchern</td><td><span class="stufe">optional</span></td></tr>
-          <tr><td>Typst, Python 3</td><td>Eigene Bauskripte im Bereich „Bauen“</td><td><span class="stufe">optional</span></td></tr>
+          <tr><td>Pandoc 3+</td><td>Nur für Bände, die noch eine eigene Pandoc-Kopfdatei (pdf-header.typ) nutzen</td><td><span class="stufe">optional</span></td></tr>
+          <tr><td>Typst (Kommandozeile), Python 3</td><td>Nur für eigene Bauskripte, die diese Programme aufrufen</td><td><span class="stufe">optional</span></td></tr>
           <tr><td>Rust, Flutter oder Dart</td><td>Code-Prüfer für die Beispiele im Buch</td><td><span class="stufe">optional</span></td></tr>
         </tbody>
       </table>
@@ -695,7 +709,7 @@ section { padding-block: 84px 0; }
       <a class="knopf leise" href="#schreiben">Funktionen ansehen</a>
     </div>
   </div>
-  <footer class="fuss"><span><a href="impressum.html">Impressum</a> · <a href="datenschutz.html">Datenschutz</a></span><span>Werkbank 1.2.2 · <a href="mailto:kontakt@jurzel.de">kontakt@jurzel.de</a></span><span>Geschrieben in Rust mit Iced und Typst</span></footer>
+  <footer class="fuss"><span><a href="impressum.html">Impressum</a> · <a href="datenschutz.html">Datenschutz</a></span><span>Werkbank 1.3.0 · <a href="mailto:kontakt@jurzel.de">kontakt@jurzel.de</a></span><span>Geschrieben in Rust mit Iced und Typst</span></footer>
 </div>
 
 <script>

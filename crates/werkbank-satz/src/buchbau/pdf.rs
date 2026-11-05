@@ -270,7 +270,11 @@ pub fn vorlage(profil: &Profil, fassung: Fassung, untertitel: &str, stil: &Satzs
         ("@@RUBRIKEN@@", rubrik_regeln),
         ("@@ZEILENNUMMERN@@", zeilennummern.to_string()),
     ];
+    let liste = |namen: &[&str]| format!("({},)", crate::welt::vorhandene_familien(namen).iter().map(|n| format!("\"{n}\"")).collect::<Vec<_>>().join(", "));
     let mut t = VORLAGE.to_string();
+    t = t.replace("@@SERIFE@@", &liste(&["Noto Serif", "Liberation Serif", "DejaVu Serif", "Libertinus Serif"]));
+    t = t.replace("@@SANSE@@", &liste(&["Noto Sans", "Liberation Sans", "DejaVu Sans", "Fira Sans"]));
+    t = t.replace("@@MONOE@@", &liste(&["DejaVu Sans Mono", "Liberation Mono"]));
     for (name, wert) in ersetzungen {
         t = t.replace(name, &wert);
     }
@@ -280,9 +284,9 @@ pub fn vorlage(profil: &Profil, fassung: Fassung, untertitel: &str, stil: &Satzs
 /// Typst-Vorlage. Werte aus dem Stylesheet: 1 px = 0,75 pt; Zeilenhöhe als 1-em-Zeilenkasten plus Abstand.
 /// Alle `@@…@@` kommen aus der Gestaltung (leer = Werkstatt-Layout).
 const VORLAGE: &str = r##"// Buchsatz der Werkbank – Werkstatt-Layout (wie das bisherige build_book.py) mit eigener Gestaltung
-#let serif = ("Noto Serif", "Liberation Serif", "DejaVu Serif", "Libertinus Serif")
-#let sans = ("Noto Sans", "Liberation Sans", "DejaVu Sans", "Fira Sans")
-#let mono = ("DejaVu Sans Mono", "Liberation Mono")
+#let serif = @@SERIFE@@
+#let sans = @@SANSE@@
+#let mono = @@MONOE@@
 #let akzent1 = @@AKZENT1@@
 #let akzent2 = @@AKZENT2@@
 #let coderand = @@CODERAND@@

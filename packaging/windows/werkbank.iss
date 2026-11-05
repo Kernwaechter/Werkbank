@@ -1,7 +1,10 @@
 ; Inno Setup 6 – baut den Windows-Installer (Setup.exe).
 ; Aufruf unter Windows:  iscc packaging\windows\werkbank.iss
 ; Erwartet target\x86_64-pc-windows-msvc\release\werkbank-app.exe (siehe windows-bauen.sh).
-#define Version "1.2.2"
+; Die Version kommt aus Cargo.toml (windows-bauen.ps1 übergibt /DVersion=…); ohne Angabe gilt dieser Wert.
+#ifndef Version
+  #define Version "1.3.0"
+#endif
 
 [Setup]
 AppId={{5D0B6C4A-7E1F-4B7E-9A55-DAEHN-WERKBANK}

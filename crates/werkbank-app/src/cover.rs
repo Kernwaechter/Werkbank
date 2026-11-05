@@ -33,15 +33,12 @@ pub fn png_schreiben(svg: &str, ziel_breite: u32, datei: &Path) -> Result<(), St
     pixel.save_png(datei).map_err(|e| format!("{}: {e}", datei.display()))
 }
 
-/// Klappentext aus `klappentext.md` (Überschriften und Auszeichnung entfernt).
+/// Klappentext aus `klappentext.md` als Markdown (Schlagzeile, Absätze, Punkte, Fettdruck werden beim Satz ausgewertet).
 pub fn klappentext_lesen(bandordner: &Path) -> String {
     std::fs::read_to_string(bandordner.join("klappentext.md"))
         .unwrap_or_default()
-        .lines()
-        .filter(|z| !z.trim_start().starts_with('#') && !z.trim().is_empty())
-        .map(|z| z.replace(['*', '_', '`'], ""))
-        .collect::<Vec<_>>()
-        .join("\n")
+        .trim_start_matches('\u{feff}')
+        .to_string()
 }
 
 fn kurzname(name: &str) -> String {

@@ -215,6 +215,17 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
         } else {
             (ok, pfad)
         };
+        // Typst steckt im Programm; ein eigenes Typst-Programm brauchen nur die alten Bauskripte
+        let (ok, pfad) = if n == "typst" {
+            let eingebaut = !matches!(state.werkzeuge.typst_eingebaut, Some(Err(_)));
+            let programm = if ok { format!(" · zusätzlich Programm: {pfad}") } else { String::new() };
+            match &state.werkzeuge.typst_eingebaut {
+                Some(Err(e)) => (false, format!("eingebauter Satz meldet einen Fehler: {e}")),
+                _ => (eingebaut, format!("eingebaut (Satz der Werkbank){programm}")),
+            }
+        } else {
+            (ok, pfad)
+        };
         werkzeuge = werkzeuge.push(punkt(n, pfad, ok));
     }
     if cfg!(windows) {

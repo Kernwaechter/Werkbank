@@ -20,4 +20,4 @@ $zip = Join-Path $out "Werkbank-$v-windows-x64.zip"
 Remove-Item $zip -ErrorAction SilentlyContinue
 Compress-Archive -Path $ziel -DestinationPath $zip
 Get-Item $zip | Format-Table Name, Length
-if (Get-Command iscc -ErrorAction SilentlyContinue) { iscc packaging\windows\werkbank.iss } else { Write-Host 'Für den Setup-Installer: Inno Setup installieren (winget install JRSoftware.InnoSetup) und iscc packaging\windows\werkbank.iss ausführen.' }
+if (Get-Command iscc -ErrorAction SilentlyContinue) { iscc "/DVersion=$v" packaging\windows\werkbank.iss } else { Write-Host 'Für den Setup-Installer: Inno Setup installieren (winget install JRSoftware.InnoSetup) und iscc packaging\windows\werkbank.iss ausführen.' }

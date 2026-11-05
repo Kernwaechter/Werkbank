@@ -9,7 +9,7 @@ Das **Symbol** (`assets/icons/werkbank.svg`: aufgeschlagenes Buch auf einer Werk
 | Debian/Ubuntu (.deb) | `packaging/pakete-bauen.sh` (cargo-deb), Metadaten in `crates/werkbank-app/Cargo.toml` | **gebaut** (20 MB), Inhalt mit `dpkg-deb` geprüft, nicht installiert |
 | Fedora/openSUSE (.rpm) | `packaging/pakete-bauen.sh` (cargo-generate-rpm) | **gebaut** (22 MB), Dateiliste und Abhängigkeiten gelesen, nicht installiert |
 | Flatpak | `packaging/flatpak/bauen.sh`, Manifest `packaging/de.daehn.Werkbank.yaml` | Manifest geprüft, **nicht gebaut** (flatpak-builder fehlt) |
-| macOS | `cargo install cargo-bundle && cargo bundle --release -p werkbank-app` erzeugt eine `.app` mit dem icns-Symbol | **nicht gebaut, nicht signiert/notarisiert** |
+| macOS | `.app` von Hand gebaut (Info.plist + icns, ad-hoc signiert), DMG mit `hdiutil` | **DMG gebaut (arm64)**, nicht notarisiert |
 | Windows | `packaging\windows\windows-bauen.ps1` (unter Windows, MSVC) oder `windows-bauen.sh` (Cross-Build unter Linux) liefert `werkbank-app.exe` mit Symbol und ein ZIP; `werkbank.iss` (Inno Setup) den Installer | Release-Build läuft unter Windows 11; Installer und Signatur **nicht geprüft** |
 
 `.github/workflows/release.yml` baut alle Systeme bei einem Tag `v*` (inklusive Flatpak). Er wurde nicht ausgeführt. Signieren: [SIGNIEREN.md](SIGNIEREN.md).

@@ -47,6 +47,23 @@ fn schriften_suchen() -> Fonts {
     typst_kit::fonts::FontSearcher::new().include_system_fonts(true).search()
 }
 
+/// Gibt aus einer Wunschliste nur die Schriftfamilien zurück, die auf diesem Rechner oder eingebaut vorhanden sind
+/// (Typst meldet sonst für jede fehlende Familie „unknown font family“). Bleibt nichts übrig, wird die Liste unverändert zurückgegeben.
+pub fn vorhandene_familien<'a>(wunsch: &[&'a str]) -> Vec<&'a str> {
+    static FAMILIEN: std::sync::OnceLock<std::collections::HashSet<String>> = std::sync::OnceLock::new();
+    let menge = FAMILIEN.get_or_init(|| {
+        let mut buch = schriften_suchen().book;
+        for daten in MITGELIEFERTE_SCHRIFTEN {
+            for schrift in Font::iter(Bytes::new(*daten)) {
+                buch.push(schrift.info().clone());
+            }
+        }
+        buch.families().map(|(name, _)| name.to_lowercase()).collect()
+    });
+    let gefunden: Vec<&str> = wunsch.iter().copied().filter(|n| menge.contains(&n.to_lowercase())).collect();
+    if gefunden.is_empty() { wunsch.to_vec() } else { gefunden }
+}
+
 impl Welt {
     fn neu(text: String, wurzel: Option<PathBuf>, speicher: HashMap<String, Bytes>) -> Self {
         let f = schriften_suchen();

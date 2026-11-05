@@ -50,17 +50,17 @@ body[data-os="windows"] .os:not([data-os="windows"]){display:none}
 <p class="zurueck"><a href="index.html">← Zur Werkbank</a></p>
 <p class="marke">Installation</p>
 <h1>Hilfsprogramme für die Werkbank</h1>
-<p class="lead">Zum Schreiben, Speichern, für Statistik, Cover und den eingebauten Buchsatz brauchst du nichts weiter: Die Werkbank bringt Typst und die Schriften mit. Für einige Funktionen nutzt sie Programme, die du selbst installierst. Hier steht, wofür jedes gut ist und wie du es unter Linux, macOS und Windows einrichtest.</p>
+<p class="lead">Zum Schreiben, Speichern, für Statistik, Cover und das Setzen des Buches (PDF, EPUB, Verlagsordner) brauchst du nichts weiter: Die Werkbank bringt Typst und die Schriften mit. Python und Pandoc sind nicht mehr nötig. Für einige Funktionen nutzt sie Programme, die du selbst installierst. Hier steht, wofür jedes gut ist und wie du es unter Linux, macOS und Windows einrichtest.</p>
 
 <table class="uebersicht">
   <thead><tr><th>Programm</th><th class="wofuer">Wofür</th><th>Brauchst du es?</th></tr></thead>
   <tbody>
     <tr><td><a href="#hunspell">Hunspell-Wörterbuch (Deutsch)</a></td><td class="wofuer">Rote Markierung unbekannter Wörter, offline</td><td><span class="noetig ja">empfohlen</span></td></tr>
     <tr><td><a href="#languagetool">LanguageTool und Java 17+</a></td><td class="wofuer">Grammatik, Stil und Zeichensetzung</td><td><span class="noetig opt">optional</span></td></tr>
-    <tr><td><a href="#ghostscript">Ghostscript</a></td><td class="wofuer">Druckdatei als PDF/X-3 für Druckdienstleister</td><td><span class="noetig druck">für den Druck</span></td></tr>
-    <tr><td><a href="#pandoc">Pandoc 3 oder neuer</a></td><td class="wofuer">Satzvorschau und Bauskripte für Bücher, die mit Pandoc gebaut werden</td><td><span class="noetig opt">optional</span></td></tr>
+    <tr><td><a href="#ghostscript">Ghostscript</a></td><td class="wofuer">PDF/X-3 für Druckdienstleister und CMYK-Umschläge</td><td><span class="noetig druck">für den Druck</span></td></tr>
+    <tr><td><a href="#pandoc">Pandoc 3 oder neuer</a></td><td class="wofuer">Nur für Bände mit eigener Pandoc-Kopfdatei (<code>pdf-header.typ</code>)</td><td><span class="noetig opt">optional</span></td></tr>
     <tr><td><a href="#typst">Typst (Kommandozeile)</a></td><td class="wofuer">Nur für eigene Bauskripte, die <code>typst</code> aufrufen</td><td><span class="noetig opt">optional</span></td></tr>
-    <tr><td><a href="#python">Python 3</a></td><td class="wofuer">Eigene Bauskripte (Bereich „Bauen“)</td><td><span class="noetig opt">optional</span></td></tr>
+    <tr><td><a href="#python">Python 3</a></td><td class="wofuer">Nur für eigene Bauskripte</td><td><span class="noetig opt">optional</span></td></tr>
     <tr><td><a href="#rust">Rust (rustc)</a></td><td class="wofuer">Code-Prüfer für Rust-Beispiele</td><td><span class="noetig opt">optional</span></td></tr>
     <tr><td><a href="#flutter">Flutter oder Dart</a></td><td class="wofuer">Code-Prüfer für Dart- und Flutter-Beispiele</td><td><span class="noetig opt">optional</span></td></tr>
   </tbody>
@@ -129,14 +129,16 @@ Expand-Archive LanguageTool.zip -DestinationPath C:\LanguageTool</span>
     <p class="distro">Arch, Manjaro</p><span class="befehl">sudo pacman -S ghostscript</span>
   </div>
   <div class="os" data-os="mac"><h3>macOS</h3><span class="befehl">brew install ghostscript</span></div>
-  <div class="os" data-os="windows"><h3>Windows</h3><span class="befehl">winget install --id ArtifexSoftware.GhostScript</span>
-    <p class="distro">Das Programm heißt unter Windows <code>gswin64c</code>; die Werkbank findet es.</p></div>
-  <p class="pruefen">Prüfen: <code>gs --version</code></p>
+  <div class="os" data-os="windows"><h3>Windows</h3><p class="distro">Ghostscript gibt es nicht in winget. Den Installer (Windows 64 bit) von <a href="https://ghostscript.com/releases/gsdnld.html">ghostscript.com</a> laden und ausführen, oder mit Chocolatey bzw. Scoop:</p>
+    <span class="befehl">choco install ghostscript</span>
+    <span class="befehl">scoop install ghostscript</span>
+    <p class="distro">Das Programm heißt unter Windows <code>gswin64c</code>; die Werkbank findet es in <code>C:\Program Files\gs</code>. Liegt es woanders, den Ordner in der Werkbank unter <b>Einstellungen → Werkzeuge → Ordner von Ghostscript</b> eintragen.</p></div>
+  <p class="pruefen">Prüfen: <code>gs --version</code> (Windows: <code>gswin64c --version</code>)</p>
 </section>
 
 <section class="werkzeug" id="pandoc">
   <div class="werkzeug-kopf"><h2>Pandoc</h2><span class="noetig opt">optional</span></div>
-  <p>Für Bücher, deren Bauskripte mit Pandoc arbeiten (Markdown → Typst). Die Satzvorschau geht dann denselben Weg. Ohne Pandoc setzt der eingebaute Satz. Nötig ist Version 3 oder neuer.</p>
+  <p>Nur für Bände, die noch eine eigene Pandoc-Kopfdatei (<code>pdf-header.typ</code>) haben: Ihre Vorschau geht über Pandoc. „Buch setzen“ braucht Pandoc nie, es setzt mit dem eingebauten Typst. Nötig ist Version 3 oder neuer.</p>
   <div class="os" data-os="linux"><h3>Linux</h3>
     <p class="distro">Debian, Ubuntu, Mint</p><span class="befehl">sudo apt install pandoc</span>
     <p class="distro">Fedora</p><span class="befehl">sudo dnf install pandoc</span>
@@ -151,7 +153,7 @@ Expand-Archive LanguageTool.zip -DestinationPath C:\LanguageTool</span>
 
 <section class="werkzeug" id="typst">
   <div class="werkzeug-kopf"><h2>Typst (Kommandozeile)</h2><span class="noetig opt">optional</span></div>
-  <p>Die Werkbank selbst braucht kein eigenes Typst, sie bringt es eingebaut mit. Installiere es nur, wenn deine eigenen Bauskripte <code>typst compile</code> aufrufen.</p>
+  <p>Die Werkbank selbst braucht kein eigenes Typst, sie bringt es eingebaut mit. Das Setzen eines Buches braucht es nicht. Installiere es nur, wenn deine eigenen Bauskripte <code>typst compile</code> aufrufen.</p>
   <div class="os" data-os="linux"><h3>Linux</h3>
     <p class="distro">Arch, Manjaro</p><span class="befehl">sudo pacman -S typst</span>
     <p class="distro">Alle Distributionen: fertiges Programm von den <a href="https://github.com/typst/typst/releases">Typst-Releases</a> laden, entpacken und nach <code>~/.local/bin</code> legen – oder mit Rust bauen:</p>
@@ -164,7 +166,7 @@ Expand-Archive LanguageTool.zip -DestinationPath C:\LanguageTool</span>
 
 <section class="werkzeug" id="python">
   <div class="werkzeug-kopf"><h2>Python 3</h2><span class="noetig opt">optional</span></div>
-  <p>Der Bereich „Bauen“ startet die Bauskripte deines Buches. Sind sie in Python geschrieben, braucht es Python 3 – und die Pakete, die das Skript selbst importiert (steht meist am Anfang des Skripts).</p>
+  <p>Der Bereich „Bauen“ braucht für „Buch setzen“ kein Python. Nur wenn du dort eigene Bauskripte startest, die in Python geschrieben sind, braucht es Python 3 – und die Pakete, die das Skript selbst importiert (steht meist am Anfang des Skripts).</p>
   <div class="os" data-os="linux"><h3>Linux</h3>
     <p class="distro">Debian, Ubuntu, Mint</p><span class="befehl">sudo apt install python3 python3-pip</span>
     <p class="distro">Fedora</p><span class="befehl">sudo dnf install python3 python3-pip</span>

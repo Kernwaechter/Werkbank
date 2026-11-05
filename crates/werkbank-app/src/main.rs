@@ -522,6 +522,8 @@ pub enum Message {
     CoverFeld(ui::cover::CoverFeld, String),
     /// Barcode-Freifläche ein/aus.
     CoverBarcode(bool),
+    /// Schrift der Rückseite automatisch verkleinern, wenn der Klappentext nicht passt.
+    CoverSchriftAuto(bool),
     /// Regler der Cover-Vorlage (Prozent).
     CoverRegler(ui::cover::CoverRegler, u32),
     /// Auswahlfeld der Cover-Vorlage (Bildbereich, Ausschnitt).
@@ -980,12 +982,18 @@ fn cover_vorschau(state: &mut AppState) -> Task<Message> {
     let seiten = if daten.seiten > 0 { daten.seiten } else { state.satz_seiten.unwrap_or(state.projekt.buchseiten_schaetzung() as u32) };
     let umschlag = state.cover.umschlag;
     let ordner = state.band.ordner.clone();
+    // Satz und Prüfung des Klappentextes (schnell, deshalb gleich hier)
+    state.cover.cover_png = ordner.as_deref().is_some_and(|o| o.join("cover.png").is_file());
+    state.cover.klappentext = portal.as_ref().map(|p| {
+        let roh = if daten.klappentext.trim().is_empty() { ordner.as_deref().map(cover::klappentext_lesen).unwrap_or_default() } else { daten.klappentext.clone() };
+        werkbank_kern::cover::klappentext_satz(&daten, p, seiten, &roh)
+    });
     Task::perform(
         languagetool::im_hintergrund(move || {
-            // Hat der Band ein eigenes cover.png und noch keinen Entwurf im Cover-Designer, zeigt die Vorschau dieses Bild
+            // Hat der Band ein fertiges cover.png und wurde im Cover-Designer kein Hintergrundbild gewählt, zeigt die Vorschau dieses Bild
             if !umschlag
+                && daten.bild.is_empty()
                 && let Some(o) = ordner.as_deref()
-                && !o.join(".werkbank").join("cover.json").is_file()
                 && let Ok(daten) = std::fs::read(o.join("cover.png"))
                 && let Ok(voll) = resvg::tiny_skia::Pixmap::decode_png(&daten)
             {
@@ -2115,6 +2123,12 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
             return cover_vorschau(state);
         }
 
+        Message::CoverSchriftAuto(an) => {
+            state.cover.daten.rueckseite_schrift_auto = an;
+            cover_speichern(state);
+            return cover_vorschau(state);
+        }
+
         Message::CoverRegler(regler, prozent) => {
             let wert = prozent as f32 / 100.0;
             let d = &mut state.cover.daten;
@@ -2122,6 +2136,7 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
                 ui::cover::CoverRegler::Abdunkeln => d.bild_abdunkeln = wert.min(0.9),
                 ui::cover::CoverRegler::RueckenDeckkraft => d.ruecken_kasten_deckkraft = wert.min(1.0),
                 ui::cover::CoverRegler::RueckseiteDeckkraft => d.rueckseite_kasten_deckkraft = wert.min(1.0),
+                ui::cover::CoverRegler::RueckseiteSchrift => d.rueckseite_schrift_pt = prozent as f32, // Punkt, nicht Prozent
             }
             cover_speichern(state);
             return cover_vorschau(state);

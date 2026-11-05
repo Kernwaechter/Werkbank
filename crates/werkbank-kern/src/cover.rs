@@ -54,6 +54,10 @@ pub struct CoverDaten {
     pub barcode: bool,
     /// Text der Rückseite (leer = `klappentext.md`).
     pub klappentext: String,
+    /// Schriftgröße des Klappentextes in Punkt (unter 6 = 11 pt).
+    pub rueckseite_schrift_pt: f32,
+    /// Schrift automatisch verkleinern (bis 7,5 pt), wenn der Text nicht auf die Rückseite passt.
+    pub rueckseite_schrift_auto: bool,
 }
 
 impl Default for CoverDaten {
@@ -83,6 +87,8 @@ impl Default for CoverDaten {
             seiten: 0,
             barcode: true,
             klappentext: String::new(),
+            rueckseite_schrift_pt: 11.0,
+            rueckseite_schrift_auto: true,
         }
     }
 }
@@ -90,16 +96,22 @@ impl Default for CoverDaten {
 impl CoverDaten {
     /// Lädt `.werkbank/cover.json`.
     pub fn laden(bandordner: &Path) -> Option<Self> {
-        fs::read_to_string(bandordner.join(".werkbank").join("cover.json"))
-            .ok()
-            .and_then(|t| serde_json::from_str(&t).ok())
+        let text = fs::read_to_string(bandordner.join(".werkbank").join("cover.json")).ok()?;
+        let mut d: Self = serde_json::from_str(text.trim_start_matches('\u{feff}')).ok()?;
+        d.bild = bild_aufloesen(&d.bild, bandordner);
+        Some(d)
     }
 
-    /// Speichert nach `.werkbank/cover.json`.
+    /// Speichert nach `.werkbank/cover.json`. Ein Bild im Bandordner wird relativ eingetragen,
+    /// damit der Band zwischen Windows, Linux und macOS wandern kann.
     pub fn speichern(&self, bandordner: &Path) -> io::Result<()> {
         let ordner = bandordner.join(".werkbank");
         fs::create_dir_all(&ordner)?;
-        fs::write(ordner.join("cover.json"), serde_json::to_string_pretty(self).map_err(io::Error::other)?)
+        let mut kopie = self.clone();
+        if let Ok(rel) = Path::new(&self.bild).strip_prefix(bandordner) {
+            kopie.bild = rel.to_string_lossy().replace('\\', "/");
+        }
+        fs::write(ordner.join("cover.json"), serde_json::to_string_pretty(&kopie).map_err(io::Error::other)?)
     }
 
     fn bild_nur_vorn(&self) -> bool {
@@ -117,6 +129,33 @@ impl CoverDaten {
     fn abdunkeln(&self) -> f32 {
         self.bild_abdunkeln.clamp(0.0, 0.9)
     }
+}
+
+/// Macht den gespeicherten Bildpfad auf diesem Rechner brauchbar: relative Pfade gelten ab dem Bandordner;
+/// ein absoluter Pfad von einem anderen System (z. B. `/home/…/cover.png` unter Windows) wird, wenn es ihn hier nicht gibt,
+/// über den Dateinamen im Bandordner (oder in `.werkbank`) gesucht.
+pub fn bild_aufloesen(bild: &str, bandordner: &Path) -> String {
+    if bild.trim().is_empty() {
+        return String::new();
+    }
+    let norm = bild.trim().replace('\\', "/");
+    let pfad = Path::new(&norm);
+    // Absolut ist auch, was nur auf einem anderen System so aussieht (`/home/…` unter Windows, `C:/…` unter Linux)
+    let fremd_absolut = norm.starts_with('/') || norm.as_bytes().get(1) == Some(&b':');
+    if pfad.is_relative() && !fremd_absolut {
+        return bandordner.join(pfad).to_string_lossy().into_owned();
+    }
+    if pfad.is_absolute() && pfad.is_file() {
+        return bild.to_string();
+    }
+    if let Some(name) = norm.rsplit('/').next().filter(|n| !n.is_empty()) {
+        for kandidat in [bandordner.join(name), bandordner.join(".werkbank").join(name), bandordner.join("bilder").join(name)] {
+            if kandidat.is_file() {
+                return kandidat.to_string_lossy().into_owned();
+            }
+        }
+    }
+    bild.to_string()
 }
 
 /// Nur gültige Farben (`#rgb`/`#rrggbb`) gelangen ins SVG, alles andere wird zum Ersatzwert.
@@ -332,6 +371,276 @@ pub fn svg_ebook(d: &CoverDaten, breite: f32, hoehe: f32, umschlag: Option<(&Por
     s
 }
 
+// ---- Klappentext (Rückseite)
+
+#[derive(Debug, Clone, PartialEq)]
+struct Wort {
+    text: String,
+    fett: bool,
+    kursiv: bool,
+    /// Ohne Leerraum an das vorige Wort angehängt (z. B. `**Rust**-Compiler`).
+    kleben: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Art {
+    /// Überschrift der Ebene 1, 2, …
+    Kopf(u8),
+    Absatz,
+    Punkt,
+}
+
+#[derive(Debug, Clone)]
+struct Block {
+    art: Art,
+    worte: Vec<Wort>,
+    /// Zeichen vor einem Aufzählungspunkt („•“ oder „1.“).
+    marke: String,
+}
+
+/// Zerlegt eine Zeile in Wörter; `**fett**`, `*kursiv*`, `_kursiv_` und `` `code` `` werden ausgewertet.
+fn inline_worte(zeile: &str, fett_ganz: bool) -> Vec<Wort> {
+    let z: Vec<char> = zeile.chars().collect();
+    let (mut aus, mut akt) = (Vec::new(), String::new());
+    let (mut fett, mut kursiv, mut akt_kleben, mut kleben_naechst) = (fett_ganz, false, false, false);
+    let mut i = 0;
+    macro_rules! fertig {
+        ($f:expr, $k:expr) => {
+            if !akt.is_empty() {
+                aus.push(Wort { text: std::mem::take(&mut akt), fett: $f, kursiv: $k, kleben: akt_kleben });
+            }
+        };
+    }
+    while i < z.len() {
+        let c = z[i];
+        if c == '*' && z.get(i + 1) == Some(&'*') {
+            let war_wort = !akt.is_empty();
+            fertig!(fett, kursiv);
+            fett = !fett || fett_ganz;
+            kleben_naechst = war_wort; // nur ans vorige Wort kleben, wenn kein Leerzeichen davor stand
+            i += 2;
+        } else if c == '*' || (c == '_' && (akt.is_empty() || (kursiv && z.get(i + 1).is_none_or(|n| !n.is_alphanumeric())))) {
+            let war_wort = !akt.is_empty();
+            fertig!(fett, kursiv);
+            kursiv = !kursiv;
+            kleben_naechst = war_wort;
+            i += 1;
+        } else if c == '`' {
+            i += 1;
+        } else if c.is_whitespace() {
+            fertig!(fett, kursiv);
+            kleben_naechst = false;
+            i += 1;
+        } else {
+            if akt.is_empty() {
+                akt_kleben = kleben_naechst && !aus.is_empty();
+                kleben_naechst = false;
+            }
+            akt.push(c);
+            i += 1;
+        }
+    }
+    fertig!(fett, kursiv);
+    aus
+}
+
+/// „1. Text“ → („1.“, „Text“).
+fn nummeriert(z: &str) -> Option<(String, &str)> {
+    let ziffern = z.chars().take_while(|c| c.is_ascii_digit()).count();
+    if ziffern == 0 || ziffern > 3 {
+        return None;
+    }
+    let rest = z[ziffern..].strip_prefix(". ")?;
+    Some((format!("{}.", &z[..ziffern]), rest))
+}
+
+/// Markdown des Klappentextes in Blöcke: Überschriften, Absätze, Aufzählungspunkte.
+fn klappentext_bloecke(roh: &str) -> Vec<Block> {
+    let mut bloecke: Vec<Block> = Vec::new();
+    let mut absatz: Vec<Wort> = Vec::new();
+    let fertig = |absatz: &mut Vec<Wort>, bloecke: &mut Vec<Block>| {
+        if !absatz.is_empty() {
+            bloecke.push(Block { art: Art::Absatz, worte: std::mem::take(absatz), marke: String::new() });
+        }
+    };
+    for zeile in roh.trim_start_matches('\u{feff}').lines() {
+        let t = zeile.trim();
+        if t.is_empty() {
+            fertig(&mut absatz, &mut bloecke);
+        } else if t.starts_with('#') {
+            fertig(&mut absatz, &mut bloecke);
+            let ebene = t.chars().take_while(|c| *c == '#').count().min(6) as u8;
+            bloecke.push(Block { art: Art::Kopf(ebene), worte: inline_worte(t.trim_start_matches('#').trim(), true), marke: String::new() });
+        } else if let Some(rest) = t.strip_prefix("- ").or_else(|| t.strip_prefix("* ")).or_else(|| t.strip_prefix("• ")) {
+            fertig(&mut absatz, &mut bloecke);
+            bloecke.push(Block { art: Art::Punkt, worte: inline_worte(rest, false), marke: "•".to_string() });
+        } else if let Some((nr, rest)) = nummeriert(t) {
+            fertig(&mut absatz, &mut bloecke);
+            bloecke.push(Block { art: Art::Punkt, worte: inline_worte(rest, false), marke: nr });
+        } else {
+            // Zeilen eines Absatzes laufen zusammen
+            absatz.extend(inline_worte(t, false));
+        }
+    }
+    fertig(&mut absatz, &mut bloecke);
+    bloecke
+}
+
+struct Zeile {
+    /// Grundlinie, gemessen ab Oberkante des Textfeldes (mm).
+    y: f32,
+    groesse: f32,
+    einzug: f32,
+    art: Art,
+    /// Erste Zeile eines Aufzählungspunktes: das Zeichen davor.
+    marke: Option<String>,
+    worte: Vec<Wort>,
+}
+
+fn wortbreite(w: &Wort, groesse: f32) -> f32 {
+    let faktor = if w.fett { 0.60 } else if w.kursiv { 0.48 } else { 0.51 };
+    w.text.chars().count() as f32 * faktor * groesse
+}
+
+/// Setzt die Blöcke bei der Grundschrift `basis` (mm) in die Breite `breite` (mm). Liefert Zeilen und Gesamthöhe.
+fn klappentext_setzen(bloecke: &[Block], basis: f32, breite: f32) -> (Vec<Zeile>, f32) {
+    let mut zeilen = Vec::new();
+    let mut y = 0.0f32;
+    for (n, b) in bloecke.iter().enumerate() {
+        let (groesse, einzug, davor, danach) = match b.art {
+            Art::Kopf(1) => (basis * 1.45, 0.0, if n == 0 { 0.0 } else { basis * 0.9 }, basis * 0.45),
+            Art::Kopf(_) => (basis * 1.18, 0.0, if n == 0 { 0.0 } else { basis * 0.8 }, basis * 0.3),
+            Art::Punkt => (basis, basis * 1.3, 0.0, basis * 0.28),
+            Art::Absatz => (basis, 0.0, 0.0, basis * 0.75),
+        };
+        y += davor;
+        let verfuegbar = (breite - einzug).max(10.0);
+        let leer = groesse * 0.26;
+        let mut aktuelle: Vec<Wort> = Vec::new();
+        let mut laenge = 0.0f32;
+        let mut erste = true;
+        let mut zeile_ab = |aktuelle: &mut Vec<Wort>, y: &mut f32, erste: &mut bool| {
+            if aktuelle.is_empty() {
+                return;
+            }
+            *y += groesse;
+            zeilen.push(Zeile { y: *y, groesse, einzug, art: b.art, marke: (*erste && b.art == Art::Punkt).then(|| b.marke.clone()), worte: std::mem::take(aktuelle) });
+            *y += groesse * 0.38;
+            *erste = false;
+        };
+        for w in &b.worte {
+            let wb = wortbreite(w, groesse);
+            let abstand = if aktuelle.is_empty() || w.kleben { 0.0 } else { leer };
+            if !aktuelle.is_empty() && laenge + abstand + wb > verfuegbar && !w.kleben {
+                zeile_ab(&mut aktuelle, &mut y, &mut erste);
+                laenge = 0.0;
+            }
+            laenge += if aktuelle.is_empty() { 0.0 } else if w.kleben { 0.0 } else { leer } + wb;
+            aktuelle.push(w.clone());
+        }
+        zeile_ab(&mut aktuelle, &mut y, &mut erste);
+        y += danach;
+    }
+    (zeilen, y)
+}
+
+/// Satz des Klappentextes auf der Rückseite samt Prüfergebnis.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KlappentextSatz {
+    /// Textelemente (SVG) in Millimetern des Umschlags.
+    pub svg: String,
+    /// Oberkante des Textfeldes im Umschlag (mm).
+    pub oben: f32,
+    /// Höhe, die der Text braucht (mm).
+    pub hoehe_mm: f32,
+    /// Höhe, die auf der Rückseite zur Verfügung steht (mm).
+    pub verfuegbar_mm: f32,
+    /// Verwendete Schriftgröße in Punkt.
+    pub groesse_pt: f32,
+    /// Eingestellte Schriftgröße in Punkt.
+    pub gewuenscht_pt: f32,
+    /// Passt der Text auf die Rückseite?
+    pub passt: bool,
+    /// Um wie viele Millimeter der Text zu hoch ist (0 = passt).
+    pub ueberhang_mm: f32,
+    /// Anzahl der gesetzten Zeilen.
+    pub zeilen: usize,
+}
+
+const MIN_PT: f32 = 7.5;
+const MM_JE_PT: f32 = 25.4 / 72.0;
+
+/// Setzt den Klappentext (Markdown: `#` Schlagzeile, Absätze, `-` Punkte, `**fett**`, `*kursiv*`)
+/// auf die Rückseite. Bei `rueckseite_schrift_auto` wird die Schrift verkleinert, bis der Text passt (bis 7,5 pt).
+pub fn klappentext_satz(d: &CoverDaten, portal: &Portal, seiten: u32, klappentext: &str) -> KlappentextSatz {
+    let g = geometrie(portal, seiten);
+    let (fb, fh) = g.format;
+    let breite = fb - 24.0;
+    let (x, oben) = (g.beschnitt + 12.0, g.beschnitt + 28.0);
+    let unten = if d.barcode { g.beschnitt + fh - 44.0 } else { g.beschnitt + fh - 20.0 };
+    let verfuegbar = (unten - oben - 6.0).max(10.0);
+    let bloecke = klappentext_bloecke(klappentext);
+    let gewuenscht = if d.rueckseite_schrift_pt >= 6.0 { d.rueckseite_schrift_pt.min(20.0) } else { 11.0 };
+
+    let mut pt = gewuenscht;
+    let (mut zeilen, mut hoehe) = klappentext_setzen(&bloecke, pt * MM_JE_PT, breite);
+    if d.rueckseite_schrift_auto {
+        while hoehe > verfuegbar && pt - 0.25 >= MIN_PT {
+            pt -= 0.25;
+            (zeilen, hoehe) = klappentext_setzen(&bloecke, pt * MM_JE_PT, breite);
+        }
+    }
+    let passt = hoehe <= verfuegbar;
+
+    let tx = farbe(&d.text, "#f5f4f0");
+    let ak = farbe(&d.akzent, "#7fa6c9");
+    let text_farbe = farbe(&d.farbe_rueckseite, &tx);
+    let mut svg = String::new();
+    for z in &zeilen {
+        let (f, kopf) = match z.art {
+            Art::Kopf(_) => (ak.as_str(), true),
+            _ => (text_farbe.as_str(), false),
+        };
+        if let Some(m) = &z.marke {
+            svg.push_str(&format!(
+                r#"<text x="{:.2}" y="{:.2}" font-size="{:.2}" fill="{ak}" font-family="{SCHRIFT}" font-weight="bold">{}</text>"#,
+                x,
+                oben + z.y,
+                z.groesse,
+                maskieren(m)
+            ));
+        }
+        svg.push_str(&format!(
+            r#"<text xml:space="preserve" x="{:.2}" y="{:.2}" font-size="{:.2}" fill="{f}" font-family="{SCHRIFT}"{}>"#,
+            x + z.einzug,
+            oben + z.y,
+            z.groesse,
+            if kopf { r#" font-weight="bold""# } else { "" }
+        ));
+        for (i, w) in z.worte.iter().enumerate() {
+            let vor = if i == 0 || w.kleben { "" } else { " " };
+            let stil = format!(
+                "{}{}",
+                if w.fett && !kopf { r#" font-weight="bold""# } else { "" },
+                if w.kursiv { r#" font-style="italic""# } else { "" }
+            );
+            svg.push_str(&format!("<tspan{stil}>{vor}{}</tspan>", maskieren(&w.text)));
+        }
+        svg.push_str("</text>");
+    }
+    KlappentextSatz {
+        svg,
+        oben,
+        hoehe_mm: hoehe,
+        verfuegbar_mm: verfuegbar,
+        groesse_pt: pt,
+        gewuenscht_pt: gewuenscht,
+        passt,
+        ueberhang_mm: (hoehe - verfuegbar).max(0.0),
+        zeilen: zeilen.len(),
+    }
+}
+
 /// SVG des Gesamtumschlags in Millimetern: Rückseite, Rücken und Vorderseite samt Beschnitt.
 pub fn svg_umschlag(d: &CoverDaten, portal: &Portal, seiten: u32, klappentext: &str) -> String {
     let g = geometrie(portal, seiten);
@@ -354,22 +663,21 @@ pub fn svg_umschlag(d: &CoverDaten, portal: &Portal, seiten: u32, klappentext: &
         }
     }
 
-    // Rückseite: Text in einem Kasten mit wählbarer Deckkraft
-    let text_b = fb - 24.0;
+    // Rückseite: Klappentext (Markdown) in einem Kasten mit wählbarer Deckkraft
     let roh = if klappentext.trim().is_empty() { &d.klappentext } else { klappentext };
-    let zeilen: Vec<String> = umbrechen(roh, (text_b / 2.1).max(20.0) as usize).into_iter().take(40).collect();
-    if !zeilen.is_empty() && !roh.trim().is_empty() {
+    if !roh.trim().is_empty() {
+        let satz = klappentext_satz(d, portal, seiten, roh);
         let kasten = farbe(&d.rueckseite_kasten_farbe, "#000000");
         s.push_str(&format!(
             r#"<rect x="{:.1}" y="{:.1}" width="{:.1}" height="{:.1}" rx="2" fill="{kasten}" fill-opacity="{:.2}"/>"#,
             g.beschnitt + 6.0,
-            g.beschnitt + 20.0,
+            satz.oben - 8.0,
             fb - 12.0,
-            zeilen.len() as f32 * 4.0 * 1.45 + 10.0,
+            satz.hoehe_mm + 14.0,
             d.rueckseite_kasten_deckkraft.clamp(0.0, 1.0)
         ));
+        s.push_str(&satz.svg);
     }
-    s.push_str(&text_zeilen(&zeilen, g.beschnitt + 12.0, g.beschnitt + 30.0, 4.0, &farbe(&d.farbe_rueckseite, &tx), SCHRIFT, "normal", 1.45, "start"));
     if d.barcode {
         // Freifläche für den Barcode: 50 × 30 mm, 10 mm vom Rand
         let (bx, by) = (g.beschnitt + fb - 60.0, g.beschnitt + fh - 40.0);
@@ -520,6 +828,48 @@ mod tests {
     }
 
     #[test]
+    fn klappentext_wird_gegliedert_und_geprueft() {
+        let p = portal();
+        let d = CoverDaten::default();
+        let kurz = "# Rust lernen, **ohne** Umwege\n\nEin Absatz über das Buch.\n\n- Erster Punkt\n- Zweiter Punkt mit *Betonung*\n";
+        let s = klappentext_satz(&d, &p, 300, kurz);
+        assert!(s.passt && s.zeilen == 4, "{s:?}");
+        // „**ohne**“ steht mit Leerzeichen davor und danach
+        assert!(s.svg.contains("<tspan> ohne</tspan>") || s.svg.contains(r#"<tspan> ohne</tspan>"#), "{}", s.svg);
+        assert!(s.svg.contains(r#"font-weight="bold""#) && s.svg.contains("•") && s.svg.contains(r#"font-style="italic""#));
+        assert!(s.svg.contains(">Rust<") && s.svg.contains("lernen,"));
+        // Sehr langer Text: erst verkleinern, dann Warnung
+        let lang = "Dieses Buch erklärt Schritt für Schritt wie Programmierung funktioniert. ".repeat(60);
+        let auto = klappentext_satz(&d, &p, 300, &lang);
+        assert!(auto.groesse_pt < 11.0, "{auto:?}");
+        let riesig = "Wort ".repeat(3000);
+        let z = klappentext_satz(&d, &p, 300, &riesig);
+        assert!(!z.passt && z.ueberhang_mm > 0.0 && (z.groesse_pt - 7.5).abs() < 0.01, "{z:?}");
+        let fest = CoverDaten { rueckseite_schrift_auto: false, ..CoverDaten::default() };
+        let f = klappentext_satz(&fest, &p, 300, &lang);
+        assert!((f.groesse_pt - 11.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn bildpfade_wandern_zwischen_systemen() {
+        let o = std::env::temp_dir().join("werkbank-test-bildpfad");
+        let _ = fs::remove_dir_all(&o);
+        fs::create_dir_all(&o).unwrap();
+        fs::write(o.join("cover.png"), b"x").unwrap();
+        // absoluter Linux-Pfad, den es hier nicht gibt → Datei im Bandordner
+        let r = bild_aufloesen("/home/volker/buch/band1/cover.png", &o);
+        assert_eq!(Path::new(&r), o.join("cover.png"));
+        assert_eq!(Path::new(&bild_aufloesen("cover.png", &o)), o.join("cover.png"));
+        assert_eq!(bild_aufloesen("", &o), "");
+        // Speichern trägt Bilder im Bandordner relativ ein
+        let d = CoverDaten { bild: o.join("cover.png").to_string_lossy().into_owned(), ..Default::default() };
+        d.speichern(&o).unwrap();
+        let roh = fs::read_to_string(o.join(".werkbank").join("cover.json")).unwrap();
+        assert!(roh.contains(r#""bild": "cover.png""#), "{roh}");
+        assert_eq!(CoverDaten::laden(&o).unwrap().bild, o.join("cover.png").to_string_lossy());
+    }
+
+    #[test]
     fn umbruch() {
         assert_eq!(umbrechen("Die Rust Werkstatt", 9), ["Die Rust", "Werkstatt"]);
         assert_eq!(umbrechen("a\n\nb", 10), ["a", "", "b"]);
@@ -554,7 +904,7 @@ mod tests {
         let (b, h) = p.umschlag_mm(400);
         assert!(svg.contains(&format!(r#"width="{b:.2}mm""#)));
         assert!(svg.contains(&format!(r#"height="{h:.2}mm""#)));
-        assert!(svg.contains("Ein Klappentext"));
+        assert!(svg.contains("Klappentext") && svg.contains("Rust."));
         assert!(svg.contains(r##"width="50" height="30" fill="#ffffff""##), "Barcode-Fläche");
         assert!(svg.contains("rotate(90)"), "Rückentext");
         assert!(svg.contains(r#"fill-opacity="0.25""#), "Deckkraft des Rückenkastens");

@@ -41,6 +41,8 @@ pub enum CoverRegler {
     Abdunkeln,
     RueckenDeckkraft,
     RueckseiteDeckkraft,
+    /// Schriftgröße des Klappentextes in Punkt (nicht Prozent).
+    RueckseiteSchrift,
 }
 
 /// Auswahlfelder der Cover-Vorlage.
@@ -68,6 +70,10 @@ pub struct CoverZustand {
     pub dateien: Vec<std::path::PathBuf>,
     /// Pixelmaße des gewählten Hintergrundbildes.
     pub bild_masse: Option<(u32, u32)>,
+    /// Satz des Klappentextes auf der Rückseite (Größe, Passt-Prüfung) für das gewählte Portal.
+    pub klappentext: Option<cover::KlappentextSatz>,
+    /// Liegt im Bandordner ein fertiges `cover.png`?
+    pub cover_png: bool,
 }
 
 impl std::fmt::Debug for CoverZustand {
@@ -142,10 +148,12 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
         feld("Autor", &d.autor, CoverFeld::Autor),
         feld("Seitenzahl für den Rücken (0 = Schätzung aus dem Buch)", &if d.seiten == 0 { String::new() } else { d.seiten.to_string() }, CoverFeld::Seiten),
         column![
-            text("Rückseite (leer = klappentext.md des Bandes)").size(11).color(thema::text_gedimmt()),
+            text("Rückseite (leer = klappentext.md des Bandes; Markdown: # Schlagzeile, - Punkte, **fett**)").size(11).color(thema::text_gedimmt()),
             text_input("", &d.klappentext).on_input(|t| Message::CoverFeld(CoverFeld::Klappentext, t)).size(13).padding(6),
         ]
         .spacing(3),
+        regler("Schriftgröße der Rückseite", d.rueckseite_schrift_pt.round().clamp(6.0, 20.0) as u32, 6, 16, " pt", |w| Message::CoverRegler(CoverRegler::RueckseiteSchrift, w)),
+        toggler(d.rueckseite_schrift_auto).label("Schrift verkleinern, wenn der Klappentext nicht passt").size(15).text_size(12).on_toggle(Message::CoverSchriftAuto),
         toggler(d.barcode).label("Freifläche für den Barcode auf der Rückseite").size(15).text_size(12).on_toggle(Message::CoverBarcode),
     ]
     .spacing(8);
@@ -275,6 +283,27 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
             .push(zeile(true, format!("Umschlag {ub:.1} × {uh:.1} mm inkl. {} mm Beschnitt", p.beschnitt_mm)))
             .push(zeile(true, format!("E-Book-Cover {} × {} px", p.cover_ebook_px.0, p.cover_ebook_px.1)))
             .push(zeile(d.barcode, "Barcode-Freifläche 50 × 30 mm auf der Rückseite".to_string()));
+        if let Some(k) = &c.klappentext {
+            if k.zeilen == 0 {
+                pruefung = pruefung.push(zeile(false, "Kein Klappentext (klappentext.md im Bandordner oder Feld „Rückseite“)".to_string()));
+            } else if k.passt {
+                let klein = if k.groesse_pt + 0.01 < k.gewuenscht_pt { format!(", auf {:.1} pt verkleinert (eingestellt {:.0} pt)", k.groesse_pt, k.gewuenscht_pt) } else { String::new() };
+                pruefung = pruefung.push(zeile(true, format!("Klappentext passt auf die Rückseite ({} Zeilen, {:.1} pt{klein})", k.zeilen, k.groesse_pt)));
+            } else {
+                pruefung = pruefung.push(
+                    text(format!(
+                        "! Der Klappentext ist zu lang: Er braucht {:.0} mm, auf der Rückseite sind {:.0} mm frei ({:.0} mm zu viel, bei {:.1} pt). Bitte den Text kürzen{}.",
+                        k.hoehe_mm,
+                        k.verfuegbar_mm,
+                        k.ueberhang_mm,
+                        k.groesse_pt,
+                        if d.rueckseite_schrift_auto { "" } else { " oder „Schrift verkleinern“ einschalten" }
+                    ))
+                    .size(12)
+                    .color(thema::fehler_rot()),
+                );
+            }
+        }
     }
 
     let steuerung = row![
@@ -312,6 +341,18 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     .spacing(12);
 
     let mut rechts = column![steuerung, vorschau].spacing(10);
+    if c.cover_png && d.bild.is_empty() && !c.umschlag {
+        rechts = rechts.push(
+            text("Die Vorschau zeigt das fertige cover.png aus dem Bandordner. Für einen Entwurf aus dieser Vorlage ein Hintergrundbild wählen (links unter „Hintergrundbild“) oder den Gesamtumschlag einschalten.")
+                .size(11)
+                .color(thema::warnung_orange()),
+        );
+    }
+    if let Some(k) = c.klappentext.as_ref().filter(|k| k.zeilen > 0 && !k.passt && c.umschlag) {
+        rechts = rechts.push(
+            text(format!("Klappentext zu lang: {:.0} mm zu viel auf der Rückseite. Text kürzen.", k.ueberhang_mm)).size(12).color(thema::fehler_rot()),
+        );
+    }
     rechts = rechts.push(text("Gerade bei E-Readern entscheidet die Graustufen-Fassung: Farbige Schrift auf farbigem Grund kann dort denselben Grauton haben und verschwinden.").size(10).color(thema::text_gedimmt()));
     rechts = rechts.push(pruefung);
     if !c.meldung.is_empty() {
