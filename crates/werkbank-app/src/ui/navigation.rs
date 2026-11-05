@@ -147,7 +147,8 @@ pub fn kopfleiste<'a, Message: Clone + 'a, Quelle: ToString + PartialEq + Clone 
             "Alles gespeichert. Klick speichert erneut  ·  Strg+S",
         )
     };
-    rechts = rechts.push(container(speichern).max_width(300));
+    // Langer Status (z. B. Bauschritte) wird abgeschnitten statt das Suchfeld zu überdecken
+    rechts = rechts.push(container(speichern).max_width(300).clip(true));
     rechts = rechts.push(tooltip_knopf(
         button(
             row![text("⌕").size(14), text("Suchen").size(12), space::horizontal().width(18), text("Strg+K").size(10)]

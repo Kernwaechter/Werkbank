@@ -518,6 +518,11 @@ pub enum Message {
     BauStarten(usize),
     /// Baut den Band nach `buchbau.yaml` (nativ, ohne Skripte).
     BuchbauStarten,
+    /// Nächster Arbeitsschritt des Buchbaus bzw. des Satzes (für die Fortschrittsanzeige).
+    BuchbauSchritt(String),
+    SatzSchritt(String),
+    /// Takt der Arbeitsanzeige, solange gesetzt oder gebaut wird.
+    Puls,
     /// Ergebnis des Buchbaus.
     BuchbauFertig(Result<werkbank_satz::buchbau::Bericht, String>),
     /// Eine Zeile Ausgabe des Bauprozesses.
@@ -1951,16 +1956,23 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
             };
             dateien::editor_in_modell(state);
             state.bau.satz_laeuft = true;
-            state.bau.satz_meldung = "Setze … (das dauert bei einem ganzen Buch einige Minuten)".to_string();
+            let schritte = state.portale.portale.len() * if state.einstellungen.pdfx { 2 } else { 1 } + 2;
+            state.bau.satz_lauf = Some(ui::bauen::Lauf::neu(schritte, "Vorbereiten"));
+            state.bau.satz_meldung.clear();
             state.bau.satz_dateien.clear();
             state.aktiver_bereich = Arbeitsbereich::Bauen;
+            state.speicher_zeitstempel = "Das Buch wird gesetzt …".to_string();
             let projekt = state.projekt.clone();
             let portale = state.portale.portale.clone();
             let cover_daten = state.cover.daten.clone();
             let wahl = state.einstellungen.clone();
-            return Task::perform(
-                languagetool::im_hintergrund(move || satz_ausfuehren(&projekt, &portale, &cover_daten, &ordner, &wahl)),
-                Message::SatzFertig,
+            return Task::run(
+                mit_schritten(
+                    move |melde| satz_ausfuehren(&projekt, &portale, &cover_daten, &ordner, &wahl, melde),
+                    Message::SatzSchritt,
+                    Message::SatzFertig,
+                ),
+                |m| m,
             );
         }
 
@@ -1972,39 +1984,71 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
                 return Task::none();
             }
             // Der Bau liest die Dateien von der Platte: Ungespeichertes zuerst sichern
-            if dateien::hat_ungespeichertes(state) {
-                let _ = update(state, Message::Speichern);
+            if dateien::hat_ungespeichertes(state)
+                && let Err(e) = dateien::speichern(state, dateien::SNAPSHOT_MANUELL)
+            {
+                state.bau.buchbau_meldung = format!("Bauen abgebrochen, Speichern fehlgeschlagen: {e}");
+                return Task::none();
             }
             state.bau.buchbau_laeuft = true;
+            state.bau.buchbau_lauf = Some(ui::bauen::Lauf::neu(werkbank_satz::buchbau::SCHRITTE, "Vorbereiten"));
             state.bau.buchbau_meldung = format!("Baue Band {nummer} …");
             state.bau.buchbau_hinweise.clear();
             state.bau.buchbau_dateien.clear();
             state.aktiver_bereich = Arbeitsbereich::Bauen;
-            return Task::perform(
-                languagetool::im_hintergrund(move || werkbank_satz::buchbau::bauen(&buch, nummer, &|_| {})),
-                Message::BuchbauFertig,
+            state.speicher_zeitstempel = format!("Band {nummer} wird gebaut …");
+            return Task::run(
+                mit_schritten(
+                    move |melde| werkbank_satz::buchbau::bauen(&buch, nummer, &|s| melde(s.to_string())),
+                    Message::BuchbauSchritt,
+                    Message::BuchbauFertig,
+                ),
+                |m| m,
             );
         }
 
+        Message::BuchbauSchritt(text) => {
+            if let Some(l) = state.bau.buchbau_lauf.as_mut() {
+                l.weiter(text);
+                state.speicher_zeitstempel = format!("Bauen {}/{}: {} …", l.schritt, l.von, l.text);
+            }
+        }
+
+        Message::SatzSchritt(text) => {
+            if let Some(l) = state.bau.satz_lauf.as_mut() {
+                l.weiter(text);
+                state.speicher_zeitstempel = format!("Setzen {}/{}: {} …", l.schritt, l.von, l.text);
+            }
+        }
+
+        Message::Puls => state.bau.puls = state.bau.puls.wrapping_add(1),
+
         Message::BuchbauFertig(ergebnis) => {
             state.bau.buchbau_laeuft = false;
+            let dauer = state.bau.buchbau_lauf.take().map(|l| ui::bauen::dauer(l.start)).unwrap_or_default();
             match ergebnis {
                 Ok(b) => {
                     state.bau.buchbau_meldung =
-                        format!("Fertig: {} Dateien, Buchblock (Graudruck) mit {} Seiten.", b.dateien.len(), b.seiten_grau);
+                        format!("Fertig nach {dauer}: {} Dateien, Buchblock (Graudruck) mit {} Seiten.", b.dateien.len(), b.seiten_grau);
+                    state.speicher_zeitstempel = format!("Buch gebaut ({dauer})");
                     state.satz_seiten = Some(b.seiten_grau as u32);
                     state.bau.buchbau_hinweise = b.hinweise;
                     state.bau.buchbau_dateien = b.dateien;
                 }
-                Err(f) => state.bau.buchbau_meldung = format!("Buchbau fehlgeschlagen: {f}"),
+                Err(f) => {
+                    state.bau.buchbau_meldung = format!("Buchbau fehlgeschlagen: {f}");
+                    state.speicher_zeitstempel = "Bauen fehlgeschlagen".to_string();
+                }
             }
         }
 
         Message::SatzFertig(ergebnis) => {
             state.bau.satz_laeuft = false;
+            let dauer = state.bau.satz_lauf.take().map(|l| ui::bauen::dauer(l.start)).unwrap_or_default();
+            state.speicher_zeitstempel = format!("Satz beendet ({dauer})");
             match ergebnis {
                 Ok((dateien, seiten)) => {
-                    state.bau.satz_meldung = format!("Fertig: {} Dateien, Druck-PDF mit {seiten} Seiten.", dateien.len());
+                    state.bau.satz_meldung = format!("Fertig nach {dauer}: {} Dateien, Druck-PDF mit {seiten} Seiten.", dateien.len());
                     state.bau.satz_dateien = dateien;
                     state.satz_seiten = Some(seiten as u32);
                 }
@@ -3198,6 +3242,7 @@ fn satz_ausfuehren(
     cover_daten: &werkbank_kern::cover::CoverDaten,
     ordner: &Path,
     wahl: &Einstellungen,
+    melde: &dyn Fn(String),
 ) -> Result<(Vec<(PathBuf, String)>, usize), String> {
     use werkbank_satz::{SatzOptionen, Seitenzahl, Zaehlung, epub_schreiben, pdf_setzen};
     let stellung = if wahl.seitenzahl == "mitte" { Seitenzahl::Mitte } else { Seitenzahl::Aussen };
@@ -3220,6 +3265,7 @@ fn satz_ausfuehren(
             .mit_titelei_zahlen(wahl.titelei_zahlen)
             .mit_teiltitelseiten(wahl.teil_titelseiten)
             .mit_gerader_seitenzahl(wahl.gerade_seitenzahl);
+        melde(format!("Druck-PDF für {} setzen", p.name));
         let e = pdf_setzen(projekt, &opt.mit_stil_zusatz(stil.clone()))?;
         if i == 0 {
             seiten = e.seiten;
@@ -3229,6 +3275,7 @@ fn satz_ausfuehren(
         dateien.push((datei.clone(), format!("Druck {:.0}×{:.0} mm, {} Seiten, {:.1} MB", p.druck_format_mm.0, p.druck_format_mm.1, e.seiten, e.bytes.len() as f32 / 1e6)));
         // Am Ende des Weges: PDF/X-3 in Graustufen mit Ghostscript (wie tolino-print.py --pdfx)
         if wahl.pdfx {
+            melde(format!("PDF/X-3 für {} (Ghostscript)", p.name));
             let ziel_x = ziel.join(format!("buch-druck-{}-pdfx.pdf", werkbank_kern::speicher::kennung_aus_titel(&p.name)));
             match werkzeuge::pdfx_erzeugen(&datei, &ziel_x, &projekt.metadaten.titel) {
                 Ok(()) => {
@@ -3240,12 +3287,14 @@ fn satz_ausfuehren(
         }
     }
 
+    melde("Lese-PDF in Farbe setzen".to_string());
     let lesen = pdf_setzen(projekt, &SatzOptionen::lesen().mit_seitenzahl(stellung).mit_zaehlung(zaehlung).mit_titelei_zahlen(wahl.titelei_zahlen).mit_stil_zusatz(stil_farbig))?;
     let datei = ziel.join("buch-lesen.pdf");
     std::fs::write(&datei, &lesen.bytes).map_err(|e| e.to_string())?;
     dateien.push((datei, format!("Lese-PDF farbig B5, {} Seiten, {:.1} MB", lesen.seiten, lesen.bytes.len() as f32 / 1e6)));
 
     // EPUB mit Cover (Vorderseite als PNG)
+    melde("EPUB 3 mit Cover schreiben".to_string());
     let cover_png = {
         let svg = werkbank_kern::cover::svg_ebook(cover_daten, 1600.0, 2560.0, portale.first().map(|p| (p, seiten as u32)));
         let (b, h, px) = cover::rendern(&svg, 800)?;
@@ -3837,6 +3886,49 @@ fn statistik_erfassen(state: &mut AppState) {
     state.statistik_dirty = true;
 }
 
+/// Führt `arbeit` auf einem eigenen Thread aus; ihre Meldungen (`melde`) kommen als `schritt`-Nachrichten,
+/// das Ergebnis als `fertig`-Nachricht an.
+fn mit_schritten<T: Send + 'static>(
+    arbeit: impl FnOnce(&dyn Fn(String)) -> T + Send + 'static,
+    schritt: fn(String) -> Message,
+    fertig: fn(T) -> Message,
+) -> impl iced::futures::Stream<Item = Message> {
+    iced::stream::channel(16, async move |mut ausgabe: iced::futures::channel::mpsc::Sender<Message>| {
+        use iced::futures::{SinkExt, StreamExt};
+        let (sender, mut empfaenger) = iced::futures::channel::mpsc::unbounded::<Message>();
+        std::thread::spawn(move || {
+            let s = sender.clone();
+            let ergebnis = arbeit(&move |text| {
+                let _ = s.unbounded_send(schritt(text));
+            });
+            let _ = sender.unbounded_send(fertig(ergebnis));
+        });
+        while let Some(m) = empfaenger.next().await {
+            if ausgabe.send(m).await.is_err() {
+                break;
+            }
+        }
+    })
+}
+
+/// Takt für die Arbeitsanzeige (alle 100 ms), solange gesetzt oder gebaut wird.
+fn puls_strom() -> impl iced::futures::Stream<Item = Message> {
+    iced::stream::channel(1, async |mut ausgabe: iced::futures::channel::mpsc::Sender<Message>| {
+        use iced::futures::{SinkExt, StreamExt};
+        let (sender, mut empfaenger) = iced::futures::channel::mpsc::unbounded::<()>();
+        std::thread::spawn(move || {
+            while sender.unbounded_send(()).is_ok() {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        });
+        while empfaenger.next().await.is_some() {
+            if ausgabe.send(Message::Puls).await.is_err() {
+                break;
+            }
+        }
+    })
+}
+
 /// Liefert alle 500 ms einen Zeitpunkt (ein Hilfsthread, keine Laufzeit-Abhängigkeit wie tokio).
 fn takt_strom() -> impl iced::futures::Stream<Item = Message> {
     iced::stream::channel(1, async |mut ausgabe: iced::futures::channel::mpsc::Sender<Message>| {
@@ -3881,6 +3973,11 @@ fn subscription(state: &AppState) -> Subscription<Message> {
         Subscription::none()
     };
     let schliessen = iced::window::close_requests().map(Message::FensterSchliessen);
+    let puls = if state.bau.satz_laeuft || state.bau.buchbau_laeuft || state.bau.laeuft.is_some() {
+        Subscription::run(puls_strom)
+    } else {
+        Subscription::none()
+    };
     let groesse = iced::window::resize_events().map(|(_, g)| Message::FensterGroesse(g));
 
     // Nur während des Ziehens mitlesen, wohin die Maus wandert
@@ -3894,7 +3991,7 @@ fn subscription(state: &AppState) -> Subscription<Message> {
         Subscription::none()
     };
 
-    Subscription::batch([tasten, takt, schliessen, ziehen, groesse])
+    Subscription::batch([tasten, takt, schliessen, ziehen, groesse, puls])
 }
 
 /// Das Iced-Thema folgt der Werkbank-Palette (hell: „Papier“, dunkel: „Dämmerung“).

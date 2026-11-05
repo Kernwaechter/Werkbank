@@ -12,6 +12,77 @@ use iced::{Alignment, Element, Fill, Length, Padding, Pixels};
 use std::path::PathBuf;
 use std::time::SystemTime;
 
+/// Ein laufender Arbeitsgang mit Schritten (Setzen oder Bauen).
+#[derive(Debug, Clone)]
+pub struct Lauf {
+    /// Aktueller Schritt (ab 1) und Gesamtzahl; 0 = noch nicht begonnen.
+    pub schritt: usize,
+    pub von: usize,
+    /// Beschreibung des aktuellen Schritts.
+    pub text: String,
+    pub start: std::time::Instant,
+}
+
+impl Lauf {
+    pub fn neu(von: usize, text: &str) -> Self {
+        Self { schritt: 0, von, text: text.to_string(), start: std::time::Instant::now() }
+    }
+
+    /// Nächster Schritt mit Beschreibung.
+    pub fn weiter(&mut self, text: String) {
+        self.schritt = (self.schritt + 1).min(self.von.max(1));
+        self.text = text;
+    }
+}
+
+/// Verstrichene Zeit als „m:ss“.
+pub fn dauer(start: std::time::Instant) -> String {
+    let s = start.elapsed().as_secs();
+    format!("{}:{:02}", s / 60, s % 60)
+}
+
+/// Arbeitsanzeige: ein Balken, der den erledigten Anteil zeigt und in dem ein Lichtstreifen läuft,
+/// solange gearbeitet wird; darunter Schritt, Beschreibung und verstrichene Zeit.
+pub fn arbeitsanzeige<'a>(lauf: Option<&Lauf>, text_ohne_schritte: &str, start: std::time::Instant, puls: u32) -> Element<'a, Message> {
+    let (anteil, zeile) = match lauf {
+        Some(l) if l.von > 0 => (
+            (l.schritt.saturating_sub(1)) as f32 / l.von as f32,
+            format!("Schritt {} von {}: {} …   {}", l.schritt.max(1), l.von, l.text, dauer(l.start)),
+        ),
+        _ => (0.0, format!("{text_ohne_schritte} …   {}", dauer(start))),
+    };
+    // Lichtstreifen: wandert in 40 Takten einmal durch den noch offenen Teil
+    let lage = (puls % 40) as u16;
+    let fertig = (anteil * 1000.0).round() as u16;
+    let offen = 1000 - fertig;
+    let streifen = row![
+        space::horizontal().width(Length::FillPortion(lage * 2 + 1)),
+        container(space().height(6)).width(Length::FillPortion(16)).style(|_| container::Style {
+            background: Some(iced::Background::Color(thema::akzent())),
+            border: iced::Border { radius: 3.0.into(), ..Default::default() },
+            ..Default::default()
+        }),
+        space::horizontal().width(Length::FillPortion((40 - lage) * 2 + 1)),
+    ];
+    let balken = container(
+        row![
+            container(space().height(6))
+                .width(Length::FillPortion(fertig.max(1)))
+                .style(|_| container::Style { background: Some(iced::Background::Color(thema::akzent_fuell())), ..Default::default() }),
+            container(streifen).width(Length::FillPortion(offen.max(1))),
+        ],
+    )
+    .width(Fill)
+    .height(6)
+    .clip(true)
+    .style(|_| container::Style {
+        background: Some(iced::Background::Color(thema::akzent_flaeche())),
+        border: iced::Border { radius: 3.0.into(), ..Default::default() },
+        ..Default::default()
+    });
+    column![balken, text(zeile).size(12).color(thema::text_hell())].spacing(6).into()
+}
+
 /// Zustand der Bauansicht.
 #[derive(Debug, Default)]
 pub struct BauZustand {
@@ -32,6 +103,11 @@ pub struct BauZustand {
     /// Buchbau nach `buchbau.yaml`: (Buchordner, Bandnummer, Untertitel), wenn der Band dazu gehört.
     pub buchbau: Option<(PathBuf, u32, String)>,
     pub buchbau_laeuft: bool,
+    /// Fortschritt des laufenden Buchbaus bzw. Satzes.
+    pub buchbau_lauf: Option<Lauf>,
+    pub satz_lauf: Option<Lauf>,
+    /// Takt für die Bewegung der Arbeitsanzeige.
+    pub puls: u32,
     pub buchbau_meldung: String,
     pub buchbau_hinweise: Vec<String>,
     pub buchbau_dateien: Vec<(PathBuf, u64)>,
@@ -70,13 +146,39 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     let bau = &state.bau;
     let seiten = projekt.buchseiten_schaetzung() as u32;
 
+    let erklaerung = |titel: &'static str, text_: &'static str| -> Element<'_, Message> {
+        row![
+            text(titel).size(12).font(thema::fett()).color(thema::text_hell()).width(Length::Fixed(118.0)),
+            text(text_).size(12).color(thema::text_gedimmt()).width(Fill),
+        ]
+        .spacing(10)
+        .into()
+    };
+    let mut wege = column![text("Setzen, Bauen, Skripte – was ist der Unterschied?").size(14).font(thema::fett()).color(thema::text_hell())].spacing(8);
+    if bau.buchbau.is_some() {
+        wege = wege.push(erklaerung(
+            "Bauen",
+            "Erzeugt dein Buch in deinem festen Buchlayout (aus buchbau.yaml) und füllt die Verlagsordner tolino/, kdp/ und webpublishing/ mit allem, was du hochlädst: Druck-PDFs, EPUB, Umschläge, E-Book-Cover. Das ist der Weg für die Veröffentlichung.",
+        ));
+    }
+    wege = wege
+        .push(erklaerung(
+            "Setzen",
+            "Die Werkbank setzt jedes Buch in ihrer eigenen, einstellbaren Gestaltung (unten: Gestaltung, Stil) – ohne Vorbereitung. Ergebnis in .werkbank/satz/: Druck-PDF je Portal, Lese-PDF, EPUB. Gut zum Ausprobieren und für Bücher ohne eigenes Layout.",
+        ))
+        .push(erklaerung(
+            "Bauskripte",
+            "Startet eigene Programme des Bandes (z. B. Python-Skripte), falls vorhanden. Optional – Setzen und Bauen brauchen sie nicht.",
+        ))
+        .push(erklaerung(
+            "Reihenfolge",
+            "Egal. Die drei Wege sind unabhängig, du brauchst nur einen. Jeder Lauf liest den Text neu (Bauen und Skripte speichern vorher). Einzige Verbindung: Der Bereich „Cover“ berechnet die Rückenbreite mit der Seitenzahl des letzten Laufs – vorher nur geschätzt.",
+        ));
     let kopf = column![
-        text("Buch bauen").size(22).font(thema::fett()).color(thema::text_hell()),
-        text("„Buch nativ setzen“ erzeugt alles ohne Python und Bash: Druck-PDFs je Portal (Schwarzweiß), Lese-/Web-PDF in Farbe und EPUB. Vorhandene Bauskripte des Bandes laufen weiter, sind aber optional.")
-            .size(13)
-            .color(thema::text_gedimmt()),
+        text("Setzen und Bauen").size(22).font(thema::fett()).color(thema::text_hell()),
+        karte(wege),
     ]
-    .spacing(4);
+    .spacing(10);
 
     // Portale mit berechneter Rückenbreite
     let mut portale = row![].spacing(14);
@@ -130,7 +232,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     // Befehle
     let mut befehle = column![
         row![
-            text("Bauskripte des Bandes (optional)").size(14).font(thema::fett()).color(thema::text_hell()),
+            text("Bauskripte des Bandes (optional, eigene Programme)").size(14).font(thema::fett()).color(thema::text_hell()),
             space::horizontal(),
             if bau.laeuft.is_some() {
                 button(text("Abbrechen").size(12)).padding([6, 14]).style(thema::sekundaer_knopf_stil).on_press(Message::BauAbbrechen)
@@ -144,9 +246,13 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
         .align_y(Alignment::Center),
     ]
     .spacing(6);
+    if bau.laeuft.is_some() {
+        let start = std::time::Instant::now() - bau.start.and_then(|s| s.elapsed().ok()).unwrap_or_default();
+        befehle = befehle.push(arbeitsanzeige(None, "Skript läuft (Ausgabe unten)", start, bau.puls));
+    }
     if bau.befehle.is_empty() {
         befehle = befehle.push(
-            text("Keine Bauskripte im Bandordner gefunden. Das ist in Ordnung: „Buch nativ setzen“ oben braucht keine. Skripte (build.sh, alle.py, build.py, scripts/build_book.py) oder eigene Befehle in .werkbank/bauen.json werden sonst hier angeboten.")
+            text("Keine Bauskripte im Bandordner gefunden. Das ist in Ordnung: Setzen und Bauen oben brauchen keine. Skripte (build.sh, alle.py, build.py, scripts/build_book.py) oder eigene Befehle in .werkbank/bauen.json werden sonst hier angeboten.")
                 .size(12)
                 .color(thema::warnung_orange()),
         );
@@ -170,7 +276,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     let buchbau: Option<Element<'_, Message>> = bau.buchbau.as_ref().map(|(buch, nummer, untertitel)| {
         let mut spalte = column![
             row![
-                text("Buchbau nach buchbau.yaml (ohne Skripte)").size(14).font(thema::fett()).color(thema::text_hell()),
+                text("Bauen: dein Buchlayout und die Verlagsordner").size(14).font(thema::fett()).color(thema::text_hell()),
                 space::horizontal(),
                 button(text(if bau.buchbau_laeuft { "Baue …".to_string() } else { format!("Band {nummer} bauen") }).size(12))
                     .padding([6, 14])
@@ -185,7 +291,9 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
             .color(thema::text_gedimmt()),
         ]
         .spacing(6);
-        if !bau.buchbau_meldung.is_empty() {
+        if bau.buchbau_laeuft {
+            spalte = spalte.push(arbeitsanzeige(bau.buchbau_lauf.as_ref(), "Baue", std::time::Instant::now(), bau.puls));
+        } else if !bau.buchbau_meldung.is_empty() {
             spalte = spalte.push(text(&bau.buchbau_meldung).size(11).color(thema::text_hell()));
         }
         for h in &bau.buchbau_hinweise {
@@ -207,10 +315,10 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     // Nativer Satz
     let mut satz = column![
         row![
-            text("Nativer Satz (Typst und EPUB, ohne Skripte)").size(14).font(thema::fett()).color(thema::text_hell()),
+            text("Setzen: Werkbank-Satz in einstellbarer Gestaltung").size(14).font(thema::fett()).color(thema::text_hell()),
             space::horizontal(),
             button(text("Stil bearbeiten …").size(12)).padding([6, 14]).style(thema::sekundaer_knopf_stil).on_press(Message::SatzStilBearbeiten),
-            button(text(if bau.satz_laeuft { "Setze …" } else { "Buch nativ setzen" }).size(12))
+            button(text(if bau.satz_laeuft { "Setze …" } else { "Buch setzen" }).size(12))
                 .padding([6, 14])
                 .style(thema::primaer_knopf_stil)
                 .on_press_maybe((!bau.satz_laeuft).then_some(Message::SatzStarten)),
@@ -277,7 +385,9 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
             .align_y(Alignment::Center),
         );
     }
-    if !bau.satz_meldung.is_empty() {
+    if bau.satz_laeuft {
+        satz = satz.push(arbeitsanzeige(bau.satz_lauf.as_ref(), "Setze", std::time::Instant::now(), bau.puls));
+    } else if !bau.satz_meldung.is_empty() {
         satz = satz.push(text(&bau.satz_meldung).size(11).color(thema::text_gedimmt()));
     }
     for (p, info) in &bau.satz_dateien {

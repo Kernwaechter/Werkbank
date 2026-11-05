@@ -195,7 +195,10 @@ impl Bericht {
     }
 }
 
-/// Baut einen Band: `fortschritt(text)` meldet die Schritte.
+/// Anzahl der Schritte, die [`bauen`] über `fortschritt` meldet.
+pub const SCHRITTE: usize = 5;
+
+/// Baut einen Band: `fortschritt(text)` meldet die [`SCHRITTE`] Arbeitsschritte.
 pub fn bauen(buchordner: &Path, nummer: u32, fortschritt: &dyn Fn(&str)) -> Result<Bericht, String> {
     let profil = profil::Profil::laden(buchordner)?;
     let band = profil.band(nummer).ok_or_else(|| format!("Band {nummer} steht nicht in {}", profil::DATEI))?.clone();
@@ -207,7 +210,7 @@ pub fn bauen(buchordner: &Path, nummer: u32, fortschritt: &dyn Fn(&str)) -> Resu
     std::fs::create_dir_all(&ausgabe).map_err(|e| format!("{}: {e}", ausgabe.display()))?;
 
     let mut bericht = Bericht::default();
-    fortschritt(&format!("Baue {} – {} (Quelle: {}/)", profil.titel, band.untertitel, band.ordner));
+    fortschritt("Texte lesen und übersetzen");
     let abschnitte = abschnitte_lesen(&bandordner, &profil, &mut bericht.hinweise);
     if abschnitte.is_empty() {
         return Err(format!("Keine Markdown-Quelldateien in „{}“ gefunden.", bandordner.display()));
@@ -229,7 +232,7 @@ pub fn bauen(buchordner: &Path, nummer: u32, fortschritt: &dyn Fn(&str)) -> Resu
     std::fs::write(&gesamt, text).map_err(|e| format!("{}: {e}", gesamt.display()))?;
     bericht.notieren(&gesamt);
 
-    fortschritt("Print-PDF (Farbe) und Print-PDF (Graustufen) …");
+
     let cover_png = bandordner.join("cover.png");
     for fassung in [pdf::Fassung::Farbe, pdf::Fassung::Grau] {
         let (endung, cover) = match fassung {
@@ -237,6 +240,10 @@ pub fn bauen(buchordner: &Path, nummer: u32, fortschritt: &dyn Fn(&str)) -> Resu
             pdf::Fassung::Grau => ("print-sw", None),
         };
         let dateien = dateien_fuer_typst(&abschnitte, &bandordner, buchordner, fassung, cover.map(|_| cover_png.as_path()), &mut bericht.hinweise);
+        fortschritt(match fassung {
+            pdf::Fassung::Farbe => "Druck-PDF in Farbe setzen",
+            pdf::Fassung::Grau => "Druck-PDF in Graustufen setzen",
+        });
         let quelle = pdf::dokument(&profil, &band.untertitel, &abschnitte, fassung, cover, 0);
         let mut ergebnis = crate::welt::typst_zu_pdf(quelle, Some(bandordner.clone()), dateien.clone())?;
         // Graudruck: wie bisher mit Notizseiten auffüllen, bis die Seitenzahl durch 4 teilbar ist
@@ -257,14 +264,14 @@ pub fn bauen(buchordner: &Path, nummer: u32, fortschritt: &dyn Fn(&str)) -> Resu
         }
     }
 
-    fortschritt("EPUB 3 für Tolino Media und Amazon KDP …");
+    fortschritt("EPUB 3 schreiben");
     let epub_pfad = ausgabe.join(format!("{}-ebook.epub", band.kurzname));
     let bilder = [bandordner.join("images"), buchordner.join("images")].into_iter().find(|p| p.is_dir());
     let cover = cover_finden(&bandordner, buchordner);
     epub::schreiben(&epub_pfad, &info, &abschnitte, bilder.as_deref(), cover.as_deref(), &jetzt_iso())?;
     bericht.notieren(&epub_pfad);
 
-    fortschritt("Verlagsordner tolino/, kdp/ und webpublishing/ …");
+    fortschritt("Verlagsordner und Umschläge (tolino/, kdp/, webpublishing/)");
     let seiten = bericht.seiten_grau;
     let umschlag = |plattform: pakete::Plattform, ziel: &Path| umschlag::schreiben(&profil, &band, &bandordner, plattform, seiten, ziel);
     let eingaben = pakete::Eingaben {
