@@ -13,6 +13,10 @@ use std::process::Command;
 pub struct WerkzeugStatus {
     /// Version von Pandoc (z. B. `3.7.0.2`), `None` = nicht gefunden.
     pub pandoc: Option<String>,
+    /// Selbsttest des eingebauten Typst-Satzes: `Ok(Beschreibung)` oder `Err(Fehler)`; `None` = noch nicht geprüft.
+    pub typst_eingebaut: Option<Result<String, String>>,
+    /// Version des Typst-Programms (nur für die Bauskripte nötig), `None` = nicht gefunden.
+    pub typst: Option<String>,
     /// Version von Ghostscript, `None` = nicht gefunden.
     pub ghostscript: Option<String>,
     /// Version von rustc (Code-Prüfer für Rust).
@@ -32,11 +36,24 @@ impl WerkzeugStatus {
     }
 }
 
+/// Installiert ein Werkzeug mit winget in einem sichtbaren Fenster (Fortschritt, Rückfragen, Administratorabfrage).
+/// Danach in den Einstellungen „Erneut prüfen“ wählen.
+pub fn winget_installieren(id: &str) {
+    if !cfg!(windows) {
+        return;
+    }
+    let _ = Command::new("cmd")
+        .args(["/c", "start", "Werkbank – Installation", "cmd", "/k", "winget", "install", "-e", "--id", id, "--accept-package-agreements", "--accept-source-agreements"])
+        .spawn();
+}
+
 /// Prüft alle Programme (ruft sie mit `--version` auf bzw. liest die Versionsdateien des Flutter-SDK).
 pub fn pruefen() -> WerkzeugStatus {
     let (dart, flutter) = werkbank_kern::dartpruefung::versionen();
     WerkzeugStatus {
         pandoc: werkbank_satz::pandoc_version(),
+        typst_eingebaut: Some(werkbank_satz::typst_selbsttest()),
+        typst: werkbank_satz::programm_version("typst", &["--version"]).map(|z| z.trim_start_matches("typst").trim().to_string()),
         ghostscript: gs_programm().and_then(|gs| werkbank_satz::programm_version(&gs, &["--version"])),
         rustc: werkbank_kern::codepruefung::rustc_version(),
         dart,
@@ -45,14 +62,72 @@ pub fn pruefen() -> WerkzeugStatus {
     }
 }
 
-/// Ghostscript im Suchpfad oder unter `~/.local/gs` (wie in den Bauskripten).
+/// Heimatordner (`HOME`, unter Windows `USERPROFILE`).
+fn heimat() -> Option<PathBuf> {
+    std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map(PathBuf::from)
+}
+
+/// Programmordner von Windows, in denen Ghostscript (`gs\gs10.x\bin\gswin64c.exe`) installiert wird.
+fn windows_gs_basen() -> Vec<PathBuf> {
+    if !cfg!(windows) {
+        return Vec::new();
+    }
+    ["ProgramFiles", "ProgramW6432", "ProgramFiles(x86)", "LOCALAPPDATA"]
+        .iter()
+        .filter_map(|v| std::env::var_os(v).map(PathBuf::from))
+        .flat_map(|p| [p.join("gs"), p.join("Programs").join("gs")])
+        .collect()
+}
+
+static GS_ORDNER: std::sync::RwLock<String> = std::sync::RwLock::new(String::new());
+
+/// Setzt den vom Benutzer angegebenen Ghostscript-Ordner (leer = suchen).
+pub fn gs_ordner_setzen(ordner: &str) {
+    if let Ok(mut g) = GS_ORDNER.write() {
+        *g = ordner.trim().trim_matches('"').to_string();
+    }
+}
+
+/// Das Programm im angegebenen Ordner: die Datei selbst, `<ordner>\bin`, `<ordner>` oder `<ordner>\<Version>\bin`.
+fn gs_im_ordner(ordner: &str) -> Option<PathBuf> {
+    let o = PathBuf::from(ordner);
+    if o.is_file() {
+        return Some(o);
+    }
+    let namen = ["gswin64c.exe", "gswin32c.exe", "gs"];
+    let mut ordner_liste = vec![o.join("bin"), o.clone()];
+    ordner_liste.extend(unterordner(&o).into_iter().map(|v| v.join("bin")));
+    ordner_liste.into_iter().flat_map(|d| namen.map(|n| d.join(n))).find(|p| p.is_file())
+}
+
+/// Ghostscript: eigener Ordner, Suchpfad, Programmordner von Windows oder unter `~/.local/gs` (wie in den Bauskripten).
 fn gs_programm() -> Option<String> {
+    let eigener = GS_ORDNER.read().map(|g| g.clone()).unwrap_or_default();
+    if !eigener.is_empty() {
+        return gs_im_ordner(&eigener).map(|p| p.to_string_lossy().into_owned());
+    }
     for name in ["gs", "gswin64c", "gswin32c"] {
         if werkbank_satz::programm_version(name, &["--version"]).is_some() {
             return Some(name.to_string());
         }
     }
-    let lokal = PathBuf::from(std::env::var_os("HOME")?).join(".local/gs/bin/gs");
+    // Der Windows-Installer von Ghostscript trägt sich nicht in PATH ein: neueste Version zuerst
+    // (ältere Installer: gs\gs10.x\bin, ab 10.6 ohne Versionsordner: gs\bin)
+    let mut windows: Vec<PathBuf> = windows_gs_basen()
+        .iter()
+        .flat_map(|b| {
+            let mut v = unterordner(b);
+            v.push(b.clone());
+            v
+        })
+        .flat_map(|v| ["gswin64c.exe", "gswin32c.exe"].map(|e| v.join("bin").join(e)))
+        .filter(|p| p.is_file())
+        .collect();
+    windows.sort();
+    if let Some(p) = windows.pop() {
+        return Some(p.to_string_lossy().into_owned());
+    }
+    let lokal = heimat()?.join(".local/gs/bin/gs");
     lokal.is_file().then(|| lokal.to_string_lossy().into_owned())
 }
 
@@ -77,8 +152,9 @@ fn gs_wurzeln() -> Vec<PathBuf> {
             w.push(v.join("share/ghostscript"));
         }
     }
-    if let Some(h) = std::env::var_os("HOME") {
-        w.push(PathBuf::from(h).join(".local/gs/share/ghostscript"));
+    w.extend(windows_gs_basen());
+    if let Some(h) = heimat() {
+        w.push(h.join(".local/gs/share/ghostscript"));
     }
     w
 }
@@ -91,8 +167,17 @@ fn pdfx_dateien() -> Result<(PathBuf, PathBuf), String> {
         profile.push(PathBuf::from(d));
     }
     profile.push(PathBuf::from("/usr/share/color/icc/ghostscript"));
+    // Installationsordner des gefundenen Programms (…\gs\bin\gswin64c.exe → …\gs, auch ohne Versionsordner)
+    let eigene: Vec<PathBuf> = gs_programm()
+        .map(PathBuf::from)
+        .and_then(|p| p.parent().and_then(|b| b.parent()).map(Path::to_path_buf))
+        .into_iter()
+        .collect();
     for wurzel in gs_wurzeln() {
-        for v in unterordner(&wurzel) {
+        let mut kandidaten = unterordner(&wurzel);
+        kandidaten.push(wurzel.clone());
+        kandidaten.extend(eigene.iter().cloned());
+        for v in kandidaten {
             let kandidat = v.join("lib/PDFX_def.ps");
             if def.is_none() && kandidat.is_file() {
                 def = Some(kandidat);
@@ -121,7 +206,7 @@ pub fn pdfx_erzeugen(quelle: &Path, ziel: &Path, titel: &str) -> Result<(), Stri
     let vorlage: String = vorlage.iter().map(|&b| b as char).collect(); // Latin-1
     let vorlage = vorlage
         .replace("/Title (Title)", &format!("/Title ({titel_ps})"))
-        .replace("/ICCProfile (ISO Coated sb.icc) def", &format!("/ICCProfile ({}) def", icc.display()))
+        .replace("/ICCProfile (ISO Coated sb.icc) def", &format!("/ICCProfile ({}) def", icc.to_string_lossy().replace('\\', "/")))
         .replace(
             "/OutputCondition (Commercial and specialty printing)",
             "/OutputCondition (Offset printing, uncoated paper, black and white)",
@@ -129,9 +214,9 @@ pub fn pdfx_erzeugen(quelle: &Path, ziel: &Path, titel: &str) -> Result<(), Stri
     let def_neu = arbeit.join("pdfx-def.ps");
     std::fs::write(&def_neu, vorlage.chars().map(|c| c as u32 as u8).collect::<Vec<u8>>()).map_err(|e| e.to_string())?;
 
-    let aus = Command::new(gs)
+    let aus = werkbank_kern::prozess::ohne_fenster(&mut Command::new(gs))
         .args(["-dBATCH", "-dNOPAUSE", "-dQUIET"])
-        .arg(format!("--permit-file-read={}", icc.display()))
+        .arg(format!("--permit-file-read={}", icc.to_string_lossy().replace('\\', "/")))
         .args([
             "-dPDFX",
             "-sColorConversionStrategy=Gray",

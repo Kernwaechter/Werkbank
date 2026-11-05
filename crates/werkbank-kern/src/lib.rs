@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 pub mod codepruefung;
+pub mod prozess;
 pub mod dartpruefung;
 pub mod cover;
 pub mod io;

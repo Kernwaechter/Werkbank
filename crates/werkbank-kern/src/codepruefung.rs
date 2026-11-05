@@ -116,7 +116,7 @@ pub fn rustc_programm() -> Option<std::path::PathBuf> {
 
 /// Version von `rustc`, z. B. `1.99.1`; `None` = nicht gefunden.
 pub fn rustc_version() -> Option<String> {
-    let aus = Command::new(rustc_programm()?).arg("--version").output().ok()?;
+    let aus = crate::prozess::ohne_fenster(Command::new(rustc_programm()?).arg("--version")).output().ok()?;
     let text = String::from_utf8_lossy(&aus.stdout);
     text.split_whitespace().nth(1).map(str::to_string)
 }
@@ -139,7 +139,7 @@ pub fn pruefen(bsp: &Beispiel, edition: &str, arbeitsordner: &Path, zeitlimit: D
     let Some(rustc) = rustc_programm() else {
         return Ergebnis::Uebersprungen("rustc nicht gefunden (Rust über rustup installieren)".to_string());
     };
-    let kind = Command::new(rustc)
+    let kind = crate::prozess::ohne_fenster(&mut Command::new(rustc))
         .args(["--edition", edition, "--crate-type", "bin", "--emit=metadata", "--color", "never", "-A", "warnings"])
         .arg("-o")
         .arg(&ausgabe)

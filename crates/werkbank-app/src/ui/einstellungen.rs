@@ -66,7 +66,7 @@ pub const SEITEN: [(&str, &str); 5] = [
     ("Allgemein", "Lizenz, automatisch speichern, Tagespensum"),
     ("Editor", "Design, Schrift, Zeilenabstand, Spaltenbreite"),
     ("Prüfung", "Rechtschreibung, LanguageTool, Ausnahmen"),
-    ("Werkzeuge", "Pandoc, Ghostscript, Rust, Dart/Flutter"),
+    ("Werkzeuge", "Pandoc, Typst, Ghostscript, Rust, Dart/Flutter"),
     ("Tastenkürzel", "Kürzel ändern und zurücksetzen"),
 ];
 
@@ -465,7 +465,25 @@ pub fn ansicht<'a>(
             "Wandelt Markdown nach Typst. Die Satzvorschau geht damit denselben Weg wie die Bauskripte.",
             pandoc_alt.then_some("zu alt: ab Version 3 nötig"),
         ),
+        match &werkzeuge.typst_eingebaut {
+            Some(Ok(t)) => werkzeug_zeile(
+                "Typst",
+                &Some(format!("eingebaut, Test bestanden ({t}){}", werkzeuge.typst.as_ref().map(|v| format!(" · Programm {v}")).unwrap_or_default())),
+                5,
+                "Der Satz der Bücher (PDF) steckt im Programm; das Typst-Programm ist nur für die alten Bauskripte nötig.",
+                None,
+            ),
+            Some(Err(e)) => werkzeug_zeile("Typst", &Some(format!("Selbsttest fehlgeschlagen: {e}")), 5, "Der eingebaute Satz arbeitet nicht; Bücher lassen sich so nicht setzen.", Some("Fehler")),
+            None => werkzeug_zeile("Typst", &None, 5, "Der Satz der Bücher (PDF) steckt im Programm.", None),
+        },
         werkzeug_zeile("Ghostscript", &werkzeuge.ghostscript, 2, "Erzeugt aus dem Druck-PDF die PDF/X-3-Datei (Graustufen) für die Portale.", None),
+        beschriftet(
+            "Ordner von Ghostscript (leer = automatisch suchen)",
+            text_input(if cfg!(windows) { "z. B. C:\\Program Files\\gs" } else { "z. B. /usr/local/gs" }, &e.gs_ordner)
+                .on_input(Message::GsOrdner)
+                .size(12)
+                .padding(6),
+        ),
         abschnitt("Code-Prüfer"),
         werkzeug_zeile("Rust", &werkzeuge.rustc, 3, "rustc prüft die Rust-Beispiele des Buches auf Typfehler (Bereich Prüfen).", None),
         werkzeug_zeile(
@@ -698,7 +716,7 @@ pub fn ansicht<'a>(
     .into()
 }
 
-/// Installationshinweise für Pandoc (1), Ghostscript (2), Rust (3) oder Dart/Flutter (4).
+/// Installationshinweise für Pandoc (1), Ghostscript (2), Rust (3), Dart/Flutter (4) oder Typst (5).
 fn werkzeug_anleitung<'a>(welches: u8, system: Betriebssystem) -> Element<'a, Message> {
     let (name, url, zeilen): (&str, &str, Vec<(&str, &str)>) = match (welches, system) {
         (1, Betriebssystem::Windows) => ("Pandoc", "https://pandoc.org/installing.html", vec![
@@ -743,9 +761,22 @@ fn werkzeug_anleitung<'a>(welches: u8, system: Betriebssystem) -> Element<'a, Me
             ("Oder per Git in den Home-Ordner:", "git clone https://github.com/flutter/flutter.git -b stable ~/flutter"),
             ("Flutter bringt Dart mit. Die Werkbank findet es auch unter ~/flutter oder ~/Development/flutter und über FLUTTER_ROOT.", ""),
         ]),
+        (5, Betriebssystem::Windows) => ("Typst", "https://typst.app/open-source/", vec![
+            ("Der Satz ist eingebaut, ein Typst-Programm brauchst du nur für die alten Bauskripte. Mit winget (PowerShell):", "winget install --id Typst.Typst"),
+            ("Oder mit Scoop:", "scoop install typst"),
+        ]),
+        (5, Betriebssystem::MacOs) => ("Typst", "https://typst.app/open-source/", vec![
+            ("Der Satz ist eingebaut, ein Typst-Programm brauchst du nur für die alten Bauskripte. Mit Homebrew:", "brew install typst"),
+        ]),
+        (5, Betriebssystem::Linux) => ("Typst", "https://typst.app/open-source/", vec![
+            ("Der Satz ist eingebaut, ein Typst-Programm brauchst du nur für die alten Bauskripte. Mit Cargo:", "cargo install --locked typst-cli"),
+            ("Oder mit Snap:", "sudo snap install typst"),
+            ("Arch (pacman):", "sudo pacman -S typst"),
+        ]),
         (_, Betriebssystem::Windows) => ("Ghostscript", "https://ghostscript.com/releases/gsdnld.html", vec![
-            ("Mit winget (PowerShell):", "winget install --id ArtifexSoftware.GhostScript"),
-            ("Oder den Installer von der Webseite laden. Das Programm heißt unter Windows gswin64c.", ""),
+            ("Den Installer (Windows 64 bit) von der Webseite laden und ausführen. Die Werkbank findet ihn in C:\\Program Files\\gs. Das Programm heißt unter Windows gswin64c. (Ghostscript gibt es nicht in winget.)", ""),
+            ("Oder mit Chocolatey (Administrator-PowerShell):", "choco install ghostscript"),
+            ("Oder mit Scoop:", "scoop install ghostscript"),
         ]),
         (_, Betriebssystem::MacOs) => ("Ghostscript", "https://ghostscript.com/releases/gsdnld.html", vec![("Mit Homebrew:", "brew install ghostscript")]),
         (_, Betriebssystem::Linux) => ("Ghostscript", "https://ghostscript.com/releases/gsdnld.html", vec![
@@ -788,8 +819,35 @@ fn werkzeug_anleitung<'a>(welches: u8, system: Betriebssystem) -> Element<'a, Me
             );
         }
     }
+    if system == Betriebssystem::Windows {
+        let id = match welches {
+            1 => Some("JohnMacFarlane.Pandoc"),
+            3 => Some("Rustlang.Rustup"),
+            5 => Some("Typst.Typst"),
+            4 => None,
+            _ => None, // Ghostscript ist nicht in winget
+        };
+        if let Some(id) = id {
+            inhalt = inhalt.push(
+                button(text(format!("{name} jetzt mit winget installieren")).size(12))
+                    .padding([6, 14])
+                    .style(thema::primaer_knopf_stil)
+                    .on_press(Message::WerkzeugInstallieren(id)),
+            );
+        }
+    }
     inhalt = inhalt
-        .push(text(format!("Webseite: {url}")).size(11).color(thema::text_gedimmt()))
+        .push(
+            row![
+                text("Webseite:").size(11).color(thema::text_gedimmt()),
+                button(text(url).size(11))
+                    .padding([0, 4])
+                    .style(thema::link_knopf_stil)
+                    .on_press(Message::LinkOeffnen(url.to_string())),
+            ]
+            .spacing(4)
+            .align_y(Alignment::Center),
+        )
         .push(text(match welches {
             3 => "Danach in den Einstellungen „Erneut prüfen“ wählen. Die Werkbank findet rustc im Suchpfad (PATH) und unter ~/.cargo/bin.",
             _ => "Danach in den Einstellungen „Erneut prüfen“ wählen. Die Werkbank findet das Programm im Suchpfad (PATH).",

@@ -88,7 +88,7 @@ pub fn erkennen(band: &Path) -> Vec<BauBefehl> {
 
 fn pfad_mit_zusaetzen() -> std::ffi::OsString {
     let mut ordner: Vec<PathBuf> = Vec::new();
-    if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
+    if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map(PathBuf::from) {
         ordner.push(home.join(".local/bin"));
         ordner.push(home.join(".cargo/bin"));
     }
@@ -102,6 +102,45 @@ pub fn programm_finden(name: &str) -> Option<PathBuf> {
     std::env::split_paths(&pfad_mit_zusaetzen()).find_map(|d| {
         endungen.iter().map(|e| d.join(format!("{name}{e}"))).find(|p| p.is_file())
     })
+}
+
+/// Löst die Programmnamen der Skripte (`python3`, `bash`) auf das auf, was das System hat.
+///
+/// Unter Windows heißt Python `py`/`python` (`python3.exe` ist dort oft nur ein Store-Platzhalter), und
+/// `bash` kommt von Git für Windows (nicht das `bash.exe` von WSL in `System32`).
+/// Rückgabe: Programm und Argumente, die davor stehen.
+pub fn programm_aufloesen(name: &str) -> (String, Vec<String>) {
+    if !cfg!(windows) {
+        return (name.to_string(), Vec::new());
+    }
+    let nicht_store = |p: &Path| {
+        let s = p.to_string_lossy().to_lowercase();
+        !s.contains("windowsapps") && !s.contains("\\system32\\")
+    };
+    match name {
+        "python3" | "python" => {
+            if programm_finden("py").is_some_and(|p| nicht_store(&p) || p.to_string_lossy().to_lowercase().contains("\\windows\\py.exe")) {
+                return ("py".to_string(), vec!["-3".to_string()]);
+            }
+            if let Some(p) = programm_finden("python").filter(|p| nicht_store(p)) {
+                return (p.to_string_lossy().into_owned(), Vec::new());
+            }
+            (name.to_string(), Vec::new())
+        }
+        "bash" | "sh" => {
+            let mut kandidaten: Vec<PathBuf> = ["ProgramFiles", "ProgramW6432", "ProgramFiles(x86)", "LOCALAPPDATA"]
+                .iter()
+                .filter_map(|v| std::env::var_os(v).map(PathBuf::from))
+                .flat_map(|p| [p.join("Git").join("bin").join("bash.exe"), p.join("Programs").join("Git").join("bin").join("bash.exe")])
+                .collect();
+            kandidaten.extend(programm_finden("bash").filter(|p| nicht_store(p)));
+            kandidaten
+                .into_iter()
+                .find(|p| p.is_file())
+                .map_or((name.to_string(), Vec::new()), |p| (p.to_string_lossy().into_owned(), Vec::new()))
+        }
+        _ => (name.to_string(), Vec::new()),
+    }
 }
 
 /// Dateien unter `out/` (bis Tiefe 3), die seit `seit` geändert wurden.
@@ -165,8 +204,12 @@ pub fn laufen(cmd: BauBefehl, abbruch: Arc<AtomicBool>) -> impl iced::futures::S
         let (sender, mut empfaenger) = iced::futures::channel::mpsc::unbounded::<Ereignis>();
 
         std::thread::spawn(move || {
-            let kind = Command::new(&cmd.programm)
+            let (programm, vorargs) = programm_aufloesen(&cmd.programm);
+            let kind = werkbank_kern::prozess::ohne_fenster(&mut Command::new(&programm))
+                .args(&vorargs)
                 .args(&cmd.args)
+                .env("PYTHONUTF8", "1")
+                .env("PYTHONIOENCODING", "utf-8")
                 .current_dir(&cmd.ordner)
                 .env("PATH", pfad_mit_zusaetzen())
                 .stdin(Stdio::null())

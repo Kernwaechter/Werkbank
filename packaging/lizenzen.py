@@ -14,6 +14,7 @@ for p in sorted(meta["packages"], key=lambda p: p["name"].lower()):
     zaehler[lizenz] += 1
 with open("assets/lizenzen.txt", "w", encoding="utf-8") as f:
     f.write("\n".join(zeilen) + "\n")
+    f.write("\nFira Sans (Schriftdateien in assets/fonts, eingebettet für den Buchsatz) – SIL Open Font License 1.1, Copyright (c) 2012-2015 The Mozilla Foundation und Telefonica S.A. Volltext: assets/fonts/OFL.txt\n")
 print(f"{len(zeilen)} Fremdbausteine", file=sys.stderr)
 kritisch = [l for l in zaehler if any(k in l.upper() for k in ("GPL", "AGPL", "SSPL", "UNBEKANNT")) and "LGPL" not in l.upper().replace("AGPL", "")]
 print("Lizenzen nach Häufigkeit:", file=sys.stderr)

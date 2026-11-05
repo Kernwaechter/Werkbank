@@ -483,6 +483,19 @@ pub enum Message {
     VorschauText(bool),
     /// PDF/X-3 mit Ghostscript erzeugen.
     SatzPdfx(bool),
+    SatzStilOffen,
+    SatzStilVorlage(String),
+    SatzStilElement(String),
+    SatzStilFeld(String, String),
+    SatzStilZuruecksetzen(bool),
+    SatzStilMusterFarbig(bool),
+    SatzMusterFertig(u64, Result<Arc<Vec<werkbank_satz::Seitenbild>>, String>),
+    /// Legt `.werkbank/satz-stil.typ` an (falls nötig) und öffnet sie.
+    SatzStilBearbeiten,
+    /// Installiert ein Werkzeug unter Windows mit winget (Pandoc, Ghostscript, Python, Git).
+    WerkzeugInstallieren(&'static str),
+    /// Öffnet eine Webseite im Standardbrowser.
+    LinkOeffnen(String),
     /// Stellung der Seitenzahl im Satz (`aussen` oder `mitte`).
     SatzSeitenzahl(String),
     /// Zählweise im Satz (`roemisch` oder `durchgehend`).
@@ -503,6 +516,10 @@ pub enum Message {
     SatzFertig(Result<(Vec<(PathBuf, String)>, usize), String>),
     /// Startet einen Bauschritt (Index in der Befehlsliste).
     BauStarten(usize),
+    /// Baut den Band nach `buchbau.yaml` (nativ, ohne Skripte).
+    BuchbauStarten,
+    /// Ergebnis des Buchbaus.
+    BuchbauFertig(Result<werkbank_satz::buchbau::Bericht, String>),
     /// Eine Zeile Ausgabe des Bauprozesses.
     BauZeile(String),
     /// Der Bauprozess ist beendet (Exitcode, `None` = abgebrochen).
@@ -591,6 +608,8 @@ pub enum Message {
     RechtschreibungToggle(bool),
     /// Anderer Ordner für Wörterbücher.
     WoerterbuchOrdner(String),
+    /// Eigener Ordner von Ghostscript.
+    GsOrdner(String),
     /// Merkt ein Wort als richtig.
     WortMerken(String),
     /// Öffnet die Suche im Kapitel (`false`) oder im ganzen Buch (`true`).
@@ -752,6 +771,7 @@ fn new() -> (AppState, Task<Message>) {
     let (erst_teil_id, erst_kapitel_id, initialer_text) = startauswahl(&projekt);
     let einstellungen = Einstellungen::laden();
     einstellungen.darstellung_anwenden();
+    werkzeuge::gs_ordner_setzen(&einstellungen.gs_ordner);
     let (statistik, ausnahmen) = dateien::band_daten_laden(&band);
 
     let state = AppState {
@@ -957,6 +977,11 @@ fn band_umfeld_laden(state: &mut AppState) {
         Some(o) => {
             state.portale = Portalregeln::laden(&o);
             state.bau.befehle = bau::erkennen(&o);
+            // Gehört der Band zu einem Buch mit buchbau.yaml? (einmal beim Laden, nicht beim Zeichnen)
+            state.bau.buchbau = werkbank_satz::buchbau::profil::Profil::suchen(&o)
+                .and_then(|(buch, p)| p.band_zu_ordner(&buch, &o).map(|b| (buch.clone(), b.nummer, b.untertitel.clone())));
+            state.bau.stil = werkbank_satz::gestaltung::Satzstil::laden(&o);
+            state.bau.muster.clear();
         }
         None => state.portale = Portalregeln::default(),
     }
@@ -1333,6 +1358,84 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
         Message::VorschauText(an) => {
             state.satz_vorschau.text_modus = an;
             return vorschau_folgen(state);
+        }
+
+        Message::SatzStilOffen => {
+            state.bau.stil_offen = !state.bau.stil_offen;
+            if state.bau.stil_offen {
+                return muster_setzen(state);
+            }
+        }
+
+        Message::SatzStilVorlage(name) => {
+            if let Some(v) = werkbank_satz::gestaltung::vorlagen().into_iter().find(|v| v.name == name) {
+                state.bau.stil = v.stil;
+                stil_sichern(state);
+                return muster_setzen(state);
+            }
+        }
+
+        Message::SatzStilElement(k) => state.bau.stil_element = k,
+
+        Message::SatzStilFeld(feld, wert) => {
+            let k = if state.bau.stil_element.is_empty() { "text".to_string() } else { state.bau.stil_element.clone() };
+            state.bau.stil.setze(&k, &feld, wert);
+            stil_sichern(state);
+            return muster_setzen(state);
+        }
+
+        Message::SatzStilZuruecksetzen(alles) => {
+            if alles {
+                state.bau.stil = Default::default();
+            } else {
+                let k = if state.bau.stil_element.is_empty() { "text".to_string() } else { state.bau.stil_element.clone() };
+                state.bau.stil.formate.remove(&k);
+            }
+            stil_sichern(state);
+            return muster_setzen(state);
+        }
+
+        Message::SatzStilMusterFarbig(an) => {
+            state.bau.muster_farbig = an;
+            return muster_setzen(state);
+        }
+
+        Message::SatzMusterFertig(version, ergebnis) => {
+            if version == state.bau.muster_version {
+                match ergebnis {
+                    Ok(seiten) => {
+                        state.bau.muster = seiten.iter().map(|s| iced::widget::image::Handle::from_rgba(s.breite, s.hoehe, s.rgba.clone())).collect();
+                        state.bau.muster_meldung.clear();
+                    }
+                    Err(f) => {
+                        state.bau.muster.clear();
+                        state.bau.muster_meldung = format!("Muster nicht setzbar: {f}");
+                    }
+                }
+            }
+        }
+
+        Message::SatzStilBearbeiten => {
+            let datei = state.projekt.wurzelverzeichnis.join(".werkbank").join("satz-stil.typ");
+            if !datei.exists() {
+                let _ = std::fs::create_dir_all(datei.parent().unwrap_or(Path::new(".")));
+                if let Err(f) = std::fs::write(&datei, werkbank_satz::STIL_VORLAGE) {
+                    state.bau.satz_meldung = format!("Stildatei nicht angelegt: {f}");
+                    return Task::none();
+                }
+            }
+            bau::oeffnen(&datei);
+            state.bau.satz_meldung = format!("Stildatei: {} (nach dem Speichern neu setzen)", datei.display());
+        }
+
+        Message::LinkOeffnen(url) => {
+            if url.starts_with("https://") || url.starts_with("http://") {
+                bau::oeffnen(std::path::Path::new(&url));
+            }
+        }
+
+        Message::WerkzeugInstallieren(id) => {
+            werkzeuge::winget_installieren(id);
         }
 
         Message::SatzPdfx(an) => {
@@ -1861,6 +1964,42 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
             );
         }
 
+        Message::BuchbauStarten => {
+            let Some((buch, nummer, _)) = state.bau.buchbau.clone() else {
+                return Task::none();
+            };
+            if state.bau.buchbau_laeuft {
+                return Task::none();
+            }
+            // Der Bau liest die Dateien von der Platte: Ungespeichertes zuerst sichern
+            if dateien::hat_ungespeichertes(state) {
+                let _ = update(state, Message::Speichern);
+            }
+            state.bau.buchbau_laeuft = true;
+            state.bau.buchbau_meldung = format!("Baue Band {nummer} …");
+            state.bau.buchbau_hinweise.clear();
+            state.bau.buchbau_dateien.clear();
+            state.aktiver_bereich = Arbeitsbereich::Bauen;
+            return Task::perform(
+                languagetool::im_hintergrund(move || werkbank_satz::buchbau::bauen(&buch, nummer, &|_| {})),
+                Message::BuchbauFertig,
+            );
+        }
+
+        Message::BuchbauFertig(ergebnis) => {
+            state.bau.buchbau_laeuft = false;
+            match ergebnis {
+                Ok(b) => {
+                    state.bau.buchbau_meldung =
+                        format!("Fertig: {} Dateien, Buchblock (Graudruck) mit {} Seiten.", b.dateien.len(), b.seiten_grau);
+                    state.satz_seiten = Some(b.seiten_grau as u32);
+                    state.bau.buchbau_hinweise = b.hinweise;
+                    state.bau.buchbau_dateien = b.dateien;
+                }
+                Err(f) => state.bau.buchbau_meldung = format!("Buchbau fehlgeschlagen: {f}"),
+            }
+        }
+
         Message::SatzFertig(ergebnis) => {
             state.bau.satz_laeuft = false;
             match ergebnis {
@@ -1979,6 +2118,13 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
             state.einstellungen.rechtschreibung = an;
             state.einstellungen.speichern();
             return update(state, Message::WoerterbuchLaden);
+        }
+
+        Message::GsOrdner(pfad) => {
+            werkzeuge::gs_ordner_setzen(&pfad);
+            state.einstellungen.gs_ordner = pfad;
+            state.einstellungen.speichern();
+            return update(state, Message::WerkzeugePruefen);
         }
 
         Message::WoerterbuchOrdner(pfad) => {
@@ -3024,6 +3170,26 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
     Task::none()
 }
 
+/// Speichert die Gestaltung im Bandordner.
+fn stil_sichern(state: &mut AppState) {
+    if let Some(o) = state.band.ordner.clone()
+        && let Err(f) = state.bau.stil.speichern(&o)
+    {
+        state.bau.satz_meldung = format!("Gestaltung nicht gespeichert: {f}");
+    }
+}
+
+/// Setzt die Musterseite der Gestaltung neu (im Hintergrund).
+fn muster_setzen(state: &mut AppState) -> Task<Message> {
+    state.bau.muster_version += 1;
+    let version = state.bau.muster_version;
+    let typ = state.bau.stil.muster(state.bau.muster_farbig);
+    Task::perform(
+        languagetool::im_hintergrund(move || werkbank_satz::typst_zu_seiten(typ, None, 1, 1.3).map(|(s, _, _)| Arc::new(s))),
+        move |e| Message::SatzMusterFertig(version, e),
+    )
+}
+
 /// Setzt Druck-PDFs je Portal, ein farbiges Lese-PDF und ein EPUB nach `.werkbank/satz/`.
 /// Liefert die Dateien und die Seitenzahl des ersten Druck-PDFs.
 fn satz_ausfuehren(
@@ -3040,6 +3206,11 @@ fn satz_ausfuehren(
     std::fs::create_dir_all(&ziel).map_err(|e| e.to_string())?;
     let mut dateien = Vec::new();
     let mut seiten = 0;
+    // Eigener Stil des Bandes (Typst), siehe „Stil bearbeiten“ im Bereich Bauen
+    let datei_stil = std::fs::read_to_string(ordner.join(".werkbank").join("satz-stil.typ")).unwrap_or_default();
+    let gestaltung = werkbank_satz::gestaltung::Satzstil::laden(ordner);
+    let stil = format!("{}\n{datei_stil}", gestaltung.zu_typst(false));
+    let stil_farbig = format!("{}\n{datei_stil}", gestaltung.zu_typst(true));
 
     for (i, p) in portale.iter().enumerate() {
         let opt = SatzOptionen::druck(p.druck_format_mm)
@@ -3049,7 +3220,7 @@ fn satz_ausfuehren(
             .mit_titelei_zahlen(wahl.titelei_zahlen)
             .mit_teiltitelseiten(wahl.teil_titelseiten)
             .mit_gerader_seitenzahl(wahl.gerade_seitenzahl);
-        let e = pdf_setzen(projekt, &opt)?;
+        let e = pdf_setzen(projekt, &opt.mit_stil_zusatz(stil.clone()))?;
         if i == 0 {
             seiten = e.seiten;
         }
@@ -3069,7 +3240,7 @@ fn satz_ausfuehren(
         }
     }
 
-    let lesen = pdf_setzen(projekt, &SatzOptionen::lesen().mit_seitenzahl(stellung).mit_zaehlung(zaehlung).mit_titelei_zahlen(wahl.titelei_zahlen))?;
+    let lesen = pdf_setzen(projekt, &SatzOptionen::lesen().mit_seitenzahl(stellung).mit_zaehlung(zaehlung).mit_titelei_zahlen(wahl.titelei_zahlen).mit_stil_zusatz(stil_farbig))?;
     let datei = ziel.join("buch-lesen.pdf");
     std::fs::write(&datei, &lesen.bytes).map_err(|e| e.to_string())?;
     dateien.push((datei, format!("Lese-PDF farbig B5, {} Seiten, {:.1} MB", lesen.seiten, lesen.bytes.len() as f32 / 1e6)));

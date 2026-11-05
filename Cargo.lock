@@ -6831,14 +6831,22 @@ name = "werkbank-satz"
 version = "1.2.2"
 dependencies = [
  "epub-builder",
+ "image",
  "pulldown-cmark",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "syntect",
  "ttf-parser 0.24.1",
+ "two-face",
  "typst",
  "typst-assets",
  "typst-kit",
  "typst-pdf",
  "typst-render",
  "werkbank-kern",
+ "zip",
 ]
 
 [[package]]

@@ -49,9 +49,18 @@ pub struct SatzOptionen {
     pub teil_titelseiten: bool,
     /// Das Buch endet auf einer geraden Seite (Druckereien verlangen eine gerade Seitenzahl); nötigenfalls folgt eine Leerseite.
     pub gerade_seitenzahl: bool,
+    /// Eigener Typst-Text (Inhalt von `.werkbank/satz-stil.typ`), der nach dem Standardkopf folgt.
+    /// Damit lässt sich das Erscheinungsbild ändern: `#set text(...)`, `#show heading...`, eigene `kasten`-Arten.
+    pub stil_zusatz: String,
 }
 
 impl SatzOptionen {
+    /// Eigenen Stil (Typst-Text) anhängen.
+    pub fn mit_stil_zusatz(mut self, typst: String) -> Self {
+        self.stil_zusatz = typst;
+        self
+    }
+
     /// Schwarzweiß-Druck in einem Format: Zahlen außen, römische Titelei, Teile rechts.
     pub fn druck(format_mm: (f32, f32)) -> Self {
         Self {
@@ -65,6 +74,7 @@ impl SatzOptionen {
             titelei_zahlen: false,
             teil_titelseiten: true,
             gerade_seitenzahl: true,
+            stil_zusatz: String::new(),
         }
     }
 
@@ -81,6 +91,7 @@ impl SatzOptionen {
             titelei_zahlen: false,
             teil_titelseiten: false,
             gerade_seitenzahl: false,
+            stil_zusatz: String::new(),
         }
     }
 
@@ -261,6 +272,77 @@ fn verweise_ersetzen(text: &str, nummern: &HashMap<String, usize>) -> String {
 ///
 /// `ebene_versatz`: Überschriftenebenen werden um diesen Wert verschoben (Teile liegen auf Ebene 1).
 pub fn markdown_zu_typst(md: &str, wurzel: Option<&Path>, farbig: bool, nummern: &HashMap<String, usize>) -> String {
+    if !md.lines().any(|z| z.trim_start().starts_with(":::")) {
+        return markdown_ohne_divs(md, wurzel, farbig, nummern);
+    }
+    // Pandoc-Divs (`::: info` … `:::`) werden zu `#kasten("info")[ … ]`; verschachtelte gehen rekursiv.
+    let mut aus = String::new();
+    let mut aussen = String::new();
+    let mut innen = String::new();
+    let mut tiefe = 0usize;
+    let mut art = String::new();
+    let mut zaun: Option<&str> = None;
+    let abschliessen = |aus: &mut String, art: &str, innen: &mut String| {
+        let teil = markdown_zu_typst(innen, wurzel, farbig, nummern);
+        aus.push_str(&format!("#kasten({})[\n{}]\n\n", zeichenkette(art), teil));
+        innen.clear();
+    };
+    for zeile in md.split_inclusive('\n') {
+        let t = zeile.trim();
+        let ziel = if tiefe == 0 { &mut aussen } else { &mut innen };
+        if let Some(z) = zaun {
+            if t.starts_with(z) {
+                zaun = None;
+            }
+            ziel.push_str(zeile);
+            continue;
+        }
+        if t.starts_with("```") || t.starts_with("~~~") {
+            zaun = Some(&t[..3]);
+            ziel.push_str(zeile);
+            continue;
+        }
+        if let Some(rest) = t.strip_prefix(":::") {
+            let rest = rest.trim_start_matches(':').trim();
+            if rest.is_empty() {
+                // Schließende Zeile; eine überzählige am Anfang wird ignoriert
+                if tiefe > 0 {
+                    tiefe -= 1;
+                    if tiefe == 0 {
+                        abschliessen(&mut aus, &art, &mut innen);
+                    } else {
+                        innen.push_str(zeile);
+                    }
+                }
+                continue;
+            }
+            if tiefe == 0 {
+                aus.push_str(&markdown_ohne_divs(&std::mem::take(&mut aussen), wurzel, farbig, nummern));
+                art = div_art(rest);
+            } else {
+                innen.push_str(zeile);
+            }
+            tiefe += 1;
+            continue;
+        }
+        ziel.push_str(zeile);
+    }
+    if tiefe > 0 {
+        abschliessen(&mut aus, &art, &mut innen);
+    }
+    aus.push_str(&markdown_ohne_divs(&aussen, wurzel, farbig, nummern));
+    aus
+}
+
+/// Name der Kastenart aus `info`, `{.info}`, `{.info #kennung}` oder `{.info .breit}` (klein geschrieben).
+fn div_art(kopf: &str) -> String {
+    let kopf = kopf.trim_matches(['{', '}']).trim();
+    let wort = kopf.split_whitespace().find(|w| w.starts_with('.')).map(|w| &w[1..]).or_else(|| kopf.split_whitespace().next()).unwrap_or("");
+    let rein: String = wort.chars().filter(|c| c.is_alphanumeric() || matches!(c, '-' | '_')).collect::<String>().to_lowercase();
+    if rein.is_empty() { "info".to_string() } else { rein }
+}
+
+fn markdown_ohne_divs(md: &str, wurzel: Option<&Path>, farbig: bool, nummern: &HashMap<String, usize>) -> String {
     let md = verweise_ersetzen(md, nummern);
     let mut opt = Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TABLES;
     opt.insert(Options::ENABLE_HEADING_ATTRIBUTES);
@@ -334,7 +416,7 @@ pub fn markdown_zu_typst(md: &str, wurzel: Option<&Path>, farbig: bool, nummern:
             Event::End(TagEnd::Heading(_)) => ziel.push_str("\n\n"),
             Event::Start(Tag::BlockQuote(_)) => {
                 zitat_tiefe += 1;
-                ziel.push_str("#block(inset: (left: 10pt), stroke: (left: 1.5pt + luma(170)))[\n");
+                ziel.push_str("#zitat[\n");
             }
             Event::End(TagEnd::BlockQuote(_)) => {
                 zitat_tiefe = zitat_tiefe.saturating_sub(1);
@@ -476,11 +558,7 @@ const KOPF: &str = r##"#set document(title: __TITEL__, author: __AUTOR__)
 #set text(font: ("Libertinus Serif", "DejaVu Serif"), size: __GR__pt, lang: "de")
 #set par(justify: true, leading: 0.62em, spacing: 0.8em)
 #show raw: set text(font: ("DejaVu Sans Mono",), size: 0.78em)
-// Codeblöcke: jede Zeile mit Nummer (je Block ab 1, wie der Buchtext sie zitiert)
-#show raw.where(block: true): it => block(width: 100%, fill: luma(242), inset: 6pt, radius: 2pt, breakable: true, {
-  show raw.line: l => box(width: 1.8em, align(right, text(fill: luma(140), str(l.number)))) + h(0.8em) + l.body
-  it
-})
+__CODEBLOCK__
 #set heading(numbering: none)
 #show link: set text(fill: __LINK__)
 
@@ -513,6 +591,72 @@ const KOPF: &str = r##"#set document(title: __TITEL__, author: __AUTOR__)
 #show heading.where(level: 4): it => { v(2mm); text(size: 11pt, weight: "bold", style: "italic", it.body); v(1mm) }
 
 "##;
+
+/// Voreingestellter Codeblock mit Zeilennummern; entfällt, wenn ein eigener Stil einen Codeblock festlegt
+/// (sonst säße dessen Kasten in diesem).
+pub const CODEBLOCK_REGEL: &str = r##"// Codeblöcke: jede Zeile mit Nummer (je Block ab 1, wie der Buchtext sie zitiert)
+#show raw.where(block: true): it => block(width: 100%, fill: luma(242), inset: 6pt, radius: 2pt, breakable: true, {
+  show raw.line: l => box(width: 1.8em, align(right, text(fill: luma(140), str(l.number)))) + h(0.8em) + l.body
+  it
+})
+"##;
+
+/// Die Codeblock-Regel, falls `stil` keine eigene mitbringt.
+pub fn codeblock_regel(stil: &str) -> &'static str {
+    let eigene = stil.lines().any(|z| !z.trim_start().starts_with("//") && z.contains("show raw.where(block: true): it =>"));
+    if eigene { "" } else { CODEBLOCK_REGEL }
+}
+
+/// Vor dem eigenen Stil: Platz für eigene Kastenarten und eine eigene Kastenform.
+pub const KASTEN_VORAB: &str = r##"
+// Vorbelegt; .werkbank/satz-stil.typ darf beides setzen:
+//   #let kasten-eigene = (aufgabe: ("Aufgabe", rgb("#fff0f5"), rgb("#b83280")),)
+//   #let kasten-form = (art, titel, fuellung, rand, body) => block(fill: fuellung, inset: 8pt, [*#titel* \ #body])
+#let kasten-farbig = __FARBIG__
+#let kasten-eigene = (:)
+#let kasten-form = none
+#let zitat-form = none
+"##;
+
+/// Die Kasten selbst; steht hinter dem eigenen Stil, damit der `kasten-eigene` und `kasten-form` setzen kann.
+pub const KASTEN: &str = r##"
+// Kästen aus Pandoc-Divs (`::: info` … `:::`). Art: (Titel, Hintergrund, Randfarbe).
+// Im Schwarzweiß-Druck wird daraus Grau mit schwarzem Rand. Eigene Arten und Formen: .werkbank/satz-stil.typ
+#let kasten-arten = (
+  info: ("Info", rgb("#e8f1fb"), rgb("#2b6cb0")),
+  hinweis: ("Hinweis", rgb("#e8f1fb"), rgb("#2b6cb0")),
+  tipp: ("Tipp", rgb("#e6f5ec"), rgb("#00875a")),
+  merke: ("Merke", rgb("#e6f5ec"), rgb("#00875a")),
+  wichtig: ("Wichtig", rgb("#fff4e0"), rgb("#c77700")),
+  achtung: ("Achtung", rgb("#fff4e0"), rgb("#c77700")),
+  warnung: ("Warnung", rgb("#fdeaea"), rgb("#c53030")),
+  beispiel: ("Beispiel", rgb("#f1ecfa"), rgb("#6b46c1")),
+)
+#let zitat(body) = if zitat-form != none { zitat-form(body) } else {
+  block(width: 100%, above: 1em, below: 1em, inset: (left: 10pt), stroke: (left: 1.5pt + luma(170)), body)
+}
+#let kasten(art, body) = {
+  let titel = upper(art.first()) + art.slice(art.first().len())
+  let k = (kasten-arten + kasten-eigene).at(art, default: (titel, rgb("#f2f2f2"), rgb("#666666")))
+  if kasten-form != none { return kasten-form(art, k.at(0), k.at(1), k.at(2), body) }
+  block(
+    width: 100%, breakable: true, above: 1em, below: 1em, inset: (x: 9pt, y: 7pt), radius: 2pt,
+    fill: if kasten-farbig { k.at(1) } else { luma(245) },
+    stroke: (left: 2.2pt + if kasten-farbig { k.at(2) } else { luma(60) }),
+    {
+      text(weight: "bold", size: 0.9em, fill: if kasten-farbig { k.at(2) } else { black }, k.at(0))
+      parbreak()
+      body
+    },
+  )
+}
+
+"##;
+
+/// Kasten-Definition für den Farb- oder Schwarzweißsatz.
+pub fn kasten_definition(farbig: bool) -> String {
+    format!("{}{KASTEN}", KASTEN_VORAB.replace("__FARBIG__", if farbig { "true" } else { "false" }))
+}
 
 /// Ersetzt in der ersten `# `-Zeile eine Kennung `Teil [id]: Titel` durch `Teil N: Titel`.
 pub fn teil_ueberschrift_nummerieren(praeambel: &str, nr: usize) -> String {
@@ -566,6 +710,7 @@ pub fn buch_zu_typst_mit_ende(projekt: &Projekt, opt: &SatzOptionen, endleerseit
     let rechts_oder_neu = |rechts: bool| if rechts { "rechts()" } else { "neue-seite()" };
 
     let mut t = KOPF
+        .replace("__CODEBLOCK__", codeblock_regel(&opt.stil_zusatz))
         .replace("__TITEL__", &zeichenkette(&m.titel))
         .replace("__AUTOR__", &zeichenkette(&m.autor))
         .replace("__B__", &b.to_string())
@@ -578,6 +723,15 @@ pub fn buch_zu_typst_mit_ende(projekt: &Projekt, opt: &SatzOptionen, endleerseit
         .replace("__ZWISCHENTITEL__", if opt.teil_titelseiten && opt.teile_rechts { "true" } else { "false" })
         .replace("__TEILSTART__", rechts_oder_neu(opt.teile_rechts))
         .replace("__KAPITELSTART__", rechts_oder_neu(opt.kapitel_rechts && opt.teile_rechts));
+
+    t.push_str(&KASTEN_VORAB.replace("__FARBIG__", if opt.farbig { "true" } else { "false" }));
+    // Eigener Stil: kommt nach den Voreinstellungen und darf sie überschreiben (auch `kasten`, `kasten-arten`)
+    if !opt.stil_zusatz.trim().is_empty() {
+        t.push_str("\n// --- .werkbank/satz-stil.typ ---\n");
+        t.push_str(&opt.stil_zusatz);
+        t.push_str("\n// --- Ende satz-stil.typ ---\n");
+    }
+    t.push_str(KASTEN);
 
     // Titelei: auf Wunsch ohne Seitenzahl (üblich)
     let fuss_titelei = if opt.titelei_zahlen { "" } else { "footer: none, " };
@@ -682,6 +836,49 @@ pub fn buch_zu_typst_mit_ende(projekt: &Projekt, opt: &SatzOptionen, endleerseit
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn divs_werden_zu_kaesten() {
+        let n = HashMap::new();
+        let t = markdown_zu_typst("Vorher\n\n::: warnung\nAchtung **hier**\n\n::: {.tipp #x}\nInnen\n:::\n:::\n\nNachher\n", None, true, &n);
+        assert!(t.contains("#kasten(\"warnung\")[\n"), "{t}");
+        assert!(t.contains("#kasten(\"tipp\")[\n"), "{t}");
+        assert!(t.find("Vorher").unwrap() < t.find("#kasten(\"warnung\")").unwrap());
+        assert!(t.find("Nachher").unwrap() > t.rfind("]\n\n").unwrap() - 1);
+        assert!(!t.contains(":::"), "{t}");
+        // Doppelpunkte im Code bleiben
+        let c = markdown_zu_typst("```\n::: info\n```\n", None, true, &n);
+        assert!(!c.contains("#kasten"), "{c}");
+    }
+
+    #[test]
+    fn stilvorlage_eingeschaltet_ist_gueltig() {
+        let n = HashMap::new();
+        let an: Vec<String> = crate::STIL_VORLAGE
+            .lines()
+            .map(|z| if z.starts_with("// #") || z.starts_with("//   ") || z.starts_with("// )") { z[3..].to_string() } else { z.to_string() })
+            .collect();
+        for farbig in [true, false] {
+            let mut q = KASTEN_VORAB.replace("__FARBIG__", if farbig { "true" } else { "false" });
+            q.push_str(&an.join("\n"));
+            q.push_str(KASTEN);
+            q.push_str(&markdown_zu_typst("## Kapitel\n\n::: aufgabe\nText\n:::\n\n::: info\nInfo\n:::\n\n```rust\nfn main() {}\n```\n", None, farbig, &n));
+            crate::welt::typst_zu_pdf(q, None, Default::default()).unwrap_or_else(|f| panic!("Vorlage ungültig (farbig={farbig}): {f}"));
+        }
+    }
+
+    #[test]
+    fn kasten_und_eigener_stil_setzen_ein_pdf() {
+        let n = HashMap::new();
+        for farbig in [true, false] {
+            let mut q = KASTEN_VORAB.replace("__FARBIG__", if farbig { "true" } else { "false" });
+            q.push_str("#set text(size: 11pt)\n#let kasten-eigene = (eigen: (\"Eigen\", rgb(\"#eeeeee\"), rgb(\"#333333\")),)\n");
+            q.push_str(KASTEN);
+            q.push_str(&markdown_zu_typst("::: eigen\nText im Kasten\n:::\n\n::: unbekannt\nAndere Art\n:::\n", None, farbig, &n));
+            let e = crate::welt::typst_zu_pdf(q, None, Default::default()).expect("Kasten muss setzbar sein");
+            assert!(e.bytes.starts_with(b"%PDF"));
+        }
+    }
     use werkbank_kern::{Kapitel, Teil};
 
     fn num() -> HashMap<String, usize> {
@@ -755,7 +952,7 @@ mod tests {
         let t = markdown_zu_typst(md, None, true, &num());
         assert!(t.contains("#table(columns: 2"), "{t}");
         assert!(t.contains("[#strong[A]]"));
-        assert!(t.contains("#block(inset: (left: 10pt)"));
+        assert!(t.contains("#zitat["));
         assert!(t.contains("#link(\"https://x.de\")[Text]"));
         assert!(t.contains("\\[Bild: Alt\\]"));
     }

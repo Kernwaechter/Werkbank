@@ -49,6 +49,10 @@ pub fn suchordner(eigener: &str) -> Vec<PathBuf> {
     if let Some(k) = crate::einstellungen::konfig_ordner() {
         liste.push(k.join("woerterbuecher"));
     }
+    // Mitgelieferte Wörterbücher neben dem Programm (Windows-Paket)
+    if let Some(exe) = std::env::current_exe().ok().and_then(|p| p.parent().map(PathBuf::from)) {
+        liste.push(exe.join("woerterbuecher"));
+    }
     if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
         liste.push(home.join(".local/share/hunspell"));
         liste.push(home.join("Library/Spelling"));

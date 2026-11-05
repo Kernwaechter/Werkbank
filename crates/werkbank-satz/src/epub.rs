@@ -221,7 +221,14 @@ mod tests {
         let pfad = pfad.to_path_buf();
         (namen, move |name: &str| {
             // Inhalt über das Systemprogramm `unzip` lesen, falls vorhanden
-            let aus = std::process::Command::new("unzip").arg("-p").arg(&pfad).arg(name).output().expect("unzip nötig für den Test");
+            // (unter Windows liest `tar` Zip-Dateien: `tar -xOf datei name`)
+            let aus = std::process::Command::new("unzip")
+                .arg("-p")
+                .arg(&pfad)
+                .arg(name)
+                .output()
+                .or_else(|_| std::process::Command::new("tar").arg("-xOf").arg(&pfad).arg(name).output())
+                .expect("unzip oder tar nötig für den Test");
             let mut s = String::new();
             aus.stdout.as_slice().read_to_string(&mut s).unwrap();
             s

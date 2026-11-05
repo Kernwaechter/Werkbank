@@ -27,11 +27,21 @@ struct Welt {
     bibliothek: LazyHash<Library>,
     buch: LazyHash<FontBook>,
     schriften: Vec<FontSlot>,
+    /// Mitgelieferte Schriften (Fira Sans), im Schriftbuch hinter den gefundenen.
+    eigene: Vec<Font>,
     haupt: Source,
     wurzel: Option<PathBuf>,
     speicher: HashMap<String, Bytes>,
     cache: Mutex<HashMap<FileId, Bytes>>,
 }
+
+/// Fira Sans (SIL Open Font License, siehe assets/fonts/OFL.txt): die serifenlose Schrift der Vorlagen.
+const MITGELIEFERTE_SCHRIFTEN: &[&[u8]] = &[
+    include_bytes!("../../../assets/fonts/FiraSans-Regular.ttf"),
+    include_bytes!("../../../assets/fonts/FiraSans-Italic.ttf"),
+    include_bytes!("../../../assets/fonts/FiraSans-Bold.ttf"),
+    include_bytes!("../../../assets/fonts/FiraSans-BoldItalic.ttf"),
+];
 
 fn schriften_suchen() -> Fonts {
     typst_kit::fonts::FontSearcher::new().include_system_fonts(true).search()
@@ -40,10 +50,19 @@ fn schriften_suchen() -> Fonts {
 impl Welt {
     fn neu(text: String, wurzel: Option<PathBuf>, speicher: HashMap<String, Bytes>) -> Self {
         let f = schriften_suchen();
+        let mut buch = f.book;
+        let mut eigene = Vec::new();
+        for daten in MITGELIEFERTE_SCHRIFTEN {
+            for schrift in Font::iter(Bytes::new(*daten)) {
+                buch.push(schrift.info().clone());
+                eigene.push(schrift);
+            }
+        }
         Self {
             bibliothek: LazyHash::new(Library::default()),
-            buch: LazyHash::new(f.book),
+            buch: LazyHash::new(buch),
             schriften: f.fonts,
+            eigene,
             haupt: Source::new(FileId::new(None, VirtualPath::new("buch.typ")), text),
             wurzel,
             speicher,
@@ -91,7 +110,10 @@ impl World for Welt {
     }
 
     fn font(&self, index: usize) -> Option<Font> {
-        self.schriften.get(index)?.get()
+        match self.schriften.get(index) {
+            Some(slot) => slot.get(),
+            None => self.eigene.get(index - self.schriften.len()).cloned(),
+        }
     }
 
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
@@ -122,6 +144,14 @@ fn fehlertext(welt: &Welt, d: &SourceDiagnostic) -> String {
         })
         .unwrap_or_default();
     format!("{}{ort}", d.message)
+}
+
+/// Selbsttest des eingebauten Satzes: setzt eine kleine Seite mit Text, Überschrift und Code.
+/// Gibt bei Erfolg die Größe des erzeugten PDFs als Text zurück.
+pub fn typst_selbsttest() -> Result<String, String> {
+    let quelle = "#set page(width: 80mm, height: 40mm)\n= Test\nSatztest `code` und Text.\n".to_string();
+    let pdf = typst_zu_pdf(quelle, None, HashMap::new())?;
+    if pdf.bytes.starts_with(b"%PDF") { Ok(format!("{} Seite, {} Bytes PDF", pdf.seiten, pdf.bytes.len())) } else { Err("kein gültiges PDF erzeugt".into()) }
 }
 
 /// Setzt Typst-Quelltext zu PDF. `wurzel`: Ordner für relative Dateien (Bilder).

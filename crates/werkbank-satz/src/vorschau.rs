@@ -32,13 +32,28 @@ pub struct VorschauErgebnis {
 }
 
 /// Version von Pandoc (`pandoc 3.1.3`) oder `None`, wenn es nicht läuft.
+/// Pandoc im Suchpfad oder, unter Windows, in den üblichen Installationsordnern (der Installer
+/// von winget trägt den Pfad erst für neu gestartete Programme ein).
+pub fn pandoc_programm() -> String {
+    if cfg!(windows) && programm_version("pandoc", &["--version"]).is_none() {
+        for var in ["LOCALAPPDATA", "ProgramFiles", "ProgramW6432"] {
+            if let Some(p) = std::env::var_os(var).map(|v| std::path::PathBuf::from(v).join("Pandoc").join("pandoc.exe"))
+                && p.is_file()
+            {
+                return p.to_string_lossy().into_owned();
+            }
+        }
+    }
+    "pandoc".to_string()
+}
+
 pub fn pandoc_version() -> Option<String> {
-    programm_version("pandoc", &["--version"]).map(|z| z.trim_start_matches("pandoc").trim().to_string())
+    programm_version(&pandoc_programm(), &["--version"]).map(|z| z.trim_start_matches("pandoc").trim().to_string())
 }
 
 /// Erste Zeile der Versionsausgabe eines Programms.
 pub fn programm_version(programm: &str, args: &[&str]) -> Option<String> {
-    let aus = Command::new(programm).args(args).stdin(Stdio::null()).output().ok()?;
+    let aus = werkbank_kern::prozess::ohne_fenster(Command::new(programm).args(args).stdin(Stdio::null())).output().ok()?;
     if !aus.status.success() {
         return None;
     }
@@ -77,7 +92,7 @@ fn pandoc_zu_typst(md: &str, wurzel: &Path) -> Result<String, String> {
     inhalt.push_str(CODE_ZEILENNUMMERN);
     std::fs::write(&kopf, inhalt).map_err(|e| e.to_string())?;
 
-    let mut kind = Command::new("pandoc")
+    let mut kind = werkbank_kern::prozess::ohne_fenster(&mut Command::new(pandoc_programm()))
         .args(["-f", "markdown-citations", "-s", "-t", "typst", "--wrap=none"])
         .arg(format!("--include-in-header={}", kopf.display()))
         .args([
@@ -114,16 +129,17 @@ const CODE_ZEILENNUMMERN: &str = "
 
 /// Eingebauter Satz eines Kapitels (Rückfall ohne Pandoc): B5, Libertinus, wie das Lese-PDF.
 pub fn eingebaut_zu_typst(md: &str, wurzel: &Path, nummern: &HashMap<String, usize>) -> String {
+    eingebaut_zu_typst_mit_stil(md, wurzel, nummern, true, "")
+}
+
+/// Wie [`eingebaut_zu_typst`], farbig oder in Graustufen und mit eigenem Stil (Typst) nach den Voreinstellungen.
+pub fn eingebaut_zu_typst_mit_stil(md: &str, wurzel: &Path, nummern: &HashMap<String, usize>, farbig: bool, stil: &str) -> String {
     let mut t = String::from(
         r##"#set page(width: 176mm, height: 250mm, margin: (inside: 22mm, outside: 16mm, top: 20mm, bottom: 22mm), numbering: "1")
 #set text(font: ("Libertinus Serif", "DejaVu Serif"), size: 10.5pt, lang: "de")
 #set par(justify: true, leading: 0.62em, spacing: 0.8em)
 #show raw: set text(font: ("DejaVu Sans Mono",), size: 0.78em)
-// Codeblöcke: jede Zeile mit Nummer (je Block ab 1, wie der Buchtext sie zitiert)
-#show raw.where(block: true): it => block(width: 100%, fill: luma(242), inset: 6pt, radius: 2pt, breakable: true, {
-  show raw.line: l => box(width: 1.8em, align(right, text(fill: luma(140), str(l.number)))) + h(0.8em) + l.body
-  it
-})
+#let kapitel-start() = []
 #show link: set text(fill: rgb("#2c5c82"))
 #show heading.where(level: 1): it => { v(6mm); text(size: 22pt, weight: "bold", it.body); v(4mm) }
 #show heading.where(level: 2): it => { v(5mm); text(size: 16pt, weight: "bold", it.body); v(3mm) }
@@ -131,7 +147,11 @@ pub fn eingebaut_zu_typst(md: &str, wurzel: &Path, nummern: &HashMap<String, usi
 #show heading.where(level: 4): it => { v(2mm); text(size: 11pt, weight: "bold", style: "italic", it.body); v(1mm) }
 "##,
     );
-    t.push_str(&markdown_zu_typst(md, Some(wurzel), true, nummern));
+    t.push_str(crate::markdown::codeblock_regel(stil));
+    t.push_str(&crate::markdown::KASTEN_VORAB.replace("__FARBIG__", if farbig { "true" } else { "false" }));
+    t.push_str(stil);
+    t.push_str(crate::markdown::KASTEN);
+    t.push_str(&markdown_zu_typst(md, Some(wurzel), farbig, nummern));
     t
 }
 

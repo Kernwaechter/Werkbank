@@ -102,7 +102,7 @@ pub fn versionen() -> (Option<String>, Option<String>) {
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty())
         .or_else(|| {
-            let aus = Command::new(&w.dart).arg("--version").output().ok()?;
+            let aus = crate::prozess::ohne_fenster(Command::new(&w.dart).arg("--version")).output().ok()?;
             let text = format!("{}{}", String::from_utf8_lossy(&aus.stdout), String::from_utf8_lossy(&aus.stderr));
             text.split("version:").nth(1)?.split_whitespace().next().map(str::to_string)
         });
@@ -522,6 +522,7 @@ fn projekt_einrichten(w: &Werkzeug, ordner: &Path, gewuenscht: &BTreeSet<String>
         }
         fs::write(&pfad, &inhalt).map_err(|e| e.to_string())?;
         let mut befehl = Command::new(w.flutter.as_ref().unwrap_or(&w.dart));
+        crate::prozess::ohne_fenster(&mut befehl);
         befehl.current_dir(ordner).args(["pub", "get"]);
         if ohne_netz {
             befehl.arg("--offline");
@@ -589,6 +590,7 @@ pub fn alle_pruefen(beispiele: &[(usize, &Beispiel)], arbeitsordner: &Path, meld
     }
 
     let mut befehl = Command::new(&w.dart);
+    crate::prozess::ohne_fenster(&mut befehl);
     befehl.current_dir(&ordner).args(["analyze", "--format=machine", "lib"]);
     let ausgabe = match ausfuehren(befehl, Duration::from_secs(900)) {
         Ok((_, t)) => t,

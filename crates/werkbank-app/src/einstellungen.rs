@@ -54,6 +54,8 @@ pub struct Einstellungen {
     pub rechtschreibung: bool,
     /// Eigener Ordner mit Hunspell-Wörterbüchern (leer = übliche Orte).
     pub woerterbuch_ordner: String,
+    /// Eigener Ordner von Ghostscript (der Ordner mit `bin`, oder `bin` selbst; leer = suchen).
+    pub gs_ordner: String,
     /// Sprachprüfung mit LanguageTool überhaupt verwenden.
     pub sprachpruefung: bool,
     /// Nach einer kurzen Schreibpause automatisch prüfen.
@@ -93,6 +95,7 @@ impl Default for Einstellungen {
             autospeichern: true,
             rechtschreibung: true,
             woerterbuch_ordner: String::new(),
+            gs_ordner: String::new(),
             sprachpruefung: true,
             automatisch: true,
             server_url: "http://localhost:8081".to_string(),

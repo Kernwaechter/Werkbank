@@ -33,7 +33,10 @@ Name: "mdassoc"; Description: "Markdown-Dateien (.md) mit der Werkbank öffnen a
 Source: "..\..\target\x86_64-pc-windows-msvc\release\werkbank-app.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\assets\handbuch.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\assets\lizenzen.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\assets\fonts\OFL.txt"; DestDir: "{app}"; DestName: "Fira-Sans-OFL.txt"; Flags: ignoreversion
 Source: "..\..\LIZENZVEREINBARUNG.md"; DestDir: "{app}"; Flags: ignoreversion
+; Hunspell-Wörterbücher (de_DE.aff/.dic samt Lizenztext), falls im Ordner packaging\windows\woerterbuecher abgelegt
+Source: "woerterbuecher\*"; DestDir: "{app}\woerterbuecher"; Flags: ignoreversion recursesubdirs skipifsourcedoesntexist
 
 [Icons]
 Name: "{group}\Werkbank"; Filename: "{app}\werkbank-app.exe"
