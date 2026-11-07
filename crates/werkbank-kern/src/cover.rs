@@ -114,7 +114,8 @@ impl CoverDaten {
         fs::write(ordner.join("cover.json"), serde_json::to_string_pretty(&kopie).map_err(io::Error::other)?)
     }
 
-    fn bild_nur_vorn(&self) -> bool {
+    /// Gilt das Hintergrundbild nur für die Vorderseite (statt für den ganzen Umschlag)?
+    pub fn bild_nur_vorn(&self) -> bool {
         self.bild_modus == "vorderseite"
     }
 
@@ -309,7 +310,8 @@ pub fn bildmasse(pfad: &str) -> Option<(u32, u32)> {
     None
 }
 
-fn bild_uri(pfad: &str) -> Option<String> {
+/// Bilddatei als `data:`-URI (zum Einbetten in SVG).
+pub fn bild_uri(pfad: &str) -> Option<String> {
     use std::fmt::Write;
     let daten = fs::read(pfad).ok()?;
     let mime = if pfad.to_lowercase().ends_with(".png") { "image/png" } else { "image/jpeg" };
@@ -335,6 +337,15 @@ fn bildflaeche(d: &CoverDaten, uri: &str, x: f32, y: f32, b: f32, h: f32, bg: &s
         r#"<image href="{uri}" x="{x:.2}" y="{y:.2}" width="{b:.2}" height="{h:.2}" preserveAspectRatio="{}"/><rect x="{x:.2}" y="{y:.2}" width="{b:.2}" height="{h:.2}" fill="{bg}" opacity="{:.2}"/>"#,
         d.ausrichtung(),
         d.abdunkeln()
+    )
+}
+
+/// Nur die Titeltexte der Vorderseite auf durchsichtigem Grund, `breite` × `hoehe` in beliebiger Einheit
+/// (zum Auflegen auf Bild oder Farbe, z. B. im Umschlag).
+pub fn svg_vorderseite_texte(d: &CoverDaten, breite: f32, hoehe: f32) -> String {
+    format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{breite}" height="{hoehe}" viewBox="0 0 {breite} {hoehe}">{}</svg>"#,
+        vorderseite_texte(d, breite, hoehe)
     )
 }
 

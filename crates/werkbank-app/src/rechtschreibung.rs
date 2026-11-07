@@ -53,6 +53,11 @@ pub fn suchordner(eigener: &str) -> Vec<PathBuf> {
     if let Some(exe) = std::env::current_exe().ok().and_then(|p| p.parent().map(PathBuf::from)) {
         liste.push(exe.join("woerterbuecher"));
     }
+    // Snap: Wörterbücher liegen im Paket
+    if let Some(snap) = std::env::var_os("SNAP").map(PathBuf::from) {
+        liste.push(snap.join("usr/share/hunspell"));
+        liste.push(snap.join("usr/share/myspell"));
+    }
     if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
         liste.push(home.join(".local/share/hunspell"));
         liste.push(home.join("Library/Spelling"));

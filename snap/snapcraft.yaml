@@ -1,0 +1,115 @@
+# Snap der Werkbank (für den Snap Store). Bauen: packaging/snap/bauen.sh
+# Der Lizenzgeber ist ein eigener, nur lokaler Snap: packaging/snap/lizenzgeber/
+name: jz-werkbank
+title: JZ Werkbank
+base: core24
+version: '1.3.0'
+summary: Schreibwerkzeug für technische Bücher
+description: |
+  Markdown-Editor mit Sprach- und Code-Prüfung, Statistik, nativem Buchsatz
+  (Typst-PDF, EPUB) und Cover-Designer.
+
+  Im Snap mitgeliefert: LanguageTool (lokale Sprachprüfung, startet automatisch),
+  Java, Hunspell-Wörterbücher (de, en, fr, es), Pandoc, Typst, Python 3 und
+  rustc für den Code-Prüfer. Nicht enthalten: Ghostscript (PDF/X-3-Druckdatei),
+  Dart und Flutter.
+
+  Die JZ Werkbank ist proprietäre Software (Lizenzvereinbarung im Paket unter
+  share/doc/werkbank). Zum Freischalten wird ein Lizenzschlüssel gebraucht.
+license: Proprietary
+website: https://werkbank.jurzel-apps.de
+contact: volker@daehn.de
+icon: snap/gui/jz-werkbank.png
+grade: stable
+confinement: strict
+compression: lzo
+platforms:
+  amd64:
+
+apps:
+  jz-werkbank:
+    command: bin/werkbank-app
+    extensions: [gnome]
+    plugs:
+      - home
+      - network
+      - network-bind
+      - removable-media
+    environment:
+      JAVA_HOME: $SNAP/usr/lib/jvm/java-21-openjdk-amd64
+      WERKBANK_LT_ORDNER: $SNAP/opt/languagetool
+
+parts:
+  werkbank:
+    plugin: nil
+    source: .
+    build-packages:
+      - curl
+      - ca-certificates
+      - gcc
+      - pkg-config
+      - libxkbcommon-dev
+      - libwayland-dev
+      - libgtk-3-dev
+      - libssl-dev
+    override-build: |
+      set -eu
+      RUST=1.99.1
+      export RUSTUP_HOME="$CRAFT_PART_BUILD/.rustup" CARGO_HOME="$CRAFT_PART_BUILD/.cargo"
+      curl -fsSL https://static.rust-lang.org/rustup/dist/x86_64-unknown-linux-gnu/rustup-init -o rustup-init
+      chmod +x rustup-init
+      ./rustup-init -y --no-modify-path --profile minimal --default-toolchain "$RUST"
+      export PATH="$CARGO_HOME/bin:$PATH"
+      cargo build --release --locked -p werkbank-app
+      install -Dm755 target/release/werkbank-app "$CRAFT_PART_INSTALL/bin/werkbank-app"
+      # rustc für den Code-Prüfer (MIT/Apache-2.0); ohne cargo, Dokumentation und Linker
+      tc="$RUSTUP_HOME/toolchains/$RUST-x86_64-unknown-linux-gnu"
+      install -Dm755 "$tc/bin/rustc" "$CRAFT_PART_INSTALL/opt/rust/bin/rustc"
+      cp -a "$tc/lib" "$CRAFT_PART_INSTALL/opt/rust/lib"
+      install -d "$CRAFT_PART_INSTALL/usr/bin" "$CRAFT_PART_INSTALL/share/doc/werkbank"
+      ln -s ../../opt/rust/bin/rustc "$CRAFT_PART_INSTALL/usr/bin/rustc"
+      install -m644 README.md LIZENZVEREINBARUNG.md packaging/snap/DRITTANBIETER.md "$CRAFT_PART_INSTALL/share/doc/werkbank/"
+
+  laufzeit:
+    plugin: nil
+    stage-packages:
+      - openjdk-21-jre-headless
+      - pandoc
+      - python3
+      - xdg-utils
+      - hunspell-de-de
+      - hunspell-en-us
+      - hunspell-en-gb
+      - hunspell-fr
+      - hunspell-es
+    override-prime: |
+      craftctl default
+      # Die Alternativen-Verknüpfung des Pakets zeigt ins Host-System: direkt auf die JVM zeigen
+      ln -sf ../lib/jvm/java-21-openjdk-amd64/bin/java "$CRAFT_PRIME/usr/bin/java"
+
+  languagetool:
+    plugin: nil
+    build-packages: [curl, ca-certificates, unzip]
+    override-build: |
+      set -eu
+      v=6.6
+      curl -fsSL "https://languagetool.org/download/LanguageTool-$v.zip" -o lt.zip
+      echo "53600506b399bb5ffe1e4c8dec794fd378212f14aaf38ccef9b6f89314d11631  lt.zip" | sha256sum -c -
+      unzip -q lt.zip
+      install -d "$CRAFT_PART_INSTALL/opt"
+      mv "LanguageTool-$v" "$CRAFT_PART_INSTALL/opt/languagetool"
+
+  typst:
+    plugin: nil
+    build-packages: [curl, ca-certificates, xz-utils]
+    override-build: |
+      set -eu
+      v=0.15.1
+      n=typst-x86_64-unknown-linux-musl
+      curl -fsSL "https://github.com/typst/typst/releases/download/v$v/$n.tar.xz" -o typst.tar.xz
+      echo "a6d077d0a95eed5a2eba715b2dae06be954f624ccbf85758a03f389ded33118c  typst.tar.xz" | sha256sum -c -
+      tar xJf typst.tar.xz
+      install -Dm755 "$n/typst" "$CRAFT_PART_INSTALL/opt/typst/typst"
+      install -d "$CRAFT_PART_INSTALL/usr/bin" "$CRAFT_PART_INSTALL/share/doc/typst"
+      ln -s ../../opt/typst/typst "$CRAFT_PART_INSTALL/usr/bin/typst"
+      install -m644 "$n/LICENSE" "$n/NOTICE" "$CRAFT_PART_INSTALL/share/doc/typst/"

@@ -394,11 +394,17 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
         punkt("Codezeilen-Länge", if zu_lang == 0 { format!("alle ≤ {grenze} Zeichen") } else { format!("{zu_lang} Zeilen länger als {grenze} Zeichen (Prüfen → Druckregeln)") }, zu_lang == 0),
         punkt("Querverweise", if fehlende == 0 { "alle @kap:-Ziele vorhanden".to_string() } else { format!("{fehlende} Verweise ohne Ziel") }, fehlende == 0),
         punkt("Gliederung", format!("{} Teile, {} Kapitel", projekt.teile.len(), projekt.kapitel_anzahl()), true),
-        punkt(
-            "ISBN und Metadaten",
-            format!("Print-ISBN {} · Autor {}", projekt.metadaten.isbn_print.as_deref().unwrap_or("nicht vergeben"), projekt.metadaten.autor),
-            projekt.metadaten.isbn_print.is_some(),
-        ),
+        {
+            let isbn = projekt.metadaten.isbn_print.as_deref().unwrap_or("");
+            let gueltig = werkbank_satz::buchbau::barcode::isbn_ziffern(isbn).is_some();
+            let zustand = if isbn.trim().is_empty() { "nicht vergeben".to_string() } else if gueltig { isbn.to_string() } else { format!("{isbn} (keine gültige ISBN-13)") };
+            row![
+                punkt("ISBN und Metadaten", format!("Print-ISBN {zustand} · Autor {}", projekt.metadaten.autor), gueltig),
+                button(text("Buchdaten bearbeiten …").size(11)).padding([2, 8]).style(thema::link_knopf_stil).on_press(Message::MetaOeffnen),
+            ]
+            .spacing(12)
+            .align_y(Alignment::Center)
+        },
         punkt("Ungespeicherte Änderungen", if crate::dateien::hat_ungespeichertes(state) { "ja – vor dem Bauen speichern (Strg+S)".to_string() } else { "keine".to_string() }, !crate::dateien::hat_ungespeichertes(state)),
     ]
     .spacing(5);

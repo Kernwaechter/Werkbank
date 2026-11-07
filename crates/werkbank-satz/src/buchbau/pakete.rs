@@ -101,7 +101,9 @@ pub fn schreiben(e: &Eingaben, hinweise: &mut Vec<String>) -> Result<Vec<PathBuf
     };
 
     // Klappentext in alle drei Ordner
-    match std::fs::read_to_string(e.bandordner.join("klappentext.md")) {
+    // Shop-Text: `klappentext-shop.md` (der lange Text für Buchbeschreibungen), sonst `klappentext.md`
+    let shop = [e.bandordner.join("klappentext-shop.md"), e.bandordner.join("klappentext.md")].into_iter().find(|p| p.is_file());
+    match shop.map(std::fs::read_to_string).unwrap_or_else(|| Err(std::io::ErrorKind::NotFound.into())) {
         Ok(k) => {
             for d in [&tolino, &kdp, &web] {
                 schreib(d.join("KLAPPENTEXT.md"), &k, &mut dateien)?;
@@ -175,7 +177,7 @@ Alle Dateien in diesem Ordner sind exakt nach den aktuellen Vorgaben von **Amazo
   * **Buchrücken-Breite (Spine):** `{s} × 0,0572 mm` = **`{ruecken} mm`**\n\
   * **Beschnittzugabe Umschlag (Bleed):** umlaufend **`{beschnitt} mm`** (`0,125 Zoll`)\n\
   * **Gesamtformat Umschlag-PDF:** **`{gb} mm × {gh} mm`**\n\
-  * **Barcode:** Unten rechts auf der Rückseite (U4) ist das weiße KDP-Barcode-Feld (`50,8 × 30,5 mm`) reserviert.\n\n---\n\n\
+  * **Barcode:** Unten rechts auf der Rückseite (U4) ist das weiße KDP-Barcode-Feld (`50,8 × 30,5 mm`, mit `8 mm` Abstand zu Rücken und Unterkante; KDP verlangt mindestens `0,25 Zoll`) freigehalten. KDP druckt den Barcode dort selbst, auch bei eigener ISBN. Das Feld nicht beschriften; bei eigenem Barcode im Cover das Häkchen „Cover enthält bereits einen Barcode“ setzen.\n\n---\n\n\
 ## 2. Kindle E-Book\n\n### Hochzuladende Dateien im KDP-Dashboard:\n\
 * **Kindle-Manuskript:** `{slug}-kdp-kindle-ebook.epub` (EPUB 3)\n\
 * **Kindle-Produktbild (Frontcover):** `{slug}-kdp-kindle-cover-1600x2560.jpg` (`1600 × 2560 Pixel`, Seitenverhältnis `1 : 1,6`, sRGB-JPEG)\n",
@@ -228,7 +230,7 @@ Alle Dateien in diesem Ordner sind nach dem offiziellen Druckdatenleitfaden von 
 * **Umschlag-Maße (`{gb} mm × {gh} mm`):**\n\
   * Umlaufender Beschnitt (Bleed): **`{beschnitt} mm`** (Tolino-Vorgabe für Softcover)\n\
   * Buchrücken: **`{ruecken} mm`**\n\
-  * Barcode-Feld auf der Rückseite (U4): Mit **`16 mm` Abstand** zum Buchrücken und zum unteren/äußeren Beschnittrand angelegt (Tolino fordert mindestens `15 mm` Abstand). Den im Tolino-Dashboard generierten ISBN-Barcode kannst du direkt in dieses weiße Feld setzen.\n",
+  * **Barcode** unten rechts auf der Rückseite (U4), `33,4 × 18,1 mm` (Tolino: nicht verkleinern, verzerren oder einfärben), mit **`16 mm` Abstand** zum Buchrücken und zur Seitenkante (Tolino fordert mindestens `15 mm`). Ist in den Buchdaten eine gültige ISBN-13 eingetragen, ist der EAN-13-Barcode daraus schon gesetzt; sonst bleibt ein weißes Feld in dieser Größe, in das du den im Tolino-Dashboard (Buchdaten) erzeugten Barcode setzt. Der Barcode gehört nur auf den Umschlag, nicht in den Buchblock.\n",
             s = e.seiten,
             boegen = e.seiten / 4,
             innen = de(r.innen, 0),

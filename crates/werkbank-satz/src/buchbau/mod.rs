@@ -8,7 +8,9 @@
 
 pub mod css;
 pub mod epub;
+pub mod barcode;
 pub mod hervorhebung;
+pub mod klappentext;
 pub mod md;
 pub mod pakete;
 pub mod pdf;
@@ -210,6 +212,21 @@ pub struct Auftrag<'a> {
     pub stil: &'a crate::gestaltung::Satzstil,
     /// Frontcover als PNG, falls im Bandordner kein `cover.png` liegt (z. B. aus dem Cover-Designer).
     pub ersatz_cover: Option<Vec<u8>>,
+    /// ISBN der Druckausgabe (für den Barcode auf dem Umschlag), z. B. aus `band.yaml`.
+    pub isbn: Option<String>,
+}
+
+/// ISBN (Druck) des Bandes aus `band.yaml` und `.werkbank/metadaten.yaml` (Letztere gewinnt, wie in der App).
+pub fn isbn_aus_ordner(bandordner: &Path) -> Option<String> {
+    let mut isbn = None;
+    for datei in [bandordner.join("band.yaml"), bandordner.join(".werkbank").join("metadaten.yaml")] {
+        if let Ok(text) = std::fs::read_to_string(datei)
+            && let Ok(m) = serde_yaml::from_str::<werkbank_kern::BandMetadaten>(&text)
+        {
+            isbn = m.isbn_print.filter(|i| !i.trim().is_empty());
+        }
+    }
+    isbn
 }
 
 /// Baut einen Band nach `buchbau.yaml` mit der Gestaltung aus seinem `.werkbank/satzstil.json`.
@@ -218,7 +235,7 @@ pub fn bauen(buchordner: &Path, nummer: u32, fortschritt: &dyn Fn(&str)) -> Resu
     let band = profil.band(nummer).ok_or_else(|| format!("Band {nummer} steht nicht in {}", profil::DATEI))?.clone();
     let bandordner = buchordner.join(&band.ordner);
     let stil = crate::gestaltung::Satzstil::laden(&bandordner);
-    setzen(&Auftrag { buchordner, bandordner: &bandordner, profil: &profil, band: &band, stil: &stil, ersatz_cover: None }, fortschritt)
+    setzen(&Auftrag { buchordner, bandordner: &bandordner, profil: &profil, band: &band, stil: &stil, ersatz_cover: None, isbn: isbn_aus_ordner(&bandordner) }, fortschritt)
 }
 
 /// Setzt einen Band: Druck-PDF in Farbe (mit Cover) und in Graustufen, EPUB 3, Verlagsordner mit Umschlägen.
@@ -309,11 +326,19 @@ pub fn setzen(a: &Auftrag, fortschritt: &dyn Fn(&str)) -> Result<Bericht, String
 
     fortschritt("Verlagsordner und Umschläge (tolino/, kdp/, webpublishing/)");
     let seiten = bericht.seiten_grau;
+    let umschlag_hinweise = std::cell::RefCell::new(Vec::<String>::new());
     let umschlag = |plattform: pakete::Plattform, ziel: &Path| {
-        if profil.reihe.titel.trim().is_empty() {
-            return Err(format!("keine Umschlagtexte (Abschnitt „reihe“ in {}) – den Umschlag im Bereich „Cover“ exportieren", profil::DATEI));
+        let b = umschlag::schreiben(profil, band, bandordner, plattform, seiten, ziel, a.isbn.as_deref())?;
+        for h in &b.hinweise {
+            umschlag_hinweise.borrow_mut().push(format!("{}-Umschlag: {h}", plattform.name));
         }
-        umschlag::schreiben(profil, band, bandordner, plattform, seiten, ziel)
+        if !b.passt {
+            umschlag_hinweise.borrow_mut().push(format!(
+                "{}-Umschlag: Der Text aus klappentext.md ist {:.0} mm zu hoch für die Rückseite (auch bei {:.1} pt). Bitte kürzen.",
+                plattform.name, b.ueberhang_mm, b.groesse_pt
+            ));
+        }
+        Ok(())
     };
     let eingaben = pakete::Eingaben {
         buchordner,
@@ -330,6 +355,7 @@ pub fn setzen(a: &Auftrag, fortschritt: &dyn Fn(&str)) -> Result<Bericht, String
     for d in pakete::schreiben(&eingaben, &mut bericht.hinweise)? {
         bericht.notieren(&d);
     }
+    bericht.hinweise.extend(umschlag_hinweise.into_inner());
 
     Ok(bericht)
 }
@@ -427,15 +453,33 @@ mod tests {
         stil.setze("codeblock", "kopf", "nein".into());
         stil.setze("zitat", "fuellung", "#ffeecc".into());
         let ziel = o.join(".werkbank").join("satz");
-        let a = super::Auftrag { buchordner: &ziel, bandordner: &o, profil: &profil, band: &band, stil: &stil, ersatz_cover: Some(png) };
+        let a = super::Auftrag { buchordner: &ziel, bandordner: &o, profil: &profil, band: &band, stil: &stil, ersatz_cover: Some(png), isbn: Some("978-3-9825412-0-4".into()) };
         let b = super::setzen(&a, &|_| {}).unwrap_or_else(|f| panic!("{f}"));
         assert_eq!(b.seiten_grau % 4, 0);
         for d in ["test-print-farbe.pdf", "test-print-sw.pdf", "test-ebook.epub", "test-cover.png", "kdp/test-kdp-kindle-cover-1600x2560.jpg", "webpublishing/test-cover.png"] {
             assert!(ziel.join(d).is_file(), "{d} fehlt: {:?}", b.dateien);
         }
-        // Umschlag ohne Umschlagtexte: Hinweis statt Fehler
-        assert!(b.hinweise.iter().any(|h| h.contains("Umschlag")), "{:?}", b.hinweise);
+        // Ohne klappentext.md: Hinweis statt Fehler, kein Umschlag
+        assert!(b.hinweise.iter().any(|h| h.contains("klappentext.md")), "{:?}", b.hinweise);
+        assert!(!ziel.join("tolino/test-tolino-taschenbuch-umschlag.pdf").exists());
         assert!(!b.hinweise.iter().any(|h| h.contains("Abbildung nicht gefunden")), "{:?}", b.hinweise);
+
+        // Mit klappentext.md entstehen beide Umschläge (Tolino mit Barcode aus der ISBN)
+        std::fs::write(o.join("klappentext.md"), "Dachzeile\n\n# Schlagzeile\n\nText.\n\n- Punkt\n\n---\nweb.de\nDownload · {seiten} Seiten\n").unwrap();
+        let b = super::setzen(&a, &|_| {}).unwrap_or_else(|f| panic!("{f}"));
+        for d in ["tolino/test-tolino-taschenbuch-umschlag.pdf", "kdp/test-kdp-taschenbuch-umschlag.pdf"] {
+            let pfad = ziel.join(d);
+            assert!(std::fs::read(&pfad).unwrap_or_default().starts_with(b"%PDF"), "{d} fehlt: {:?}", b.hinweise);
+        }
+        assert!(!b.hinweise.iter().any(|h| h.contains("Umschlag")), "{:?}", b.hinweise);
+
+        // Ohne gültige ISBN: Tolino-Umschlag mit weißem Feld und Hinweis, KDP ohne Hinweis
+        for isbn in [None, Some("978-3-9825412-0-5".to_string())] {
+            let a2 = super::Auftrag { isbn, ersatz_cover: None, ..a };
+            let b = super::setzen(&a2, &|_| {}).unwrap_or_else(|f| panic!("{f}"));
+            let h: Vec<_> = b.hinweise.iter().filter(|h| h.contains("Umschlag")).collect();
+            assert!(h.len() == 1 && h[0].starts_with("Tolino-Umschlag") && h[0].contains("Barcode"), "{h:?}");
+        }
     }
 
     #[test]

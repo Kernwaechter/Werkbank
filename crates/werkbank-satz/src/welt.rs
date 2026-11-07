@@ -230,6 +230,77 @@ pub fn typst_zu_seiten_mit(
     Ok((seiten, dokument.pages.len(), warnungen))
 }
 
+/// Ergebnis eines Satzlaufs mit Rückmeldungen aus dem Dokument (`#metadata(...) <label>`).
+#[derive(Debug, Clone)]
+pub struct MitWerten {
+    /// PDF-Daten (wenn verlangt).
+    pub pdf: Option<Vec<u8>>,
+    /// Erste Seite als Bild (wenn verlangt).
+    pub bild: Option<crate::vorschau::Seitenbild>,
+    /// Zahlenwerte, die der Quelltext unter `label` meldet.
+    pub werte: HashMap<String, f64>,
+    pub warnungen: Vec<String>,
+}
+
+/// Setzt einseitigen Quelltext (z. B. den Umschlag) zu PDF und/oder Bild und liest die Zahlen,
+/// die der Quelltext mit `#metadata((name: wert, …)) <label>` meldet.
+pub fn typst_mit_werten(
+    quelltext: String,
+    dateien: HashMap<String, Vec<u8>>,
+    label: &str,
+    mit_pdf: bool,
+    pixel_pro_pt: Option<f32>,
+) -> Result<MitWerten, String> {
+    use typst::foundations::{Label, Selector, Value};
+    use typst::introspection::MetadataElem;
+    let speicher = dateien.into_iter().map(|(k, v)| (k, Bytes::new(v))).collect();
+    let welt = Welt::neu(quelltext, None, speicher);
+    let ergebnis = typst::compile::<PagedDocument>(&welt);
+    let warnungen: Vec<String> = ergebnis.warnings.iter().take(10).map(|w| fehlertext(&welt, w)).collect();
+    let dokument = ergebnis
+        .output
+        .map_err(|fehler| fehler.iter().take(8).map(|d| fehlertext(&welt, d)).collect::<Vec<_>>().join("\n"))?;
+    let mut werte = HashMap::new();
+    {
+        let l = Label::new(typst::utils::PicoStr::intern(label));
+        for inhalt in dokument.introspector.query(&Selector::Label(l)) {
+            if let Some(m) = inhalt.to_packed::<MetadataElem>()
+                && let Value::Dict(d) = &m.value
+            {
+                for (name, wert) in d.iter() {
+                    match wert {
+                        Value::Float(f) => {
+                            werte.insert(name.to_string(), *f);
+                        }
+                        Value::Int(i) => {
+                            werte.insert(name.to_string(), *i as f64);
+                        }
+                        Value::Bool(b) => {
+                            werte.insert(name.to_string(), if *b { 1.0 } else { 0.0 });
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+    let pdf = if mit_pdf {
+        Some(typst_pdf::pdf(&dokument, &typst_pdf::PdfOptions::default()).map_err(|fehler| {
+            fehler.iter().take(8).map(|d| fehlertext(&welt, d)).collect::<Vec<_>>().join("\n")
+        })?)
+    } else {
+        None
+    };
+    let bild = match (pixel_pro_pt, dokument.pages.first()) {
+        (Some(faktor), Some(seite)) => {
+            let pixel = typst_render::render(seite, faktor);
+            Some(crate::vorschau::Seitenbild { breite: pixel.width(), hoehe: pixel.height(), rgba: pixel.take() })
+        }
+        _ => None,
+    };
+    Ok(MitWerten { pdf, bild, werte, warnungen })
+}
+
 /// Setzt ein Buchprojekt zu PDF.
 pub fn pdf_setzen(projekt: &werkbank_kern::Projekt, opt: &crate::SatzOptionen) -> Result<PdfErgebnis, String> {
     let wurzel = Some(projekt.wurzelverzeichnis.clone());

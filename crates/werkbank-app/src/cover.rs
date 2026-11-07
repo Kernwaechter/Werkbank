@@ -8,6 +8,7 @@ use resvg::{tiny_skia, usvg};
 use std::path::{Path, PathBuf};
 use werkbank_kern::cover::{self, CoverDaten};
 use werkbank_kern::portale::Portal;
+use werkbank_satz::buchbau::{klappentext, umschlag};
 
 fn baum(svg: &str) -> Result<usvg::Tree, String> {
     let mut optionen = usvg::Options::default();
@@ -61,17 +62,68 @@ pub fn graustufen(rgba: &[u8], eink_stufen: Option<u32>) -> Vec<u8> {
         .collect()
 }
 
+/// Umschlagmaße eines Portals für den Umschlagsatz.
+pub fn masse(p: &Portal, seiten: u32) -> umschlag::Masse {
+    let (gesamt_b, gesamt_h) = p.umschlag_mm(seiten);
+    umschlag::Masse { gesamt_b, gesamt_h, ruecken: p.ruecken_mm(seiten), beschnitt: p.beschnitt_mm, seite_b: p.druck_format_mm.0, seite_h: p.druck_format_mm.1 }
+}
+
+/// Bandbezeichnung für den Rücken („BAND 1“) aus `buchbau.yaml`, falls der Band dort steht.
+pub fn band_ruecken(bandordner: &Path) -> String {
+    use werkbank_satz::buchbau::profil::Profil;
+    Profil::suchen(bandordner)
+        .and_then(|(buch, profil)| profil.band_zu_ordner(&buch, bandordner).map(|b| b.umschlag.band_ruecken.clone()))
+        .unwrap_or_default()
+}
+
+/// Setzt den Umschlag für ein Portal: Vorschaubild (`bild_px` breit) und/oder PDF. Dieselbe Funktion wie beim Bauen.
+pub fn umschlag_setzen(
+    daten: &CoverDaten,
+    portal: &Portal,
+    seiten: u32,
+    bandordner: Option<&Path>,
+    isbn: Option<&str>,
+    mit_pdf: bool,
+    bild_px: Option<u32>,
+) -> Result<umschlag::Ergebnis, String> {
+    let ordner = bandordner.unwrap_or(Path::new(""));
+    let text = klappentext::lesen(&bandordner.map(klappentext_lesen).unwrap_or_default());
+    let ruecken = bandordner.map(band_ruecken).unwrap_or_default();
+    let e = umschlag::eingabe_aus_cover(daten, ordner, masse(portal, seiten), &text, seiten as usize, &daten.autor, &daten.titel, &ruecken, &portal.name, isbn);
+    umschlag::setzen(&e, mit_pdf, bild_px)
+}
+
+/// Das fertige Frontcover des Bandes (`cover.png`), wenn im Cover-Designer kein Hintergrundbild gewählt ist.
+/// Die Vorschau zeigt in diesem Fall genau dieses Bild, also muss auch der Export es nehmen (statt eines
+/// Standardentwurfs aus den Cover-Daten). Liefert das SVG, das das Bild in Originalproportion auf `breite` skaliert.
+fn fertiges_cover(daten: &CoverDaten, bandordner: &Path, breite: u32) -> Option<(String, u32, u32)> {
+    if !daten.bild.is_empty() {
+        return None;
+    }
+    let pfad = bandordner.join("cover.png");
+    let voll = tiny_skia::Pixmap::decode_png(&std::fs::read(&pfad).ok()?).ok()?;
+    let hoehe = (voll.height() as f32 * breite as f32 / voll.width() as f32).round().max(1.0) as u32;
+    let uri = cover::bild_uri(pfad.to_str()?)?;
+    let svg = format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{breite}" height="{hoehe}" viewBox="0 0 {breite} {hoehe}"><image href="{uri}" x="0" y="0" width="{breite}" height="{hoehe}"/></svg>"#
+    );
+    Some((svg, breite, hoehe))
+}
+
 /// Schreibt alle Formate in `.werkbank/cover/` und liefert die erzeugten Dateien.
-pub fn exportieren(daten: &CoverDaten, portale: &[Portal], seiten: u32, bandordner: &Path) -> Result<Vec<PathBuf>, String> {
+///
+/// Die E-Book-Formate (PNG, PDF) kommen aus `cover.png` des Bandes, solange im Cover-Designer kein Hintergrundbild
+/// gewählt ist; die Komplettumschläge werden immer aus den Cover-Daten gesetzt.
+pub fn exportieren(daten: &CoverDaten, portale: &[Portal], seiten: u32, bandordner: &Path, isbn: Option<&str>) -> Result<Vec<PathBuf>, String> {
     let ziel = bandordner.join(".werkbank").join("cover");
     std::fs::create_dir_all(&ziel).map_err(|e| e.to_string())?;
-    let klappentext = if daten.klappentext.trim().is_empty() { klappentext_lesen(bandordner) } else { daten.klappentext.clone() };
     let mut dateien = Vec::new();
 
     for p in portale {
         let k = kurzname(&p.name);
         let (b, h) = p.cover_ebook_px;
-        let svg = cover::svg_ebook(daten, b as f32, h as f32, Some((p, seiten)));
+        let (svg, b, h) = fertiges_cover(daten, bandordner, b)
+            .unwrap_or_else(|| (cover::svg_ebook(daten, b as f32, h as f32, Some((p, seiten))), b, h));
         let datei = ziel.join(format!("cover-ebook-{k}-{b}x{h}.png"));
         png_schreiben(&svg, b, &datei)?;
         dateien.push(datei);
@@ -80,18 +132,16 @@ pub fn exportieren(daten: &CoverDaten, portale: &[Portal], seiten: u32, bandordn
         std::fs::write(&pdf, werkbank_satz::svg_als_pdf(&svg, b as f32 / 96.0 * 25.4, h as f32 / 96.0 * 25.4)?).map_err(|e| e.to_string())?;
         dateien.push(pdf);
 
-        let umschlag = cover::svg_umschlag(daten, p, seiten, &klappentext);
-        let svg_datei = ziel.join(format!("umschlag-{k}-{seiten}-seiten.svg"));
-        std::fs::write(&svg_datei, &umschlag).map_err(|e| e.to_string())?;
-        dateien.push(svg_datei);
+        // Komplettumschlag: derselbe Satz wie beim Bauen (Typst), Text aus klappentext.md
         let (ub, _) = p.umschlag_mm(seiten);
+        let r = umschlag_setzen(daten, p, seiten, Some(bandordner), isbn, true, Some((ub / 25.4 * 300.0).round() as u32))?; // 300 dpi
         let png = ziel.join(format!("umschlag-{k}-{seiten}-seiten.png"));
-        png_schreiben(&umschlag, (ub / 25.4 * 300.0).round() as u32, &png)?; // 300 dpi
+        let bild = r.bild.ok_or("kein Umschlagbild")?;
+        let pixel = tiny_skia::Pixmap::from_vec(bild.rgba, tiny_skia::IntSize::from_wh(bild.breite, bild.hoehe).ok_or("Größe")?).ok_or("Bild")?;
+        pixel.save_png(&png).map_err(|e| format!("{}: {e}", png.display()))?;
         dateien.push(png);
-        // Druck-PDF des Umschlags in exakten Millimetern
-        let (ub, uh) = p.umschlag_mm(seiten);
         let pdf = ziel.join(format!("umschlag-{k}-{seiten}-seiten.pdf"));
-        std::fs::write(&pdf, werkbank_satz::svg_als_pdf(&umschlag, ub, uh)?).map_err(|e| e.to_string())?;
+        std::fs::write(&pdf, r.pdf.ok_or("kein Umschlag-PDF")?).map_err(|e| e.to_string())?;
         dateien.push(pdf);
     }
     Ok(dateien)
@@ -101,6 +151,29 @@ pub fn exportieren(daten: &CoverDaten, portale: &[Portal], seiten: u32, bandordn
 mod tests {
     use super::*;
     use werkbank_kern::portale::Portalregeln;
+
+    #[test]
+    fn export_nimmt_fertiges_cover_png_ohne_hintergrundbild() {
+        let o = std::env::temp_dir().join(format!("werkbank-test-cover-fertig-{}", std::process::id()));
+        std::fs::create_dir_all(&o).unwrap();
+        // Rotes Titelbild im Format 2 : 3
+        let mut bild = tiny_skia::Pixmap::new(400, 600).unwrap();
+        bild.fill(tiny_skia::Color::from_rgba8(200, 20, 20, 255));
+        bild.save_png(o.join("cover.png")).unwrap();
+        let regeln = Portalregeln::default();
+
+        let dateien = exportieren(&CoverDaten::default(), &regeln.portale[..1], 200, &o, None).unwrap();
+        let png = dateien.iter().find(|d| d.to_string_lossy().contains("cover-ebook") && d.extension().is_some_and(|e| e == "png")).unwrap();
+        let aus = tiny_skia::Pixmap::load_png(png).unwrap();
+        assert_eq!(aus.height() * 2, aus.width() * 3, "Proportion des cover.png bleibt");
+        let mitte = aus.pixel(aus.width() / 2, aus.height() / 2).unwrap();
+        assert!(mitte.red() > 150 && mitte.green() < 80, "Mitte muss das rote cover.png sein: {mitte:?}");
+
+        // Mit gewähltem Hintergrundbild gilt der Entwurf aus den Cover-Daten
+        let d = CoverDaten { bild: o.join("cover.png").to_string_lossy().into_owned(), ..Default::default() };
+        assert!(fertiges_cover(&d, &o, 400).is_none());
+        let _ = std::fs::remove_dir_all(&o);
+    }
 
     #[test]
     fn bild_umschlag_mit_ruecken_kasten_und_graustufen() {
@@ -176,8 +249,9 @@ mod tests {
         let mut regeln = Portalregeln::default();
         regeln.portale.truncate(1);
         regeln.portale[0].cover_ebook_px = (400, 640);
-        let dateien = exportieren(&d, &regeln.portale, 120, &o).unwrap();
-        assert_eq!(dateien.len(), 5);
+        let dateien = exportieren(&d, &regeln.portale, 120, &o, None).unwrap();
+        // E-Book-Cover (PNG, PDF) und Komplettumschlag (PNG, PDF); der Umschlag ist nur noch Typst, kein SVG
+        assert_eq!(dateien.len(), 4);
         assert!(dateien.iter().filter(|f| f.extension().is_some_and(|e| e == "pdf")).count() == 2);
         assert!(dateien.iter().all(|f| f.is_file() && std::fs::metadata(f).unwrap().len() > 1000), "{dateien:?}");
     }

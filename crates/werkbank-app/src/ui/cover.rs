@@ -71,7 +71,7 @@ pub struct CoverZustand {
     /// Pixelmaße des gewählten Hintergrundbildes.
     pub bild_masse: Option<(u32, u32)>,
     /// Satz des Klappentextes auf der Rückseite (Größe, Passt-Prüfung) für das gewählte Portal.
-    pub klappentext: Option<cover::KlappentextSatz>,
+    pub klappentext: Option<werkbank_satz::buchbau::umschlag::Bericht>,
     /// Liegt im Bandordner ein fertiges `cover.png`?
     pub cover_png: bool,
 }
@@ -132,6 +132,65 @@ fn abschnitt<'a>(titel: &'a str, inhalt: impl Into<Element<'a, Message>>) -> Ele
     column![text(titel).size(12).color(thema::akzent()), inhalt.into()].spacing(8).into()
 }
 
+/// Prüft eine ISBN-Eingabe: (in Ordnung, Hinweistext).
+pub fn isbn_pruefung(eingabe: &str, barcode_an: bool) -> (bool, String) {
+    use werkbank_satz::buchbau::barcode::isbn_ziffern;
+    let t = eingabe.trim();
+    if t.is_empty() {
+        return (false, "Keine ISBN: Auf der Rückseite bleibt ein weißes Feld (Tolino: für den Barcode aus dem Tolino-Dashboard).".to_string());
+    }
+    let ziffern = t.chars().filter(|c| c.is_ascii_digit()).count();
+    if isbn_ziffern(t).is_some() {
+        let zusatz = if barcode_an { "Tolino: Der Barcode wird gesetzt. KDP: KDP druckt den Barcode selbst in die Freifläche." } else { "Der Barcode-Bereich ist oben ausgeschaltet, die ISBN wird nur gespeichert." };
+        (true, format!("Gültige ISBN-13. {zusatz}"))
+    } else if ziffern != 13 {
+        (false, format!("Eine ISBN-13 hat 13 Ziffern, hier sind es {ziffern}."))
+    } else if !t.replace(['-', ' '], "").starts_with("978") && !t.replace(['-', ' '], "").starts_with("979") {
+        (false, "Eine ISBN-13 beginnt mit 978 oder 979.".to_string())
+    } else {
+        (false, "Die Prüfziffer (letzte Ziffer) stimmt nicht: Vertippt?".to_string())
+    }
+}
+
+/// ISBN der Druckausgabe direkt im Cover-Bereich, mit Prüfung und Knopf zu allen Buchdaten.
+fn isbn_feld(state: &AppState) -> Element<'_, Message> {
+    let isbn = state.projekt.metadaten.isbn_print.as_deref().unwrap_or("");
+    let (ok, hinweis) = isbn_pruefung(isbn, state.cover.daten.barcode);
+    column![
+        text("ISBN der Druckausgabe (für den Barcode; steht in den Buchdaten)").size(11).color(thema::text_gedimmt()),
+        row![
+            text_input("978-3-…", isbn).on_input(Message::CoverIsbn).size(13).padding(6),
+            button(text("Buchdaten …").size(12)).padding([5, 8]).style(thema::link_knopf_stil).on_press(Message::MetaOeffnen),
+        ]
+        .spacing(6)
+        .align_y(Alignment::Center),
+        row![
+            text(if ok { "✓" } else { "!" }).size(11).color(if ok { thema::erfolg_gruen() } else { thema::warnung_orange() }),
+            text(hinweis).size(11).color(thema::text_gedimmt()),
+        ]
+        .spacing(6),
+    ]
+    .spacing(3)
+    .into()
+}
+
+/// Statt eines zweiten Textfeldes: Hinweis auf `klappentext.md`, die einzige Quelle der Rückseite.
+fn klappentext_hinweis(state: &AppState) -> Element<'_, Message> {
+    let datei = state.band.ordner.as_ref().map(|o| o.join("klappentext.md")).filter(|p| p.is_file());
+    let mut spalte = column![
+        text("Rückseitentext: klappentext.md im Bandordner").size(11).color(thema::text_gedimmt()),
+        text("Aufbau: Dachzeile, # Schlagzeile, Absätze, ## Titel + Aufzählung = Kasten, ## Titel + Text = Infoblock (z. B. Autor), nach --- die Fußzeile ({seiten} = Seitenzahl)")
+            .size(10)
+            .color(thema::text_gedimmt()),
+    ]
+    .spacing(3);
+    spalte = match datei {
+        Some(p) => spalte.push(button(text("klappentext.md öffnen").size(12)).padding([3, 8]).style(thema::link_knopf_stil).on_press(Message::DateiOeffnen(p))),
+        None => spalte.push(text("klappentext.md fehlt im Bandordner.").size(11).color(thema::warnung_orange())),
+    };
+    spalte.into()
+}
+
 pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     let c = &state.cover;
     let d = &c.daten;
@@ -147,14 +206,11 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
         feld("Bandzeile", &d.bandzeile, CoverFeld::Bandzeile),
         feld("Autor", &d.autor, CoverFeld::Autor),
         feld("Seitenzahl für den Rücken (0 = Schätzung aus dem Buch)", &if d.seiten == 0 { String::new() } else { d.seiten.to_string() }, CoverFeld::Seiten),
-        column![
-            text("Rückseite (leer = klappentext.md des Bandes; Markdown: # Schlagzeile, - Punkte, **fett**)").size(11).color(thema::text_gedimmt()),
-            text_input("", &d.klappentext).on_input(|t| Message::CoverFeld(CoverFeld::Klappentext, t)).size(13).padding(6),
-        ]
-        .spacing(3),
+        klappentext_hinweis(state),
         regler("Schriftgröße der Rückseite", d.rueckseite_schrift_pt.round().clamp(6.0, 20.0) as u32, 6, 16, " pt", |w| Message::CoverRegler(CoverRegler::RueckseiteSchrift, w)),
         toggler(d.rueckseite_schrift_auto).label("Schrift verkleinern, wenn der Klappentext nicht passt").size(15).text_size(12).on_toggle(Message::CoverSchriftAuto),
         toggler(d.barcode).label("Freifläche für den Barcode auf der Rückseite").size(15).text_size(12).on_toggle(Message::CoverBarcode),
+        isbn_feld(state),
     ]
     .spacing(8);
 
@@ -282,13 +338,13 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
             .push(zeile(ruecken >= 6.0, format!("Rücken {ruecken:.1} mm{}", if ruecken >= 6.0 { " – Rückentext möglich" } else { " – zu schmal für Rückentext" })))
             .push(zeile(true, format!("Umschlag {ub:.1} × {uh:.1} mm inkl. {} mm Beschnitt", p.beschnitt_mm)))
             .push(zeile(true, format!("E-Book-Cover {} × {} px", p.cover_ebook_px.0, p.cover_ebook_px.1)))
-            .push(zeile(d.barcode, "Barcode-Freifläche 50 × 30 mm auf der Rückseite".to_string()));
+            .push(zeile(d.barcode, if p.name.to_lowercase().contains("tolino") { "Barcode unten rechts auf der Rückseite (Tolino: 33,4 × 18,1 mm, aus der ISBN der Buchdaten; ohne gültige ISBN bleibt ein weißes Feld)".to_string() } else { "Barcode-Freifläche 50,8 × 30,5 mm auf der Rückseite (KDP druckt den Barcode selbst)".to_string() }));
         if let Some(k) = &c.klappentext {
-            if k.zeilen == 0 {
-                pruefung = pruefung.push(zeile(false, "Kein Klappentext (klappentext.md im Bandordner oder Feld „Rückseite“)".to_string()));
+            if k.hoehe_mm <= 0.0 {
+                pruefung = pruefung.push(zeile(false, "Kein Klappentext (klappentext.md im Bandordner)".to_string()));
             } else if k.passt {
                 let klein = if k.groesse_pt + 0.01 < k.gewuenscht_pt { format!(", auf {:.1} pt verkleinert (eingestellt {:.0} pt)", k.groesse_pt, k.gewuenscht_pt) } else { String::new() };
-                pruefung = pruefung.push(zeile(true, format!("Klappentext passt auf die Rückseite ({} Zeilen, {:.1} pt{klein})", k.zeilen, k.groesse_pt)));
+                pruefung = pruefung.push(zeile(true, format!("Klappentext passt auf die Rückseite ({:.0} von {:.0} mm, {:.1} pt{klein})", k.hoehe_mm, k.verfuegbar_mm, k.groesse_pt)));
             } else {
                 pruefung = pruefung.push(
                     text(format!(
@@ -348,7 +404,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
                 .color(thema::warnung_orange()),
         );
     }
-    if let Some(k) = c.klappentext.as_ref().filter(|k| k.zeilen > 0 && !k.passt && c.umschlag) {
+    if let Some(k) = c.klappentext.as_ref().filter(|k| k.hoehe_mm > 0.0 && !k.passt && c.umschlag) {
         rechts = rechts.push(
             text(format!("Klappentext zu lang: {:.0} mm zu viel auf der Rückseite. Text kürzen.", k.ueberhang_mm)).size(12).color(thema::fehler_rot()),
         );
@@ -370,4 +426,21 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
         .width(Fill)
         .height(Fill)
         .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::isbn_pruefung;
+
+    #[test]
+    fn isbn_hinweise_sind_verstaendlich() {
+        assert!(isbn_pruefung("978-3-9825412-0-4", true).0);
+        assert!(isbn_pruefung("978-3-9825412-0-4", true).1.contains("Tolino: Der Barcode wird gesetzt"));
+        assert!(isbn_pruefung("978-3-9825412-0-4", false).1.contains("ausgeschaltet"));
+        let leer = isbn_pruefung("  ", true);
+        assert!(!leer.0 && leer.1.contains("weißes Feld"));
+        assert!(isbn_pruefung("978-3-98", true).1.contains("13 Ziffern, hier sind es 6"));
+        assert!(isbn_pruefung("123-4-5678-9012-3", true).1.contains("978 oder 979"));
+        assert!(isbn_pruefung("978-3-9825412-0-5", true).1.contains("Prüfziffer"));
+    }
 }

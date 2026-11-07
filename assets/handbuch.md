@@ -75,7 +75,32 @@ Die Maße der Portale stehen in `.werkbank/portale.json`; die Voreinstellungen m
 
 ## Cover
 
-Der Bereich **Cover** bietet eine Vorlage mit Titel, Untertitel, Bandzeile, Autor, **einer Farbe je Text**, Hintergrundbild, Rückentext und Barcode-Fläche. Das **Hintergrundbild** läuft über den ganzen Umschlag oder nur über die Vorderseite und wird zugeschnitten skaliert (nie verzerrt); die Werkbank nennt die nötige Pixelgröße je Portal (bei 300 dpi) und bewertet dein Bild. Hinter **Rückentext und Rückseitentext** steht auf Wunsch ein Kasten mit wählbarer Farbe und Deckkraft. Die **Vorschau zeigt Farbe und Graustufen** nebeneinander, auf Wunsch mit 16 E-Ink-Stufen. Die Rückenbreite folgt aus der Seitenzahl. Exportiert wird als PNG, SVG und PDF in `.werkbank/cover/`.
+Der Bereich **Cover** bietet eine Vorlage mit Titel, Untertitel, Bandzeile, Autor, **einer Farbe je Text**, Hintergrundbild, Rückentext und Barcode-Fläche. Das **Hintergrundbild** läuft über den ganzen Umschlag oder nur über die Vorderseite und wird zugeschnitten skaliert (nie verzerrt); die Werkbank nennt die nötige Pixelgröße je Portal (bei 300 dpi) und bewertet dein Bild. Hinter **Rückentext und Rückseitentext** steht auf Wunsch ein Kasten mit wählbarer Farbe und Deckkraft. Die **Vorschau zeigt Farbe und Graustufen** nebeneinander, auf Wunsch mit 16 E-Ink-Stufen. Die Rückenbreite folgt aus der Seitenzahl. Exportiert wird als PNG und PDF in `.werkbank/cover/`.
+
+**Ein Cover, eine Stelle.** Den Umschlag setzt die Werkbank immer gleich, in der Vorschau, im Export und beim Bauen (`tolino/`, `kdp/`): Die **Vorderseite** ist das fertige `cover.png` des Bandes, solange du kein Hintergrundbild gewählt hast, sonst das Bild mit den Titeltexten aus dem Cover-Bereich. **Farben, Kästen, Schriftgröße und die Barcode-Fläche** kommen aus dem Cover-Bereich. Der **Text der Rückseite** steht nur in `klappentext.md` im Bandordner:
+
+```markdown
+Programmieren lernen an der Werkbank          ← Dachzeile (Absatz vor der ersten Überschrift)
+
+# Keine Theorie auf Vorrat.<br/>Sofort loslegen.   ← Schlagzeile (<br/> = Zeilenumbruch)
+
+Absätze mit **fett**, *kursiv* und `Code`.
+
+## Deine 5 Praxis-Projekte:                    ← Überschrift mit Aufzählung = Kasten
+- **Projekt 1:** Beschreibung
+- **Projekt 2:** Beschreibung
+
+## Über den Autor                              ← Überschrift mit Text = Infoblock unten
+Jahrgang 1971 …
+
+---
+flutter-werkstatt.de                           ← Fußzeile: Zeilen nach dem letzten ---
+Alle Begleitprogramme zum Download · {seiten} Seiten
+```
+
+Alles außer der Schlagzeile ist freiwillig. Ist der Text zu lang, wird die Schrift bis 7,5 pt kleiner; passt er dann noch nicht, meldet die Werkbank, um wie viele Millimeter er zu hoch ist. Ein langer **Shop-Text** für Buchbeschreibungen kann daneben in `klappentext-shop.md` stehen; er landet als `KLAPPENTEXT.md` in den Verlagsordnern. Alte Umschlagtexte aus `buchbau.yaml` überträgt `cargo run -p werkbank-satz --example klappentext_uebernehmen -- <Buchordner> --machen` in die `klappentext.md` jedes Bandes (der bisherige Text wird als `klappentext-shop.md` gesichert).
+
+**Barcode und ISBN.** Die ISBN trägst du direkt im Cover-Bereich ein (Feld unter „Freifläche für den Barcode“; die Werkbank prüft sie beim Tippen), im Dialog „Buchdaten bearbeiten“ (Knopf „Buchdaten …“ im Cover- und im Bauen-Bereich, auch in der Befehlspalette `Strg+K`) oder in `band.yaml`. Beim Bauen meldet die Werkbank, wenn der Tolino-Umschlag ohne gültige ISBN entsteht. **Tolino:** Bei gültiger ISBN-13 setzt die Werkbank den EAN-13-Barcode selbst auf die Rückseite (33,4 × 18,1 mm wie von Tolino Media verlangt, 16 mm Abstand zu Rücken und Kante; Tolino verlangt mindestens 15 mm); ohne gültige ISBN bleibt ein weißes Feld dieser Größe für den Barcode aus dem Tolino-Dashboard. **KDP:** Es bleibt ein weißes Feld (50,8 × 30,5 mm, 8 mm Abstand), in das KDP den Barcode selbst druckt, auch bei eigener ISBN; das Feld nicht beschriften. Ohne Haken bei „Freifläche für den Barcode“ entfällt der Bereich.
 
 ## Dateien im Bandordner
 

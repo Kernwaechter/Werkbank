@@ -99,10 +99,11 @@ impl Default for Einstellungen {
             sprachpruefung: true,
             automatisch: true,
             server_url: "http://localhost:8081".to_string(),
-            lt_ordner: String::new(),
+            // Snap: LanguageTool liegt im Paket (WERKBANK_LT_ORDNER setzt snapcraft.yaml)
+            lt_ordner: std::env::var("WERKBANK_LT_ORDNER").unwrap_or_default(),
             java: "java".to_string(),
             sprache: "de-DE".to_string(),
-            server_autostart: false,
+            server_autostart: std::env::var_os("WERKBANK_LT_ORDNER").is_some(),
         }
     }
 }

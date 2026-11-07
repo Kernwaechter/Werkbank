@@ -522,6 +522,8 @@ pub enum Message {
     CoverFeld(ui::cover::CoverFeld, String),
     /// Barcode-Freifläche ein/aus.
     CoverBarcode(bool),
+    /// ISBN der Druckausgabe direkt im Cover-Bereich ändern (wird in den Buchdaten gespeichert).
+    CoverIsbn(String),
     /// Schrift der Rückseite automatisch verkleinern, wenn der Klappentext nicht passt.
     CoverSchriftAuto(bool),
     /// Regler der Cover-Vorlage (Prozent).
@@ -539,7 +541,7 @@ pub enum Message {
     /// Ergebnis des Dateidialogs (`None` = entfernen/abbrechen).
     CoverBildGewaehlt(Option<PathBuf>),
     /// Neue Vorschau (Versionsnummer, Bild).
-    CoverVorschau(u64, Result<ui::cover::Bild, String>),
+    CoverVorschau(u64, Result<(ui::cover::Bild, Option<werkbank_satz::buchbau::umschlag::Bericht>), String>),
     /// Exportiert alle Cover-Formate.
     CoverExportieren,
     /// Export abgeschlossen.
@@ -982,14 +984,17 @@ fn cover_vorschau(state: &mut AppState) -> Task<Message> {
     let seiten = if daten.seiten > 0 { daten.seiten } else { state.satz_seiten.unwrap_or(state.projekt.buchseiten_schaetzung() as u32) };
     let umschlag = state.cover.umschlag;
     let ordner = state.band.ordner.clone();
-    // Satz und Prüfung des Klappentextes (schnell, deshalb gleich hier)
-    state.cover.cover_png = ordner.as_deref().is_some_and(|o| o.join("cover.png").is_file());
-    state.cover.klappentext = portal.as_ref().map(|p| {
-        let roh = if daten.klappentext.trim().is_empty() { ordner.as_deref().map(cover::klappentext_lesen).unwrap_or_default() } else { daten.klappentext.clone() };
-        werkbank_kern::cover::klappentext_satz(&daten, p, seiten, &roh)
-    });
+    let isbn = state.projekt.metadaten.isbn_print.clone();
+    // Den Bericht über den Klappentext liefert der Umschlagsatz mit der Vorschau
+    state.cover.klappentext = None;
     Task::perform(
         languagetool::im_hintergrund(move || {
+            // Gesamtumschlag: derselbe Satz wie beim Bauen (Typst); Text aus klappentext.md, Farben und Bild aus dem Designer
+            if umschlag && let Some(p) = &portal {
+                let r = cover::umschlag_setzen(&daten, p, seiten, ordner.as_deref(), isbn.as_deref(), false, Some(1100))?;
+                let b = r.bild.ok_or("kein Umschlagbild")?;
+                return Ok((((b.breite, b.hoehe, Arc::new(b.rgba))), Some(r.bericht)));
+            }
             // Hat der Band ein fertiges cover.png und wurde im Cover-Designer kein Hintergrundbild gewählt, zeigt die Vorschau dieses Bild
             if !umschlag
                 && daten.bild.is_empty()
@@ -1008,20 +1013,12 @@ fn cover_vorschau(state: &mut AppState) -> Task<Message> {
                         resvg::tiny_skia::Transform::from_scale(faktor, faktor),
                         None,
                     );
-                    return Ok((w, h, Arc::new(klein.take())));
+                    return Ok(((w, h, Arc::new(klein.take())), None));
                 }
             }
-            let (svg, breite) = match (umschlag, &portal) {
-                (true, Some(p)) => {
-                    let klappentext = ordner.as_deref().map(cover::klappentext_lesen).unwrap_or_default();
-                    (werkbank_kern::cover::svg_umschlag(&daten, p, seiten, &klappentext), 1100)
-                }
-                (_, p) => {
-                    let (b, h) = p.as_ref().map_or((1600, 2560), |p| p.cover_ebook_px);
-                    (werkbank_kern::cover::svg_ebook(&daten, b as f32, h as f32, p.as_ref().map(|p| (p, seiten))), 520)
-                }
-            };
-            cover::rendern(&svg, breite).map(|(b, h, px)| (b, h, Arc::new(px)))
+            let (b, h) = portal.as_ref().map_or((1600, 2560), |p| p.cover_ebook_px);
+            let svg = werkbank_kern::cover::svg_ebook(&daten, b as f32, h as f32, portal.as_ref().map(|p| (p, seiten)));
+            cover::rendern(&svg, 520).map(|(b, h, px)| ((b, h, Arc::new(px)), None))
         }),
         move |ergebnis| Message::CoverVorschau(version, ergebnis),
     )
@@ -2117,6 +2114,17 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
             return cover_vorschau(state);
         }
 
+        Message::CoverIsbn(text) => {
+            state.projekt.metadaten.isbn_print = (!text.trim().is_empty()).then_some(text);
+            if state.band.ordner.is_some() {
+                state.speicher_zeitstempel = match state.projekt.band_yaml_speichern() {
+                    Ok(p) => format!("ISBN gespeichert in {}", p.display()),
+                    Err(e) => format!("ISBN nicht gespeichert: {e}"),
+                };
+            }
+            return cover_vorschau(state);
+        }
+
         Message::CoverBarcode(an) => {
             state.cover.daten.barcode = an;
             cover_speichern(state);
@@ -2191,7 +2199,8 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
         Message::CoverVorschau(version, ergebnis) => {
             if version == state.cover.version {
                 match ergebnis {
-                    Ok((b, h, px)) => {
+                    Ok(((b, h, px), bericht)) => {
+                        state.cover.klappentext = bericht;
                         state.cover.vorschau = Some(iced::widget::image::Handle::from_rgba(b, h, px.as_ref().clone()));
                         state.cover.pixel = Some((b, h, px));
                         cover_grau_neu(state);
@@ -2212,8 +2221,9 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
             let daten = state.cover.daten.clone();
             let portale = state.portale.portale.clone();
             let seiten = if daten.seiten > 0 { daten.seiten } else { state.satz_seiten.unwrap_or(state.projekt.buchseiten_schaetzung() as u32) };
+            let isbn = state.projekt.metadaten.isbn_print.clone();
             return Task::perform(
-                languagetool::im_hintergrund(move || cover::exportieren(&daten, &portale, seiten, &ordner)),
+                languagetool::im_hintergrund(move || cover::exportieren(&daten, &portale, seiten, &ordner, isbn.as_deref())),
                 Message::CoverExportiert,
             );
         }
@@ -3156,6 +3166,7 @@ struct SatzAuftrag {
     band: werkbank_satz::buchbau::profil::Band,
     stil: werkbank_satz::gestaltung::Satzstil,
     ersatz_cover: Option<Vec<u8>>,
+    isbn: Option<String>,
 }
 
 /// Stabile Kennung `urn:uuid:…` aus einem Text (gleiches Buch → gleiche Kennung für das E-Book).
@@ -3237,7 +3248,8 @@ fn satz_auftrag(state: &AppState, ordner: &Path) -> Result<SatzAuftrag, String> 
         })
     };
     let stil = werkbank_satz::gestaltung::Satzstil::laden(ordner);
-    Ok(SatzAuftrag { buchordner, bandordner, profil, band, stil, ersatz_cover })
+    let isbn = state.projekt.metadaten.isbn_print.clone().filter(|i| !i.trim().is_empty());
+    Ok(SatzAuftrag { buchordner, bandordner, profil, band, stil, ersatz_cover, isbn })
 }
 
 /// Setzt den Band (PDFs, EPUB, Verlagsordner); auf Wunsch zusätzlich PDF/X-3 des Graudrucks.
@@ -3249,6 +3261,7 @@ fn satz_ausfuehren(a: SatzAuftrag, pdfx: bool, melde: &dyn Fn(String)) -> Result
         band: &a.band,
         stil: &a.stil,
         ersatz_cover: a.ersatz_cover.clone(),
+        isbn: a.isbn.clone(),
     };
     let mut bericht = werkbank_satz::buchbau::setzen(&auftrag, &|s| melde(s.to_string()))?;
     if pdfx {

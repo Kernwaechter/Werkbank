@@ -9,6 +9,8 @@ Das **Symbol** (`assets/icons/werkbank.svg`: aufgeschlagenes Buch auf einer Werk
 | Debian/Ubuntu (.deb) | `packaging/pakete-bauen.sh` (cargo-deb), Metadaten in `crates/werkbank-app/Cargo.toml` | **gebaut** (20 MB), Inhalt mit `dpkg-deb` geprüft, nicht installiert |
 | Fedora/openSUSE (.rpm) | `packaging/pakete-bauen.sh` (cargo-generate-rpm) | **gebaut** (22 MB), Dateiliste und Abhängigkeiten gelesen, nicht installiert |
 | Flatpak | `packaging/flatpak/bauen.sh`, Manifest `packaging/de.daehn.Werkbank.yaml` | Manifest geprüft, **nicht gebaut** (flatpak-builder fehlt) |
+| Snap (Store, „JZ Werkbank“, Snap-Name `jz-werkbank`) | `packaging/snap/bauen.sh`, Manifest `snap/snapcraft.yaml` (strict, mit LanguageTool, Java, Pandoc, Typst, Python, rustc, Hunspell; ohne Ghostscript/Dart/Flutter, siehe `packaging/snap/DRITTANBIETER.md`) | **nicht gebaut** (snapcraft fehlt) |
+| Snap Lizenzgeber (nur lokal, mit privatem Schlüssel) | `packaging/snap/lizenzgeber-bauen.sh` | **nicht gebaut** |
 | macOS | `.app` von Hand gebaut (Info.plist + icns, ad-hoc signiert), DMG mit `hdiutil` | **DMG gebaut (arm64)**, nicht notarisiert |
 | Windows | `packaging\windows\windows-bauen.ps1` (unter Windows, MSVC) oder `windows-bauen.sh` (Cross-Build unter Linux) liefert `werkbank-app.exe` mit Symbol und ein ZIP; `werkbank.iss` (Inno Setup) den Installer | Release-Build läuft unter Windows 11; Installer und Signatur **nicht geprüft** |
 
