@@ -524,6 +524,10 @@ pub enum Message {
     CoverBarcode(bool),
     /// ISBN der Druckausgabe direkt im Cover-Bereich ändern (wird in den Buchdaten gespeichert).
     CoverIsbn(String),
+    /// Farben aus dem Cover-Bild ableiten und übernehmen.
+    CoverFarbenVorschlagen,
+    /// Letzten Farbvorschlag zurücknehmen.
+    CoverFarbenZurueck,
     /// Schrift der Rückseite automatisch verkleinern, wenn der Klappentext nicht passt.
     CoverSchriftAuto(bool),
     /// Regler der Cover-Vorlage (Prozent).
@@ -2112,6 +2116,66 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
             }
             cover_speichern(state);
             return cover_vorschau(state);
+        }
+
+        Message::CoverFarbenVorschlagen => {
+            let d = &state.cover.daten;
+            let quelle = if d.bild.is_empty() {
+                state.band.ordner.as_ref().map(|o| o.join("cover.png"))
+            } else {
+                Some(PathBuf::from(match &state.band.ordner {
+                    Some(o) => werkbank_kern::cover::bild_aufloesen(&d.bild, o),
+                    None => d.bild.clone(),
+                }))
+            };
+            let Some(bytes) = quelle.and_then(|p| std::fs::read(p).ok()) else {
+                state.cover.meldung = "Kein Bild für den Farbvorschlag: Lege ein cover.png in den Bandordner oder wähle ein Hintergrundbild.".to_string();
+                return Task::none();
+            };
+            match werkbank_satz::buchbau::farben::aus_bild(&bytes) {
+                Err(f) => state.cover.meldung = format!("Farbvorschlag nicht möglich: {f}"),
+                Ok(v) => {
+                    state.cover.farben_zuvor = Some(Box::new(state.cover.daten.clone()));
+                    let d = &mut state.cover.daten;
+                    d.hintergrund = v.hintergrund.clone();
+                    d.text = v.text;
+                    d.akzent = v.akzent.clone();
+                    d.ruecken_kasten_farbe = v.ruecken.clone();
+                    d.ruecken_kasten_deckkraft = v.ruecken_deckkraft;
+                    d.rueckseite_kasten_farbe = v.rueckseite_kasten;
+                    d.rueckseite_kasten_deckkraft = v.rueckseite_kasten_deckkraft;
+                    // Einzelfarben der Texte würden den Vorschlag übersteuern
+                    for f in [&mut d.farbe_bandzeile, &mut d.farbe_titel, &mut d.farbe_untertitel, &mut d.farbe_autor, &mut d.farbe_rueckseite, &mut d.farbe_ruecken] {
+                        f.clear();
+                    }
+                    state.cover.meldung = format!("Farben aus dem Bild übernommen: Hintergrund {}, Akzent {}, Rücken {}. „Rückgängig“ nimmt sie zurück.", v.hintergrund, v.akzent, v.ruecken);
+                    cover_speichern(state);
+                    return cover_vorschau(state);
+                }
+            }
+        }
+
+        Message::CoverFarbenZurueck => {
+            if let Some(z) = state.cover.farben_zuvor.take() {
+                // Nur die Farben zurücknehmen, spätere Änderungen an Titel, Schrift usw. bleiben
+                let d = &mut state.cover.daten;
+                d.hintergrund = z.hintergrund;
+                d.text = z.text;
+                d.akzent = z.akzent;
+                d.ruecken_kasten_farbe = z.ruecken_kasten_farbe;
+                d.ruecken_kasten_deckkraft = z.ruecken_kasten_deckkraft;
+                d.rueckseite_kasten_farbe = z.rueckseite_kasten_farbe;
+                d.rueckseite_kasten_deckkraft = z.rueckseite_kasten_deckkraft;
+                d.farbe_bandzeile = z.farbe_bandzeile;
+                d.farbe_titel = z.farbe_titel;
+                d.farbe_untertitel = z.farbe_untertitel;
+                d.farbe_autor = z.farbe_autor;
+                d.farbe_rueckseite = z.farbe_rueckseite;
+                d.farbe_ruecken = z.farbe_ruecken;
+                state.cover.meldung = "Farben zurückgesetzt.".to_string();
+                cover_speichern(state);
+                return cover_vorschau(state);
+            }
         }
 
         Message::CoverIsbn(text) => {

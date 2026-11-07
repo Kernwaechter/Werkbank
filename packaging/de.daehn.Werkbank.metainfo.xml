@@ -43,6 +43,11 @@
     <control>pointing</control>
   </supports>
   <releases>
+    <release version="1.4.0" date="2026-11-07">
+      <description>
+        <p>Der Umschlag wird überall gleich gesetzt (Vorschau, Export, Bauen für Tolino und KDP): Vorderseite aus cover.png oder Cover-Designer, Rückseite aus klappentext.md mit Typst-Satz und passender Schriftgröße, Farben aus dem Cover-Bereich. Barcode nach den Vorgaben von Tolino (EAN-13 aus der ISBN) und KDP (Freifläche); ISBN-Feld mit Prüfung im Cover-Bereich. Neu: Farben passend zum Bild vorschlagen. Außerdem als Snap und mit Flatpak ausgelieferte Version.</p>
+      </description>
+    </release>
     <release version="1.2.2" date="2026-11-03">
       <description>
         <p>Text-Vorschau ohne Markdown-Reste: Bilder mit Bildunterschrift, Tabellen, Listen, Seitenumbrüche; sie folgt dem Cursor. Zeilennummern in Codeblöcken in Vorschau, nativem PDF und EPUB. Pandoc-Satzvorschau mit neueren Pandoc-Versionen wieder lauffähig.</p>

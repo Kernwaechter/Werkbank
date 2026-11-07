@@ -74,6 +74,8 @@ pub struct CoverZustand {
     pub klappentext: Option<werkbank_satz::buchbau::umschlag::Bericht>,
     /// Liegt im Bandordner ein fertiges `cover.png`?
     pub cover_png: bool,
+    /// Cover-Daten vor dem letzten Farbvorschlag (für „Rückgängig“).
+    pub farben_zuvor: Option<Box<CoverDaten>>,
 }
 
 impl std::fmt::Debug for CoverZustand {
@@ -215,7 +217,15 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     .spacing(8);
 
     // ---- Farben je Text
+    let mut vorschlag = row![button(text("Farben aus dem Bild vorschlagen").size(12)).padding([4, 10]).style(thema::link_knopf_stil).on_press(Message::CoverFarbenVorschlagen)]
+        .spacing(8)
+        .align_y(Alignment::Center);
+    if c.farben_zuvor.is_some() {
+        vorschlag = vorschlag.push(button(text("Rückgängig").size(12)).padding([4, 10]).style(thema::link_knopf_stil).on_press(Message::CoverFarbenZurueck));
+    }
     let farben = column![
+        text("Hintergrund, Akzent, Text und Rücken passend zum Bild (cover.png oder Hintergrundbild), mit lesbarem Kontrast.").size(11).color(thema::text_gedimmt()),
+        vorschlag,
         row![
             farbfeld("Hintergrund", &d.hintergrund, CoverFeld::Hintergrund, "#1b1c1f"),
             farbfeld("Standard-Text", &d.text, CoverFeld::Text, "#f5f4f0"),

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Baut und installiert das Flatpak lokal.
 # Braucht: flatpak, flatpak-builder, Laufzeit und SDK (werden bei Bedarf angeboten):
-#   flatpak install flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08 org.freedesktop.Sdk.Extension.rust-stable//24.08
+#   flatpak install flathub org.freedesktop.Platform//26.08 org.freedesktop.Sdk//26.08 org.freedesktop.Sdk.Extension.rust-stable//26.08
 set -euo pipefail
 cd "$(dirname "$0")"
 # Alle Abhängigkeiten in vendor/ ablegen (flatpak-builder baut ohne Netz)

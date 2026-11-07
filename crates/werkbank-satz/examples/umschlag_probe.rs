@@ -11,7 +11,18 @@ fn main() -> Result<(), String> {
     let ordner = buch.join(&band.ordner);
     let md = std::fs::read_to_string(ordner.join("klappentext.md")).map_err(|e| e.to_string())?;
     let text = klappentext::lesen(&md);
-    let cover = werkbank_kern::cover::CoverDaten::laden(&ordner).unwrap_or_default();
+    let mut cover = werkbank_kern::cover::CoverDaten::laden(&ordner).unwrap_or_default();
+    if std::env::var_os("AUTOFARBEN").is_some() {
+        let v = werkbank_satz::buchbau::farben::aus_bild(&std::fs::read(ordner.join("cover.png")).map_err(|e| e.to_string())?)?;
+        println!("Vorschlag: {v:?}");
+        cover.hintergrund = v.hintergrund;
+        cover.text = v.text;
+        cover.akzent = v.akzent;
+        cover.ruecken_kasten_farbe = v.ruecken;
+        cover.ruecken_kasten_deckkraft = v.ruecken_deckkraft;
+        cover.rueckseite_kasten_farbe = v.rueckseite_kasten;
+        cover.rueckseite_kasten_deckkraft = v.rueckseite_kasten_deckkraft;
+    }
     let isbn = a.get(3).cloned().or_else(|| werkbank_satz::buchbau::isbn_aus_ordner(&ordner));
     println!("ISBN: {isbn:?}");
     std::fs::create_dir_all(ziel).map_err(|e| e.to_string())?;

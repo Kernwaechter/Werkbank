@@ -8,3 +8,5 @@ packaging/flatpak/.flatpak-builder/
 /Transfer/
 privat.key
 register.jsonl
+packaging/flatpak/repo/
+packaging/flatpak/*.flatpak

@@ -3,7 +3,7 @@
 name: jz-werkbank
 title: JZ Werkbank
 base: core24
-version: '1.3.0'
+version: '1.4.0'
 summary: Schreibwerkzeug für technische Bücher
 description: |
   Markdown-Editor mit Sprach- und Code-Prüfung, Statistik, nativem Buchsatz

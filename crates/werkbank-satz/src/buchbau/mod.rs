@@ -9,6 +9,7 @@
 pub mod css;
 pub mod epub;
 pub mod barcode;
+pub mod farben;
 pub mod hervorhebung;
 pub mod klappentext;
 pub mod md;

@@ -2,7 +2,7 @@
 # Die Quellen (path: ..) sind der Ordner packaging/ relativ zu diesem Manifest, also das Projekt.
 app-id: de.daehn.Werkbank
 runtime: org.freedesktop.Platform
-runtime-version: '24.08'
+runtime-version: '26.08'
 sdk: org.freedesktop.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
@@ -48,6 +48,14 @@ modules:
           - packaging/flatpak/build
           - packaging/flatpak/vendor
           - packaging/flatpak/.flatpak-builder
+          - packaging/flatpak/repo
+          - packaging/flatpak/*.flatpak
+          # Nicht ins Flatpak und nicht in den Bauordner: Webseite samt Downloads, Schlüsselmaterial, Transfer
+          - werkstatt-web
+          - Transfer
+          - my-key-export
+          - packaging/my-key-export
+          - my-keys.md
       # Abhängigkeiten offline: `cargo vendor` legt vendor/ an (siehe bauen.sh)
       - type: dir
         path: flatpak/vendor

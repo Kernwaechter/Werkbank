@@ -24,6 +24,28 @@ Fehlen die Secrets, überspringt der Workflow die Signierschritte; die Pakete en
 - macOS: `codesign --verify --deep --strict Werkbank.app` und `spctl --assess --type execute Werkbank.app`
 - Alle Systeme: `sha256sum -c SHA256SUMS` und `gpg --verify SHA256SUMS.asc`
 
+## RPM signieren (Linux)
+
+`cargo generate-rpm` signiert mit einer **exportierten PGP-Schlüsseldatei** (RSA oder Ed25519). Ein Schlüssel mit Passwort wird nicht unterstützt, deshalb legst du einen eigenen Schlüssel nur für die Paketsignatur ohne Passwort an.
+
+```bash
+# 1. Schlüssel erzeugen (RSA 4096, 3 Jahre gültig, ohne Passwort)
+gpg --batch --passphrase '' --quick-generate-key "Volker Dähn (Werkbank Pakete) <volker@daehn.de>" rsa4096 sign 3y
+
+# 2. Kennung (Fingerabdruck) ansehen
+gpg --list-keys --keyid-format long volker@daehn.de
+
+# 3. Exportieren: privat (bleibt geheim, nicht ins Repository!) und öffentlich (kommt auf die Webseite)
+gpg --armor --export-secret-keys volker@daehn.de > ~/werkbank-rpm-signatur.secret.asc
+chmod 600 ~/werkbank-rpm-signatur.secret.asc
+gpg --armor --export volker@daehn.de > werkstatt-web/downloads/werkbank-rpm-signatur.asc
+
+# 4. RPM signieren (Release-Binary muss gebaut sein)
+packaging/rpm-signieren.sh ~/werkbank-rpm-signatur.secret.asc
+```
+
+Anwender prüfen so: `sudo rpm --import werkbank-rpm-signatur.asc` und `rpm --checksig werkbank-1.4.0-1.x86_64.rpm` (Ausgabe: `… digests signatures OK`). Den Fingerabdruck aus Schritt 2 solltest du zusätzlich auf der Webseite nennen, damit man den Schlüssel gegenprüfen kann. Die private Datei außerhalb des Repositorys sichern (z. B. Passwortmanager oder verschlüsselter Datenträger); ohne sie lassen sich spätere Versionen nicht mit demselben Schlüssel signieren.
+
 ## Lizenzschlüssel (getrennt von der Codesignatur)
 
 `werkbank-lizenz schluessel <ordner>` erzeugt das Schlüsselpaar. `oeffentlich.key` kommt nach `assets/lizenz-oeffentlich.key` und wird beim Bauen eingebaut. `privat.key` bleibt geheim und außerhalb des Repositorys. `werkbank-lizenz ausstellen …` erzeugt je Kunde eine `lizenz.json`, die der Kunde unter „Über die Werkbank“ auswählt.
