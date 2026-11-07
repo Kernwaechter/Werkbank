@@ -8,7 +8,7 @@ Zwei Snaps, bewusst getrennt:
 | Manifest | `snap/snapcraft.yaml` | `packaging/snap/lizenzgeber/snapcraft.yaml` |
 | Bauen mit | `packaging/snap/bauen.sh` | `packaging/snap/lizenzgeber-bauen.sh` |
 | Ziel | Snap Store | **nur lokal**, enthält den privaten Schlüssel |
-| Ergebnis | `target/snap/jz-werkbank_1.3.0_amd64.snap` | `~/Lizenzgeber-Pakete/werkbank-lizenzgeber_1.3.0_amd64.snap` (Rechte 600) |
+| Ergebnis | `target/snap/jz-werkbank_1.5.0_amd64.snap` | `~/Lizenzgeber-Pakete/werkbank-lizenzgeber_1.5.0_amd64.snap` (Rechte 600) |
 
 Stand 7.11.2026: Beide Snaps **gebaut** (App 666 MB, Lizenzgeber 17 MB) und der Inhalt mit `unsquashfs -l` geprüft. **Installiert und gestartet wurde noch keiner**: die Prüfliste in Abschnitt 2 steht aus.
 
@@ -29,7 +29,7 @@ Der erste Build lädt das Container-Image, Rust 1.99.1, LanguageTool (250 MB), T
 
 ```bash
 packaging/snap/bauen.sh
-sudo snap install --dangerous target/snap/jz-werkbank_1.3.0_amd64.snap
+sudo snap install --dangerous target/snap/jz-werkbank_1.5.0_amd64.snap
 jz-werkbank
 ```
 
@@ -65,7 +65,7 @@ Voraussetzung: Schlüsselpaar in `~/.local/share/werkbank-lizenzgeber/` (oder `$
 
 ```bash
 packaging/snap/lizenzgeber-bauen.sh
-sudo snap install --dangerous ~/Lizenzgeber-Pakete/werkbank-lizenzgeber_1.3.0_amd64.snap
+sudo snap install --dangerous ~/Lizenzgeber-Pakete/werkbank-lizenzgeber_1.5.0_amd64.snap
 werkbank-lizenzgeber        # Oberfläche
 werkbank-lizenzgeber.cli    # Kommandozeile
 ```
@@ -74,27 +74,74 @@ werkbank-lizenzgeber.cli    # Kommandozeile
 - Register und Schlüssel liegen im Snap unter `~/snap/werkbank-lizenzgeber/common/lizenzgeber` und überleben Aktualisierungen. Beim ersten Start kopiert der Snap das Schlüsselpaar dorthin. Ein bestehendes Kundenregister (`register.jsonl`) musst du von `~/.local/share/werkbank-lizenzgeber/` dorthin kopieren, weil der Snap versteckte Ordner im Home nicht lesen darf.
 - Der Webhook-Mailbefehl (`STRIPE_GEHEIMNIS`, Mailprogramm) braucht ein Programm, das im Snap nicht liegt. Für die Weboberfläche und Schlüssel ausstellen spielt das keine Rolle.
 
-## 4. In den Snap Store (nur JZ Werkbank)
+## 4. In den Snap Store (nur JZ Werkbank), Schritt für Schritt
 
-Einmalig:
+Gemeint ist der **Snap Store** von Canonical (snapcraft.io), der Software-Laden von Ubuntu und vielen anderen Linux-Systemen. Für Apples App Store (macOS) gilt diese Anleitung nicht.
 
-1. Konto auf https://snapcraft.io anlegen, `snapcraft login`.
-2. Namen reservieren: `snapcraft register jz-werkbank`. Der Name kann vergeben sein, dann in `snap/snapcraft.yaml` ändern.
-3. Im Dashboard Bildschirmfotos, Kategorie und Beschreibung ergänzen. Die Webseite (`werkbank.jurzel-apps.de`) und der Kontakt stehen schon im Manifest.
+### Vorher
 
-Hochladen:
+1. **Testen:** Den Snap lokal installieren und die Prüfliste aus Abschnitt 2 durcharbeiten (`sudo snap install --dangerous …`).
+2. **Rechtliches klären:** Die Lizenzvereinbarung (`LIZENZVEREINBARUNG.md`, trägt noch den Vermerk „Entwurf, vor dem Verkauf rechtlich prüfen lassen“) liegt im Snap. Dazu die Quellcode-Zusage in `DRITTANBIETER.md` (Java, Pandoc, Wörterbücher), die du hier verbindlich eingehst.
+3. **Kauf und Testzeit:** Der Store verkauft keine Programme für dich. Der Snap ist kostenlos installierbar, die Werkbank läuft 28 Tage zur Probe, danach trägst du den Lizenzschlüssel aus deinem Kauf (Stripe, Webseite) ein. Das gehört in die Beschreibung im Store, damit niemand überrascht wird.
 
-```bash
-snapcraft upload --release=edge target/snap/jz-werkbank_1.3.0_amd64.snap
-```
+### Einmalig einrichten
 
-Erst `edge`, testen mit `sudo snap install jz-werkbank --edge`, dann `candidate`, dann `stable`. Neue Namen und proprietäre Software kann der Store zur manuellen Prüfung zurückhalten.
+4. **Konto:** Auf https://snapcraft.io mit einem Ubuntu-One-Konto anmelden (kostenlos) und die Entwicklervereinbarung annehmen.
+5. **Im Terminal anmelden:** `snapcraft login` (öffnet den Browser; die Anmeldung gilt eine Weile).
+6. **Namen reservieren:**
+   ```bash
+   snapcraft register jz-werkbank
+   ```
+   Der Name muss mit `name:` in `snap/snapcraft.yaml` übereinstimmen. Er lässt sich später **nicht umbenennen**. Ist er vergeben, einen anderen wählen und `name:` sowie den Dateinamen in `snap/gui/` anpassen. Mit `--private` registrierst du ihn zuerst nur für dich sichtbar: `snapcraft register jz-werkbank --private`. Der Titel „JZ Werkbank“ ist vom Namen unabhängig.
 
-**Vor dem Veröffentlichen klären**
+### Hochladen und freigeben
 
-- **Lizenzvereinbarung:** `LIZENZVEREINBARUNG.md` trägt noch den Vermerk „Entwurf, vor dem Verkauf rechtlich prüfen lassen“. Sie liegt im Snap.
-- **GPL-Quellcode:** `packaging/snap/DRITTANBIETER.md` sagt zu, den Quellcode von Java, Pandoc und den Wörterbüchern auf Anfrage an volker@daehn.de zu schicken. Das gilt für dich verbindlich.
-- **Ghostscript:** nicht enthalten (AGPL). Wer die PDF/X-3-Druckdatei braucht, installiert es selbst; im Snap ist das nur eingeschränkt möglich.
+7. **Aktuellen Snap bauen** (Terminal, nicht aus einem Skript heraus, siehe Abschnitt 2):
+   ```bash
+   packaging/snap/bauen.sh        # erzeugt target/snap/jz-werkbank_1.5.0_amd64.snap
+   ```
+8. **Hochladen auf den Kanal `edge`:**
+   ```bash
+   snapcraft upload --release=edge target/snap/jz-werkbank_1.5.0_amd64.snap
+   ```
+   Der Store prüft den Snap automatisch (Struktur, Schnittstellen, Sicherheitsregeln). Das Ergebnis steht im Terminal und im Dashboard. Zwei Ausgänge:
+   - *bestanden*: der Snap ist auf `edge` verfügbar.
+   - *manuelle Prüfung nötig*: Bei Schnittstellen wie `removable-media` oder `network-bind` und bei neuen Namen kann das Review-Team Fragen stellen. Antworte im Dashboard bzw. im Forum (https://forum.snapcraft.io, Kategorie „store-requests“). Im Zweifel die Schnittstelle in `snap/snapcraft.yaml` weglassen und neu hochladen.
+9. **Aus dem Store testen** (am besten auf einem frischen Rechner oder einer sauberen Sitzung):
+   ```bash
+   sudo snap install jz-werkbank --edge
+   jz-werkbank
+   ```
+   Die Prüfliste aus Abschnitt 2 noch einmal durchgehen.
+10. **Store-Eintrag ausfüllen** (https://snapcraft.io/jz-werkbank/listing, Menü „Listing“):
+    - mindestens **ein Bildschirmfoto** (PNG oder JPG, am besten 3 bis 5: Schreiben, Prüfen, Cover, Bauen)
+    - Kategorie (zum Beispiel „Productivity“ oder „Education“)
+    - Lizenz **Proprietary**, Webseite `https://werkbank.jurzel-apps.de`, Kontakt und Support-Adresse
+    - Beschreibung (steht schon im Manifest, hier kannst du sie erweitern, auch mit dem Hinweis auf Testzeit und Lizenzschlüssel)
+11. **Version freigeben:** Die Revisionsnummer zeigt `snapcraft status jz-werkbank`. Dann nach oben schieben:
+    ```bash
+    snapcraft release jz-werkbank <revision> candidate
+    snapcraft release jz-werkbank <revision> stable
+    ```
+    Normale Nutzer bekommen nur `stable`; `edge` und `candidate` sind für Tests.
+12. **Öffentlich machen:** Im Dashboard unter „Settings“ den Snap von „privat“ bzw. „nicht gelistet“ auf **öffentlich** stellen. Erst danach erscheint er in der Suche und auf snapcraft.io/jz-werkbank.
+13. **Prüfen, ob es klappt:** `snap info jz-werkbank` auf einem fremden Rechner. Der Installationsbefehl `sudo snap install jz-werkbank` kommt dann auf die Webseite (Abschnitt „Download“) und in die Anleitung.
+
+*Hinweis:* Die Namen der Menüpunkte im Dashboard (Listing, Settings, Releases) kann Canonical ändern; die Befehle (`register`, `upload`, `release`, `status`) sind stabil. Quelle: https://documentation.ubuntu.com/snapcraft/ (Abschnitte „Publish“ und „Releasing“).
+
+### Wenn etwas schiefgeht
+
+| Meldung oder Lage | Was tun |
+|---|---|
+| `Registrierung abgelehnt: Name bereits vergeben` | anderen Namen wählen (Schritt 6) |
+| Upload bleibt bei „needs manual review“ | im Forum nachfragen, Schnittstelle prüfen (Schritt 8) |
+| `cannot find snap` nach dem Hochladen | der Snap ist noch nicht auf einem Kanal veröffentlicht (Schritt 11) oder noch privat (Schritt 12) |
+| Programm startet im Store-Snap nicht, lokal schon | `snap run --shell jz-werkbank` und `sudo journalctl -k | grep -i denied` (fehlende Schnittstelle) |
+| Anmeldung abgelaufen | `snapcraft login` wiederholen |
+
+### Vor jeder neuen Version
+
+Siehe Abschnitt 5. Kurz: Version erhöhen, bauen, mit `snapcraft upload --release=edge` hochladen, testen, dann mit `snapcraft release` auf `candidate` und `stable` schieben.
 
 ## 5. Neue Version veröffentlichen
 

@@ -7,7 +7,7 @@ cd "$(dirname "$0")/../.."
 arbeit="$PWD/target/snap-build/app"   # fester Ort im Projekt: snapcraft packt nur dort, und der Container bleibt wiederverwendbar
 rm -rf "$arbeit"; mkdir -p "$arbeit"
 # Ohne target/ (mehrere GB), sonst kopiert snapcraft es mit
-git ls-files -z --cached --others --exclude-standard | grep -zv -e "my-key" | xargs -0 cp -P --parents -t "$arbeit"
+git ls-files -z --cached --others --exclude-standard | grep -zv -e "my-key" -e "^werkstatt-web/" | while IFS= read -r -d "" f; do if [ -e "$f" ]; then printf "%s\0" "$f"; fi; done | xargs -0 cp -P --parents -t "$arbeit"
 (cd "$arbeit" && snapcraft pack)
 mkdir -p target/snap
 mv "$arbeit"/*.snap target/snap/

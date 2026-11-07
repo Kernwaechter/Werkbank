@@ -166,7 +166,7 @@ pub fn menue<'a>(k: &'a Kontext, teile: &'a [Teil], fenster: Size) -> Element<'a
             let kapitel = teile.iter().flat_map(|t| t.kapitel.iter()).find(|x| &x.id == id);
             liste = liste
                 .push(eintrag("Umbenennen …", "F2", Message::KapitelUmbenennenDialog, false))
-                .push(eintrag("Verlauf (frühere Stände) …", "Strg+H", Message::VerlaufOeffnen, false))
+                .push(eintrag("Zeitleiste (frühere Stände) …", "Strg+H", Message::VerlaufOeffnen, false))
                 .push(eintrag("Verweis auf dieses Kapitel einfügen", "", Message::VerweisEinfuegen(id.clone()), false))
                 .push(thema::trennlinie());
             // Bearbeitungsstand: der aktuelle ist markiert

@@ -6,7 +6,7 @@ Stand und Umsetzungsplan: [PLAN-umsetzung.md](PLAN-umsetzung.md). Konzept: [KONZ
 
 ## Aufbau
 
-- **`crates/werkbank-kern`**: Datenmodell und Logik ohne Oberfläche: verlustfreier Markdown-Parser, Speichern mit Snapshots, Struktur, Suche, Statistik, Code-Prüfer, Cover-Vorlage, Portalregeln, Sprachprüfung (Markdown → LanguageTool).
+- **`crates/werkbank-kern`**: Datenmodell und Logik ohne Oberfläche: verlustfreier Markdown-Parser, Speichern mit Sicherungen, Zeitleiste und Textvergleich, Struktur, Suche, Statistik, Code-Prüfer, Cover-Vorlage, Portalregeln, Sprachprüfung (Markdown → LanguageTool).
 - **`crates/werkbank-app`**: die Anwendung (Iced, `cosmic-text`, `wgpu`).
 
 ## Bücher öffnen
@@ -16,7 +16,8 @@ Stand und Umsetzungsplan: [PLAN-umsetzung.md](PLAN-umsetzung.md). Konzept: [KONZ
 ## Schreiben
 
 - Dreispalter: Bibliothek, Blattliste, Editor, dazu Inspektor (Status, Wortziel, Metriken, Gliederung, Notizen, Verweise, Hinweise).
-- **Speichern ist verlustfrei**: Eine Datei wird nur geschrieben, wenn sich ihr Text ändert, atomar und mit Snapshot des alten Stands in `.werkbank/snapshots/`. Autosave nach 8 s Pause, Warnung beim Beenden. **Verlauf** (`Strg+H`) holt ein Kapitel aus einem früheren Stand zurück.
+- **Speichern ist verlustfrei**: Eine Datei wird nur geschrieben, wenn sich ihr Text ändert, atomar, und jedes Speichern legt den alten Stand als nummerierte Sicherung in `.werkbank/backups/` ab (Autosave nach 8 s Pause legt zusätzlich Stände in `.werkbank/snapshots/` ab, Warnung beim Beenden). Die **Zeitleiste** (`Strg+H`) zeigt alle Stände nach Tagen und Schreibsitzungen gegliedert, vergleicht sie wortgenau mit dem aktuellen Text und holt ein Kapitel, einzelne Passagen oder eine Kopie zurück; Stände lassen sich benennen, das Aufräumen ist freiwillig und zeigt vorher, was gelöscht würde. Ein Reiter holt entfernte Teile aus dem Papierkorb zurück.
+- **Menüleiste** (Datei, Bearbeiten, Ansicht, Buch, Hilfe) mit allen wichtigen Befehlen und ihren Kürzeln; die Kopfleiste zeigt nur Band, Bereich und Suche; eine **Statusleiste** unten zeigt Speicherstand und Meldungen, Cursorstelle, Wörter mit Wortziel, Zustand der Sprachprüfung und Lizenz. Hilfe: Handbuch, Homepage, Kontakt, Lizenzkauf und „Über die Werkbank“ (Version, Urheberrecht, Lizenzstatus, Lizenzen der Open-Source-Bausteine).
 - Kapitel und Teile anlegen, umbenennen (`F2`), verschieben (`Alt+Umschalt+↑/↓`), löschen; `reihenfolge.txt` wird nachgeführt, entfernte Teile landen im Papierkorb `.werkbank/papierkorb/`.
 - **Suchen und Ersetzen** im Kapitel (`Strg+F`) und im Buch (`Strg+Umschalt+F`), `F3` weiter.
 - Markierungen im Editor: Überschriften, Code, Zitate, `@kap:`-Verweise, Fettdruck; unbekannte Wörter rot (Hunspell, offline), LanguageTool-Hinweise orange.
@@ -26,7 +27,7 @@ Stand und Umsetzungsplan: [PLAN-umsetzung.md](PLAN-umsetzung.md). Konzept: [KONZ
 ## Prüfen
 
 - **Rechtschreibung offline** mit dem Hunspell-Wörterbuch des Systems (`de_DE`), Fachwörter und eigene Wörter pro Band.
-- **LanguageTool** (`Strg+L`, automatisch nach Schreibpause): Hinweise im Inspektor, Klick markiert, Vorschlag ersetzt. Einstellungen und Installationsanleitung (Linux, Windows, macOS) über das Zahnrad (`Strg+,` oder `F10`).
+- **LanguageTool** (`Strg+L`, automatisch nach Schreibpause): Hinweise im Inspektor, Klick markiert, Vorschlag ersetzt. Einstellungen und Installationsanleitung (Linux, Windows, macOS) über Datei → Einstellungen (`Strg+,` oder `F10`).
 - Bereich **Prüfen**: Code-Prüfer (`rustc` je Rust-Beispiel, parallel; Dart/Flutter mit einem `dart analyze`-Durchgang über ein gemeinsames Analyseprojekt, Ausschnitte in drei Einbettungen, Kapitelimporte, Pakete per `pub get`; unvollständige Ausschnitte und externe Crates/Pakete werden gesondert gezählt; `rust,compile_fail` bzw. `dart,compile_fail` kennzeichnet absichtliche Fehler), Sprachprüfung über das ganze Buch, Druckregeln (Codezeilen ≤ 70 Zeichen).
 
 ## Zahlen
@@ -44,13 +45,13 @@ Netto-Wörter (neu minus gestrichen), Schreibzeit und Sitzungen, Tagespensum, Te
 
 ## Dateien der Werkbank im Bandordner
 
-`.werkbank/` enthält `snapshots/`, `papierkorb/`, `kapitel.json` (Status, Wortziel, Notizen), `statistik.json`, `sprache.json` (Ausnahmen), `portale.json`, `cover.json`, `cover/`. Buchdaten (Titel, Autor, ISBN) stehen in `band.yaml`, eine fremde `band.yaml` wird nie überschrieben (dann `.werkbank/metadaten.yaml`).
+`.werkbank/` enthält `backups/` (mit `index.json`), `snapshots/`, `papierkorb/`, `kapitel.json` (Status, Wortziel, Notizen), `statistik.json`, `sprache.json` (Ausnahmen), `portale.json`, `cover.json`, `cover/`. Buchdaten (Titel, Autor, ISBN) stehen in `band.yaml`, eine fremde `band.yaml` wird nie überschrieben (dann `.werkbank/metadaten.yaml`).
 
 ## Tastatur
 
 Alles ist per Tastatur erreichbar: `F6` (in Fenstern `Tab`) wandert über Knöpfe, Schalter, Regler und Felder, `Enter`/Leertaste betätigt, Pfeile stellen Regler und Listen. **Alle Kürzel sind änderbar** (Einstellungen → Tastenkürzel). Standard:
 
-`F1` Handbuch · `Strg+K` Befehle · `Strg+S` Speichern · `Strg+O` Ordner · `Strg+F`/`Strg+Umschalt+F` Suche · `Strg+H` Verlauf · `Strg+L` Sprachprüfung · `Strg+,`/`F10` Einstellungen · `Strg+1…5` Bereiche · `F2` Umbenennen · `Alt+↑/↓` Kapitel wechseln.
+`F1` Handbuch · `Strg+K` Befehle · `Strg+S` Speichern · `Strg+O` Ordner · `Strg+F`/`Strg+Umschalt+F` Suche · `Strg+H` Zeitleiste · `Strg+L` Sprachprüfung · `Strg+,`/`F10` Einstellungen · `Strg+1…5` Bereiche · `F2` Umbenennen · `Alt+↑/↓` Kapitel wechseln.
 
 ## Starten und prüfen
 

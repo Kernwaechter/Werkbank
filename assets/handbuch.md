@@ -4,7 +4,7 @@ Die Werkbank ist ein Schreibwerkzeug für technische Bücher. Sie liest und schr
 
 ## Erste Schritte
 
-Starte die Werkbank und öffne mit `Strg+O` den Ordner deines Buches. Das kann ein einzelnes Buch sein, eine Reihe mit Unterordnern wie `Band 1`, `Band 2` oder ein einzelner Bandordner. Die Band-Auswahl oben links in der Kopfleiste wechselt zwischen den Bänden; in der Mitte der Kopfleiste wählst du den Bereich (Schreiben, Bauen, Prüfen, Zahlen, Cover). Beim nächsten Start öffnet sich der zuletzt benutzte Ordner wieder.
+Starte die Werkbank und öffne mit `Strg+O` den Ordner deines Buches. Das kann ein einzelnes Buch sein, eine Reihe mit Unterordnern wie `Band 1`, `Band 2` oder ein einzelner Bandordner. Ganz oben steht die **Menüleiste** mit *Datei*, *Bearbeiten*, *Ansicht*, *Buch* und *Hilfe*. Sie enthält fast alle Befehle der Werkbank mit ihren Tastenkürzeln: Ordner öffnen und Speichern, Suchen und Kapitelbefehle, die Schalter für Bibliothek, Vorschau, Details und Fokus-Modus, die Bereiche, Zeitleiste und Buchdaten sowie unter *Hilfe* Handbuch, Homepage, Kontakt, Lizenzkauf und „Über die Werkbank“. Fährt die Maus bei offenem Menü auf einen anderen Titel, wechselt es. Darunter bleibt die Kopfleiste schlank: Die Band-Auswahl links wechselt zwischen den Bänden, in der Mitte wählst du den Bereich (Schreiben, Bauen, Prüfen, Zahlen, Cover), rechts steht die Suche. Am unteren Rand zeigt die **Statusleiste** links den Speicherstand mit der letzten Meldung (ein Klick öffnet die Zeitleiste, bei Änderungen speichert er) und rechts beim Schreiben Cursorstelle und Wörter des Kapitels mit seinem Wortziel, dann den Zustand der Sprachprüfung (Klick öffnet die Einstellungen) und die Lizenz (Klick öffnet „Über die Werkbank“). Beim nächsten Start öffnet sich der zuletzt benutzte Ordner wieder.
 
 Die Werkbank schreibt in deinen Ordner nur dann, wenn du etwas änderst. Alles, was sie selbst anlegt, liegt im Unterordner `.werkbank/` (Sicherungen, Statistik, Einstellungen des Bandes).
 
@@ -15,8 +15,14 @@ Die Werkbank schreibt in deinen Ordner nur dann, wenn du etwas änderst. Alles, 
 Links stehen in der Bibliothek die Teile deines Buches, daneben die Kapitel des gewählten Teils mit einer kurzen Vorschau, ihrem Bearbeitungsstand und dem Wortziel, in der Mitte der Text. Rechts zeigt der Inspektor Wortziel, Stand, Zahlen, Gliederung, Notizen, Querverweise und Hinweise zur Sprache. Die Schalter oben rechts blenden Seitenleisten, Vorschau und Inspektor ein und aus.
 
 - **Speichern:** `Strg+S` oder der Knopf „● Speichern“ oben rechts, der erscheint, sobald es Ungespeichertes gibt. Außerdem speichert die Werkbank nach acht Sekunden Pause von selbst. Eine Datei wird nur geschrieben, wenn sich ihr Text wirklich geändert hat, und zwar atomar: Es entsteht nie eine halbe Datei.
-- **Sicherungen:** Vor dem Überschreiben legt die Werkbank einen Stand in `.werkbank/snapshots/` ab. Mit `Strg+H` holst du ein Kapitel aus einem früheren Stand zurück. Der aktuelle Stand bleibt dabei ebenfalls erhalten.
-- **Kapitel und Teile:** Neues Kapitel `Strg+Umschalt+N`, Umbenennen `F2`, Verschieben `Alt+Umschalt+↑/↓`. Ein **Rechtsklick** auf ein Kapitel oder einen Teil öffnet ein Menü mit Umbenennen, Verlauf, Verweis einfügen, Bearbeitungsstand, Verschieben und Löschen. Alles davon findest du auch in der Befehlspalette. Entfernte Teile landen im Papierkorb `.werkbank/papierkorb/`.
+- **Sicherungen und Zeitleiste:** Bei jedem Speichern (`Strg+S`) legt die Werkbank den bisherigen Stand der Datei als nummerierte Sicherung ab; zusätzlich sichert das Autosave im Hintergrund. Nichts wird überschrieben. Die **Zeitleiste** (`Strg+H`, Klick auf den Speicherstand unten links oder Rechtsklick auf ein Kapitel) macht diese Stände zugänglich:
+  - Links stehen die Stände des offenen Kapitels, nach Tagen gegliedert. Stände, die kurz nacheinander entstanden, sind zu **Schreibsitzungen** zusammengefasst (aufklappbar). Zu jedem Stand siehst du, wie viele Wörter er gegenüber dem Stand davor hinzugefügt oder gekostet hat.
+  - Rechts erscheint der gewählte Stand im Vergleich zum Text von jetzt: **Änderungen** zeigt nur die geänderten Stellen, **Ganzer Text** den ganzen Stand, **Nebeneinander** den Stand und den aktuellen Text in zwei Spalten. Grün unterstrichen kommt beim Zurückholen wieder, rot durchgestrichen ginge verloren.
+  - **Diesen Stand wiederherstellen** holt das ganze Kapitel zurück. **Diese Passage übernehmen** holt nur eine einzelne Änderung zurück, der Rest bleibt, wie er ist. **Als Kopie einfügen** legt den alten Text als neues Kapitel hinter das aktuelle; **Text kopieren** und **Als Datei …** nehmen ihn mit nach draußen. Vor jedem Zurückholen sichert die Werkbank den aktuellen Text als Stand, du kannst es also jederzeit rückgängig machen.
+  - **Benennen:** Gib einem Stand einen Namen („Vor Lektorat“, „Erstfassung fertig“). Benannte Stände (★) werden nie automatisch aufgeräumt.
+  - **Aufräumen …** zeigt zuerst, was gelöscht würde, und tut es erst nach deiner Bestätigung. Die letzten 7 Tage bleiben vollständig, danach bleibt je Tag der letzte Stand, nach 90 Tagen je Woche. Ohne Aufräumen wird nie etwas gelöscht. Unten links steht, wie viel Platz die Stände belegen; **Im Dateimanager zeigen** öffnet den Ordner `.werkbank/`.
+  - Der Reiter **Papierkorb** listet entfernte Buchteile mit Vorschau. **Zurückholen** hängt den Teil ans Ende des Buches, **Endgültig löschen** fragt noch einmal nach.
+- **Kapitel und Teile:** Neues Kapitel `Strg+Umschalt+N`, Umbenennen `F2`, Verschieben `Alt+Umschalt+↑/↓`. Ein **Rechtsklick** auf ein Kapitel oder einen Teil öffnet ein Menü mit Umbenennen, Zeitleiste, Verweis einfügen, Bearbeitungsstand, Verschieben und Löschen. Alles davon findest du auch in der Befehlspalette. Entfernte Teile landen im Papierkorb (Reiter in der Zeitleiste, Ordner `.werkbank/papierkorb/`).
 - **Suchen und Ersetzen:** `Strg+F` im Kapitel, `Strg+Umschalt+F` in allen Bänden des Buchs, `F3` zum nächsten Treffer. Oben wählst du den Umfang (Kapitel, ganzer Band, alle Bände), dazu Groß-/Kleinschreibung, ganzes Wort und reguläre Ausdrücke (`$1` im Ersatz setzt Gruppen ein). Die Trefferliste zeigt jede Zeile vorher und nachher. „Alle ersetzen“ nennt zuerst die Anzahl und führt erst beim zweiten Klick aus. Die alte Fassung bleibt als nummerierte Sicherung erhalten.
 - **Verweise:** Mit `@kap:kennung` verweist du auf ein Kapitel. Fehlt das Ziel, erscheint der Verweis rot im Inspektor. Die Befehlspalette fügt Verweise für dich ein.
 - **Schreibmaschinen-Modus:** In den Einstellungen einschaltbar; die Cursorzeile bleibt in der Fenstermitte.
@@ -108,7 +114,8 @@ Alles außer der Schlagzeile ist freiwillig. Ist der Text zu lang, wird die Schr
 
 | Datei | Inhalt |
 |---|---|
-| `.werkbank/snapshots/` | frühere Stände der Dateien |
+| `.werkbank/backups/` | nummerierte Sicherungen jedes Speicherns, mit `index.json` (Zeitpunkte, Namen) |
+| `.werkbank/snapshots/` | Stände des Autosaves |
 | `.werkbank/papierkorb/` | entfernte Teile |
 | `.werkbank/kapitel.json` | Status, Wortziel, Notizen |
 | `.werkbank/statistik.json` | Tageswerte |
@@ -119,10 +126,10 @@ Alles außer der Schlagzeile ist freiwillig. Ist der Text zu lang, wird die Schr
 
 ## Lizenz
 
-Die Werkbank läuft 28 Tage lang mit vollem Funktionsumfang. Danach trägst du unter Einstellungen (Zahnrad oder `Strg+,`) auf der Seite „Allgemein“ die E-Mail-Adresse deines Kaufs und den Lizenzschlüssel ein (oder wählst eine Lizenzdatei). Ohne Schlüssel bleibt nur „Speichern und beenden“, deine Dateien bleiben unverändert. Unter „Über die Werkbank“ siehst du den Lizenzstatus und die Lizenzen der verwendeten Bausteine.
+Die Werkbank läuft 28 Tage lang mit vollem Funktionsumfang. Danach trägst du unter Datei → Einstellungen (`Strg+,`) auf der Seite „Allgemein“ die E-Mail-Adresse deines Kaufs und den Lizenzschlüssel ein (oder wählst eine Lizenzdatei). Ohne Schlüssel bleibt nur „Speichern und beenden“, deine Dateien bleiben unverändert. Unter Hilfe → „Über die Werkbank“ siehst du Version und Urheberrecht, den Lizenzstatus (mit Kauf und Aktivierung) und die Lizenzen der verwendeten Open-Source-Bausteine; Hilfe → „Lizenzschlüssel kaufen“ führt direkt zum Kauf.
 
 ## Hilfe bei Problemen
 
 - **Nichts wird markiert:** Ist unter Einstellungen → Prüfung ein Wörterbuch geladen? Auf Linux hilft das Paket `hunspell-de-de`.
 - **LanguageTool nicht erreichbar:** Einstellungen → Prüfung → Verbindung testen; die Anleitung steht hinter dem Symbol ⓘ.
-- **Eine Datei hat sich unerwartet geändert:** Öffne den Verlauf (`Strg+H`) oder sieh in `.werkbank/snapshots/` nach.
+- **Eine Datei hat sich unerwartet geändert:** Öffne die Zeitleiste (`Strg+H`): Dort findest du jeden früheren Stand und holst ihn oder einzelne Passagen zurück. Die Dateien selbst liegen in `.werkbank/backups/`.

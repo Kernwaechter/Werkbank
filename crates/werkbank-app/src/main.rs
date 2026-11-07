@@ -39,7 +39,7 @@ use ui::suche::Suche;
 use werkbank_kern::codepruefung::{self, Ergebnis};
 use werkbank_kern::portale::Portalregeln;
 use werkbank_kern::lizenz::{self, LizenzStatus};
-use werkbank_kern::speicher::Snapshot;
+use ui::zeitleiste::{self, Zeitleiste};
 use werkbank_kern::sprache::{Ausnahmen, Treffer};
 use werkbank_kern::statistik::Statistik;
 use ui::navigation::Arbeitsbereich;
@@ -264,6 +264,8 @@ pub struct AppState {
     pub palette: Option<Palette>,
     /// Offenes Kontextmenü (Rechtsklick auf Kapitel oder Teil).
     pub kontext: Option<ui::kontext::Kontext>,
+    /// Geöffnetes Menü der Menüleiste.
+    pub menue: Option<ui::menue::Menue>,
     /// Wörter, deren Markierung bis zum Neustart ausgeblendet ist („Ignorieren“).
     pub ignoriert: HashSet<String>,
     /// Aktuelle Fenstergröße (damit schwebende Menüs im Fenster bleiben).
@@ -282,8 +284,8 @@ pub struct AppState {
     pub eingabe: Option<Eingabe>,
     /// Geöffneter Bestätigungsdialog.
     pub dialog: Option<Dialog>,
-    /// Geöffneter Verlauf mit früheren Ständen.
-    pub verlauf: Option<Vec<Snapshot>>,
+    /// Geöffnete Zeitleiste mit früheren Ständen und Papierkorb.
+    pub verlauf: Option<Box<Zeitleiste>>,
     /// Schreibstatistik des aktuellen Bandes.
     pub statistik: Statistik,
     /// Statistik hat ungespeicherte Werte.
@@ -437,8 +439,34 @@ pub enum Message {
     TeilEntfernen,
     /// Öffnet den Verlauf des offenen Kapitels (`Strg+H`).
     VerlaufOeffnen,
-    /// Holt das Kapitel aus einem früheren Stand zurück.
-    VerlaufWiederherstellen(usize),
+    /// Öffnet die Zeitleiste direkt im Papierkorb.
+    PapierkorbOeffnen,
+    /// Wählt einen Stand der Zeitleiste.
+    ZeitAuswahl(usize),
+    /// Klappt eine Schreibsitzung auf oder zu.
+    ZeitSitzung(usize),
+    ZeitAnsicht(zeitleiste::Ansicht),
+    ZeitReiter(zeitleiste::Reiter),
+    /// Namensfeld der Zeitleiste.
+    ZeitName(String),
+    ZeitBenennen,
+    /// Holt das ganze Kapitel aus dem gewählten Stand zurück.
+    ZeitWiederherstellen,
+    /// Holt nur die n-te Änderung aus dem gewählten Stand zurück.
+    ZeitPassage(usize),
+    /// Legt den gewählten Stand als neues Kapitel daneben.
+    ZeitKopie,
+    ZeitKopieren,
+    ZeitExport,
+    ZeitExportZiel(Option<PathBuf>),
+    ZeitAufraeumenPlan,
+    ZeitAufraeumenAbbruch,
+    ZeitAufraeumenJa,
+    /// Zeigt den Sicherungsordner im Dateimanager.
+    ZeitOrdner,
+    KorbAuswahl(usize),
+    KorbZurueck,
+    KorbLoeschen,
     /// Das Fenster soll geschlossen werden.
     FensterSchliessen(iced::window::Id),
     /// Speichern und beenden.
@@ -639,6 +667,13 @@ pub enum Message {
     KontextAktion(Box<Message>),
     /// Schließt das Kontextmenü.
     KontextSchliessen,
+    /// Klick auf einen Menütitel: öffnet oder schließt das Menü.
+    MenueUmschalten(ui::menue::Menue),
+    /// Maus über einem Menütitel: wechselt das Menü, wenn eines offen ist.
+    MenueUeber(ui::menue::Menue),
+    MenueSchliessen,
+    /// Eintrag eines Menüs: schließt das Menü und führt die Aktion aus.
+    MenueAktion(Box<Message>),
     /// Rechtsklick auf eine markierte Stelle im Editor: öffnet das Korrekturmenü.
     WellenMenue(text_editor::WellenKlick),
     /// Ersetzt einen Bereich einer Zeile (Korrekturvorschlag der Rechtschreibung).
@@ -783,6 +818,7 @@ fn new() -> (AppState, Task<Message>) {
         vorschau_sichtbar: false,
         palette: None,
         kontext: None,
+        menue: None,
         ignoriert: HashSet::new(),
         fenster_groesse: Size::new(1380.0, 880.0),
         inspektor_tab: 0,
@@ -1120,6 +1156,94 @@ fn zu_fund_springen(state: &mut AppState, index: usize) -> Task<Message> {
     iced::widget::operation::focus(ui::schreiben::editor_id())
 }
 
+/// Öffnet die Zeitleiste für das offene Kapitel.
+fn zeitleiste_oeffnen(state: &mut AppState, reiter: zeitleiste::Reiter) {
+    dateien::editor_in_modell(state);
+    let id = state.aktives_kapitel_id.clone();
+    let z = Zeitleiste {
+        titel: state.projekt.kapitel_finden(&id).map_or_else(|| "Kapitel".to_string(), |k| k.titel.clone()),
+        kapitel_id: id,
+        staende: Vec::new(),
+        aktuell: String::new(),
+        ungespeichert: false,
+        reiter,
+        ansicht: zeitleiste::Ansicht::Aenderungen,
+        auswahl: None,
+        offen: HashSet::new(),
+        alter_text: None,
+        vergleich: None,
+        name: String::new(),
+        aufraeumen: None,
+        uebersicht: (0, 0),
+        korb: Vec::new(),
+        korb_auswahl: None,
+        korb_text: String::new(),
+        korb_sicher: false,
+    };
+    state.verlauf = Some(Box::new(z));
+    zeitleiste_aktualisieren(state, None);
+}
+
+/// Liest Stände, Papierkorb und Vergleich neu ein; `behalte` ist der Stand, der gewählt bleiben soll.
+fn zeitleiste_aktualisieren(state: &mut AppState, behalte: Option<PathBuf>) {
+    let Some(mut z) = state.verlauf.take() else { return };
+    dateien::editor_in_modell(state);
+    z.aktuell = state.editor_content.text();
+    z.ungespeichert = dateien::hat_ungespeichertes(state);
+    z.staende = state.projekt.staende_fuer_kapitel(&z.kapitel_id);
+    z.uebersicht = state.projekt.speicher_uebersicht();
+    z.korb = state.projekt.papierkorb_liste();
+    z.auswahl = behalte
+        .and_then(|p| z.staende.iter().position(|s| s.pfad == p))
+        .or(if z.staende.is_empty() { None } else { Some(0) });
+    z.offen.clear();
+    if let Some(i) = z.auswahl
+        && let Some((start, _)) = z.gruppen().into_iter().find(|(a, e)| (*a..*e).contains(&i))
+    {
+        z.offen.insert(start);
+    }
+    zeitleiste_auswahl(&state.projekt, &mut z);
+    z.korb_auswahl = match z.korb_auswahl {
+        Some(i) if i < z.korb.len() => Some(i),
+        _ if z.korb.is_empty() => None,
+        _ => Some(0),
+    };
+    z.korb_sicher = false;
+    korb_text_laden(&mut z);
+    state.verlauf = Some(z);
+}
+
+/// Lädt Text, Vergleich und Namensfeld des gewählten Standes.
+fn zeitleiste_auswahl(projekt: &Projekt, z: &mut Zeitleiste) {
+    let stand = z.auswahl.and_then(|i| z.staende.get(i));
+    let alt = stand.and_then(|s| projekt.kapitel_text_im_stand(s, &z.kapitel_id));
+    z.name = stand.and_then(|s| s.name.clone()).unwrap_or_default();
+    z.vergleich = alt.as_ref().map(|a| werkbank_kern::diff::Vergleich::neu(a, &z.aktuell));
+    z.alter_text = alt;
+}
+
+fn korb_text_laden(z: &mut Zeitleiste) {
+    z.korb_text = z
+        .korb_auswahl
+        .and_then(|i| z.korb.get(i))
+        .and_then(|k| std::fs::read_to_string(&k.pfad).ok())
+        .unwrap_or_default();
+}
+
+/// Ersetzt den Text des offenen Kapitels und sichert dabei beide Seiten: erst der bisherige Stand,
+/// dann (beim nächsten Speichern) wandert der Text davor in die Zeitleiste. Nichts geht verloren.
+fn kapitel_text_setzen(state: &mut AppState, neu: String) -> Result<(), String> {
+    let id = state.aktives_kapitel_id.clone();
+    dateien::speichern_nummeriert(state)?;
+    if let Some(k) = state.projekt.kapitel_finden_mut(&id) {
+        k.inhalt = neu;
+    }
+    dateien::teil_vormerken(state, &id);
+    dateien::editor_neu_laden(state);
+    dateien::speichern_nummeriert(state)?;
+    Ok(())
+}
+
 /// Öffnet ein Kapitel im Editor und wählt den zugehörigen Teil in der Bibliothek.
 /// Ungesicherte Eingaben des bisherigen Kapitels werden vorher ins Modell übernommen.
 fn kapitel_oeffnen(state: &mut AppState, kapitel_id: &str) {
@@ -1294,7 +1418,7 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
                     Local::now().format("%H:%M:%S"),
                     n,
                     if n == 1 { "" } else { "en" },
-                    state.letzte_sicherung.map(|s| format!(" · Sicherung Nr. {s}")).unwrap_or_default()
+                    state.letzte_sicherung.map(|_| " · alter Stand gesichert".to_string()).unwrap_or_default()
                 ),
                 Err(e) => format!("Speichern fehlgeschlagen: {e}"),
             };
@@ -1430,7 +1554,7 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
         }
 
         Message::LinkOeffnen(url) => {
-            if url.starts_with("https://") || url.starts_with("http://") {
+            if url.starts_with("https://") || url.starts_with("http://") || url.starts_with("mailto:") {
                 bau::oeffnen(std::path::Path::new(&url));
             }
         }
@@ -1617,7 +1741,7 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
                 Dialog {
                     titel: "Kapitel löschen?".to_string(),
                     text: format!(
-                        "„{}“ wird aus der Datei entfernt. Der bisherige Text bleibt im Verlauf (Snapshot) erhalten.",
+                        "„{}“ wird aus der Datei entfernt. Der bisherige Text bleibt in der Zeitleiste erhalten.",
                         k.titel
                     ),
                     knoepfe: vec![
@@ -1639,7 +1763,7 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
                     state.snapshot_zwang = true;
                     state.meta_dirty = true;
                     state.letzte_aenderung = Some(Instant::now());
-                    state.speicher_zeitstempel = format!("„{}“ gelöscht (ungespeichert, siehe Verlauf)", k.titel);
+                    state.speicher_zeitstempel = format!("„{}“ gelöscht (ungespeichert, siehe Zeitleiste)", k.titel);
                     let rest = kapitel_ids(&state.projekt);
                     let nachbar = rest.get(pos.min(rest.len().saturating_sub(1))).cloned();
                     state.aktives_kapitel_id.clear();
@@ -1719,30 +1843,231 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
         }
 
         Message::VerlaufOeffnen => {
-            let liste = state
-                .projekt
-                .teil_von_kapitel(&state.aktives_kapitel_id)
-                .map(|t| state.projekt.snapshots_fuer_teil(t))
-                .unwrap_or_default();
             state.palette = None;
-            state.verlauf = Some(liste);
+            state.kontext = None;
+            zeitleiste_oeffnen(state, zeitleiste::Reiter::Staende);
         }
 
-        Message::VerlaufWiederherstellen(index) => {
-            let id = state.aktives_kapitel_id.clone();
-            let Some(snap) = state.verlauf.as_ref().and_then(|v| v.get(index)).cloned() else { return Task::none() };
-            state.verlauf = None;
-            match state.projekt.kapitel_aus_snapshot(&snap.pfad, &id) {
-                Some(text) => {
-                    if let Some(k) = state.projekt.kapitel_finden_mut(&id) {
-                        k.inhalt = text;
-                    }
-                    dateien::teil_vormerken(state, &id);
-                    state.snapshot_zwang = true;
-                    dateien::editor_neu_laden(state);
-                    state.speicher_zeitstempel = format!("Stand vom {} geholt (noch nicht gespeichert)", snap.zeit);
+        Message::PapierkorbOeffnen => {
+            state.palette = None;
+            state.kontext = None;
+            zeitleiste_oeffnen(state, zeitleiste::Reiter::Papierkorb);
+        }
+
+        Message::ZeitAuswahl(i) => {
+            if let Some(z) = state.verlauf.as_mut()
+                && i < z.staende.len()
+            {
+                z.auswahl = Some(i);
+                z.aufraeumen = None;
+                if let Some((start, _)) = z.gruppen().into_iter().find(|(a, e)| (*a..*e).contains(&i)) {
+                    z.offen.insert(start);
                 }
-                None => state.speicher_zeitstempel = "Dieses Kapitel gab es in dem Stand nicht.".to_string(),
+                zeitleiste_auswahl(&state.projekt, z);
+            }
+        }
+
+        Message::ZeitSitzung(start) => {
+            if let Some(z) = state.verlauf.as_mut()
+                && !z.offen.remove(&start)
+            {
+                z.offen.insert(start);
+            }
+        }
+
+        Message::ZeitAnsicht(a) => {
+            if let Some(z) = state.verlauf.as_mut() {
+                z.ansicht = a;
+            }
+        }
+
+        Message::ZeitReiter(r) => {
+            if let Some(z) = state.verlauf.as_mut() {
+                z.reiter = r;
+                z.korb_sicher = false;
+                z.aufraeumen = None;
+                if r == zeitleiste::Reiter::Papierkorb && z.korb_auswahl.is_none() && !z.korb.is_empty() {
+                    z.korb_auswahl = Some(0);
+                    korb_text_laden(z);
+                }
+            }
+        }
+
+        Message::ZeitName(t) => {
+            if let Some(z) = state.verlauf.as_mut() {
+                z.name = t;
+            }
+        }
+
+        Message::ZeitBenennen => {
+            let Some(z) = state.verlauf.as_ref() else { return Task::none() };
+            let Some(stand) = z.auswahl.and_then(|i| z.staende.get(i)).filter(|s| s.art == werkbank_kern::verlauf::StandArt::Sicherung) else {
+                return Task::none();
+            };
+            let (pfad, name) = (stand.pfad.clone(), z.name.trim().to_string());
+            match state.projekt.stand_benennen(&pfad, &name) {
+                Ok(()) => {
+                    state.speicher_zeitstempel = if name.is_empty() { "Name des Standes entfernt".to_string() } else { format!("Stand „{name}“ wird beim Aufräumen nie gelöscht") };
+                    zeitleiste_aktualisieren(state, Some(pfad));
+                }
+                Err(e) => state.speicher_zeitstempel = format!("Stand ließ sich nicht benennen: {e}"),
+            }
+        }
+
+        Message::ZeitWiederherstellen => {
+            let Some(z) = state.verlauf.as_ref() else { return Task::none() };
+            let (Some(alt), Some(stand)) = (z.alter_text.clone(), z.auswahl.and_then(|i| z.staende.get(i))) else { return Task::none() };
+            let zeit = zeitleiste::zeit_text(stand.zeit);
+            match kapitel_text_setzen(state, alt) {
+                Ok(()) => {
+                    state.speicher_zeitstempel = format!("Stand von {zeit} wiederhergestellt – der vorherige Text steht in der Zeitleiste");
+                    zeitleiste_aktualisieren(state, None);
+                }
+                Err(e) => state.speicher_zeitstempel = format!("Wiederherstellen fehlgeschlagen: {e}"),
+            }
+        }
+
+        Message::ZeitPassage(nr) => {
+            let Some(neu) = state.verlauf.as_ref().and_then(|z| z.vergleich.as_ref()).map(|v| v.eine_zurueck(nr)) else { return Task::none() };
+            let behalte = state.verlauf.as_ref().and_then(|z| z.auswahl.and_then(|i| z.staende.get(i))).map(|s| s.pfad.clone());
+            match kapitel_text_setzen(state, neu) {
+                Ok(()) => {
+                    state.speicher_zeitstempel = "Passage übernommen – der vorherige Text steht in der Zeitleiste".to_string();
+                    // Die Auswahl bleibt dieselbe Datei; die neue Sicherung steht oben
+                    zeitleiste_aktualisieren(state, behalte);
+                }
+                Err(e) => state.speicher_zeitstempel = format!("Übernehmen fehlgeschlagen: {e}"),
+            }
+        }
+
+        Message::ZeitKopie => {
+            let Some(z) = state.verlauf.as_ref() else { return Task::none() };
+            let (Some(alt), Some(stand)) = (z.alter_text.clone(), z.auswahl.and_then(|i| z.staende.get(i))) else { return Task::none() };
+            let titel = format!("{} (Stand {})", z.titel, stand.zeit.format("%d.%m. %H:%M"));
+            let nach = state.aktives_kapitel_id.clone();
+            let Some(teil) = state.projekt.teil_von_kapitel(&nach).map(str::to_string) else { return Task::none() };
+            dateien::editor_in_modell(state);
+            match state.projekt.kapitel_kopie_einfuegen(&teil, &nach, &titel, &alt) {
+                Ok(id) => {
+                    state.dirty.insert(teil);
+                    state.letzte_aenderung = Some(Instant::now());
+                    state.meta_dirty = true;
+                    state.verlauf = None;
+                    state.aktiver_bereich = Arbeitsbereich::Schreiben;
+                    kapitel_oeffnen(state, &id);
+                    state.speicher_zeitstempel = match dateien::speichern_nummeriert(state) {
+                        Ok(_) => format!("„{titel}“ als neues Kapitel eingefügt"),
+                        Err(e) => format!("Kopie eingefügt, Speichern fehlgeschlagen: {e}"),
+                    };
+                }
+                Err(e) => state.speicher_zeitstempel = e,
+            }
+        }
+
+        Message::ZeitKopieren => {
+            if let Some(alt) = state.verlauf.as_ref().and_then(|z| z.alter_text.clone()) {
+                state.speicher_zeitstempel = "Text des Standes in die Zwischenablage kopiert".to_string();
+                return iced::clipboard::write(alt);
+            }
+        }
+
+        Message::ZeitExport => {
+            let Some(z) = state.verlauf.as_ref() else { return Task::none() };
+            let Some(stand) = z.auswahl.and_then(|i| z.staende.get(i)) else { return Task::none() };
+            let name = format!("{}-{}.md", werkbank_kern::speicher::kennung_aus_titel(&z.titel), stand.zeit.format("%Y%m%d-%H%M%S"));
+            let start = state.band.ordner.clone();
+            return Task::perform(
+                async move {
+                    let mut d = rfd::AsyncFileDialog::new().set_title("Stand als Datei speichern").set_file_name(name).add_filter("Markdown", &["md"]);
+                    if let Some(o) = start {
+                        d = d.set_directory(o);
+                    }
+                    d.save_file().await.map(|h| h.path().to_path_buf())
+                },
+                Message::ZeitExportZiel,
+            );
+        }
+
+        Message::ZeitExportZiel(pfad) => {
+            if let (Some(pfad), Some(alt)) = (pfad, state.verlauf.as_ref().and_then(|z| z.alter_text.clone())) {
+                state.speicher_zeitstempel = match std::fs::write(&pfad, alt) {
+                    Ok(()) => format!("Stand gespeichert: {}", pfad.display()),
+                    Err(e) => format!("Datei ließ sich nicht schreiben: {e}"),
+                };
+            }
+        }
+
+        Message::ZeitAufraeumenPlan => {
+            let plan = state.projekt.aufraeumen_planen();
+            if let Some(z) = state.verlauf.as_mut() {
+                z.aufraeumen = Some(plan);
+            }
+        }
+
+        Message::ZeitAufraeumenAbbruch => {
+            if let Some(z) = state.verlauf.as_mut() {
+                z.aufraeumen = None;
+            }
+        }
+
+        Message::ZeitAufraeumenJa => {
+            if let Some(plan) = state.verlauf.as_mut().and_then(|z| z.aufraeumen.take()) {
+                let behalte = state.verlauf.as_ref().and_then(|z| z.auswahl.and_then(|i| z.staende.get(i))).map(|s| s.pfad.clone());
+                state.speicher_zeitstempel = match state.projekt.aufraeumen_ausfuehren(&plan) {
+                    Ok(n) => format!("{n} alte Stände gelöscht"),
+                    Err(e) => format!("Aufräumen fehlgeschlagen: {e}"),
+                };
+                zeitleiste_aktualisieren(state, behalte);
+            }
+        }
+
+        Message::ZeitOrdner => {
+            let ordner = state.projekt.sicherungsordner();
+            if ordner.is_dir() {
+                bau::oeffnen(&ordner);
+            } else {
+                state.speicher_zeitstempel = "Es gibt noch keine Sicherungen – der Ordner entsteht beim ersten Speichern".to_string();
+            }
+        }
+
+        Message::KorbAuswahl(i) => {
+            if let Some(z) = state.verlauf.as_mut()
+                && i < z.korb.len()
+            {
+                z.korb_auswahl = Some(i);
+                z.korb_sicher = false;
+                korb_text_laden(z);
+            }
+        }
+
+        Message::KorbZurueck => {
+            let Some(eintrag) = state.verlauf.as_ref().and_then(|z| z.korb_auswahl.and_then(|i| z.korb.get(i))).cloned() else { return Task::none() };
+            // Erst alles speichern, dann den Band neu einlesen
+            let ergebnis = dateien::speichern_nummeriert(state).map_err(|e| e.to_string()).and_then(|_| {
+                state.projekt.papierkorb_zurueckholen(&eintrag).map_err(|e| e.to_string())?;
+                state.band.laden()
+            });
+            match ergebnis {
+                Ok(neu) => {
+                    state.projekt = neu;
+                    dateien::editor_neu_laden(state);
+                    state.speicher_zeitstempel = format!("„{}“ zurückgeholt – er steht am Ende des Buches", eintrag.titel);
+                    zeitleiste_aktualisieren(state, None);
+                }
+                Err(e) => state.speicher_zeitstempel = format!("Zurückholen fehlgeschlagen: {e}"),
+            }
+        }
+
+        Message::KorbLoeschen => {
+            let Some(z) = state.verlauf.as_mut() else { return Task::none() };
+            if !z.korb_sicher {
+                z.korb_sicher = true;
+            } else if let Some(eintrag) = z.korb_auswahl.and_then(|i| z.korb.get(i)).cloned() {
+                state.speicher_zeitstempel = match state.projekt.papierkorb_loeschen(&eintrag) {
+                    Ok(()) => format!("„{}“ endgültig gelöscht", eintrag.titel),
+                    Err(e) => format!("Löschen fehlgeschlagen: {e}"),
+                };
+                zeitleiste_aktualisieren(state, None);
             }
         }
 
@@ -2662,6 +2987,24 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
 
         Message::KontextSchliessen => state.kontext = None,
 
+        Message::MenueUmschalten(m) => {
+            state.kontext = None;
+            state.menue = if state.menue == Some(m) { None } else { Some(m) };
+        }
+
+        Message::MenueUeber(m) => {
+            if state.menue.is_some() {
+                state.menue = Some(m);
+            }
+        }
+
+        Message::MenueSchliessen => state.menue = None,
+
+        Message::MenueAktion(aktion) => {
+            state.menue = None;
+            return update(state, *aktion);
+        }
+
         Message::WellenMenue(klick) => {
             let rechtschreibung = klick.art == markierung::WELLE_RECHTSCHREIBUNG;
             let (vorschlaege, treffer, meldung, tippfehler) = if rechtschreibung {
@@ -3136,6 +3479,10 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
                 return Task::none();
             }
 
+            if key == Key::Named(Named::Escape) && state.menue.is_some() {
+                state.menue = None;
+                return Task::none();
+            }
             if key == Key::Named(Named::Escape) && state.kontext.is_some() {
                 state.kontext = None;
                 return Task::none();
@@ -3184,6 +3531,7 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
                 && let Some(id) = kuerzel::belegung(&state.einstellungen).get(&taste).copied()
                 && let Some(nachricht) = befehl_nachricht(id, state)
             {
+                state.menue = None;
                 return update(state, nachricht);
             }
 
@@ -3344,6 +3692,11 @@ fn satz_ausfuehren(a: SatzAuftrag, pdfx: bool, melde: &dyn Fn(String)) -> Result
     Ok(bericht)
 }
 
+/// Homepage der Werkbank (Hilfe-Menü, „Über die Werkbank“).
+pub const HOMEPAGE: &str = "https://werkbank.jurzel-apps.de";
+/// Kontaktadresse für Fragen und Fehlermeldungen.
+pub const KONTAKT: &str = "mailto:kontakt@jurzel.de?subject=Werkbank";
+
 /// Zahlungslink bei Stripe (`assets/kauf-url.txt`); solange sie fehlt, öffnet „Kaufen“ eine E-Mail.
 const KAUF_URL: &str = include_str!("../../../assets/kauf-url.txt");
 
@@ -3484,7 +3837,7 @@ const TITEL_KUERZEL: &[(&str, &str)] = &[
     ("Kapitel umbenennen", "umbenennen"),
     ("Kapitel nach oben schieben", "kapitel_hoch"),
     ("Kapitel nach unten schieben", "kapitel_runter"),
-    ("Verlauf des Kapitels (frühere Stände)", "verlauf"),
+    ("Zeitleiste: frühere Stände und Papierkorb", "verlauf"),
     ("Live-Vorschau umschalten", "vorschau"),
     ("Seitenleisten umschalten", "seitenleiste"),
     ("Details umschalten", "inspektor"),
@@ -3533,7 +3886,8 @@ fn alle_befehle(state: &AppState) -> Vec<Befehl> {
         befehl("Teil nach unten schieben", "", Message::TeilVerschieben(1)),
         befehl("Teil entfernen", "", Message::TeilEntfernenFrage),
         befehl("Buchdaten bearbeiten (Titel, Autor, ISBN)", "", Message::MetaOeffnen),
-        befehl("Verlauf des Kapitels (frühere Stände)", "Strg+H", Message::VerlaufOeffnen),
+        befehl("Zeitleiste: frühere Stände und Papierkorb", "Strg+H", Message::VerlaufOeffnen),
+        befehl("Papierkorb: entfernte Teile zurückholen", "", Message::PapierkorbOeffnen),
         befehl("Neuer Buchteil", "", Message::NeuerTeil),
         befehl(
             "Live-Vorschau umschalten",
@@ -3655,30 +4009,127 @@ fn palette_befehle(state: &AppState) -> Vec<Befehl> {
 }
 
 /// Erzeugt die Benutzeroberfläche passend zum gewählten Bereich.
+/// Was die Statusleiste unten zeigt.
+fn statusdaten(state: &AppState) -> ui::statusleiste::Daten<'_> {
+    use ui::statusleiste::{Daten, Pruefung, Schreibstand};
+    let schreiben = state.aktiver_bereich == Arbeitsbereich::Schreiben;
+    let schreibstand = schreiben.then(|| {
+        let pos = state.editor_content.cursor().position;
+        Schreibstand {
+            zeile: pos.line + 1,
+            spalte: pos.column + 1,
+            woerter: state.editor_content.text().split_whitespace().count(),
+            ziel: state.projekt.kapitel_finden(&state.aktives_kapitel_id).map_or(0, |k| k.wortziel),
+        }
+    });
+    let pruefung = if !state.einstellungen.sprachpruefung {
+        Pruefung::Aus
+    } else {
+        match (&state.server_status, &state.pruef_status) {
+            (ServerStatus::Erreichbar(_), PruefStatus::Laeuft) => Pruefung::Laeuft,
+            (ServerStatus::Erreichbar(_), PruefStatus::Fertig(n)) => Pruefung::Hinweise(*n),
+            (ServerStatus::Erreichbar(_), _) => Pruefung::Bereit,
+            (ServerStatus::Startet | ServerStatus::Pruefe, _) => Pruefung::Laeuft,
+            _ => Pruefung::Offline,
+        }
+    };
+    let lizenz = match &state.lizenz_status {
+        LizenzStatus::Test { tage_uebrig } => Some((format!("Testversion · noch {tage_uebrig} {}", if *tage_uebrig == 1 { "Tag" } else { "Tage" }), true)),
+        LizenzStatus::Gueltig { .. } => Some(("Lizenziert".to_string(), false)),
+        _ => None,
+    };
+    Daten {
+        meldung: &state.speicher_zeitstempel,
+        ungespeichert: dateien::hat_ungespeichertes(state),
+        demo: state.band.ordner.is_none(),
+        schreibstand,
+        pruefung,
+        lizenz,
+    }
+}
+
+/// Die Einträge eines Menüs der Menüleiste; Kürzel stammen aus den Einstellungen des Anwenders.
+fn menue_punkte(state: &AppState, menue: ui::menue::Menue) -> Vec<ui::menue::Punkt> {
+    use ui::menue::{Menue, Punkt};
+    let k = |id: &str| kuerzel::anzeige(kuerzel::kuerzel_von(&state.einstellungen, id));
+    let bereich = |b: Arbeitsbereich, id: &str| Punkt::schalter(b.titel(), k(id), state.aktiver_bereich == b, Message::BereichWechseln(b));
+    match menue {
+        Menue::Datei => vec![
+            Punkt::aktion("Ordner mit Buchprojekt öffnen …", k("ordner"), Message::OrdnerDialog),
+            Punkt::aktion("Speichern", k("speichern"), Message::Speichern),
+            Punkt::Trenner,
+            Punkt::aktion("Neues Kapitel …", k("neues_kapitel"), Message::NeuesKapitel),
+            Punkt::aktion("Neuer Buchteil …", "", Message::NeuerTeil),
+            Punkt::Trenner,
+            Punkt::aktion("Einstellungen …", k("einstellungen"), Message::EinstellungenOeffnen),
+            Punkt::Trenner,
+            Punkt::aktion("Beenden", "", Message::FensterSchliessen(iced::window::Id::unique())),
+        ],
+        Menue::Bearbeiten => vec![
+            Punkt::aktion("Im Kapitel suchen und ersetzen …", k("suche"), Message::SucheOeffnen(false)),
+            Punkt::aktion("In allen Bänden suchen …", k("suche_buch"), Message::SucheOeffnen(true)),
+            Punkt::aktion("Nächster Treffer", k("suche_weiter"), Message::SucheNaechste(1)),
+            Punkt::aktion("Vorheriger Treffer", k("suche_zurueck"), Message::SucheNaechste(-1)),
+            Punkt::Trenner,
+            Punkt::aktion("Kapitel auf Sprache prüfen", k("pruefen"), Message::KapitelPruefen),
+            Punkt::Trenner,
+            Punkt::aktion("Kapitel umbenennen …", k("umbenennen"), Message::KapitelUmbenennenDialog),
+            Punkt::aktion("Kapitel nach oben schieben", k("kapitel_hoch"), Message::KapitelVerschieben(-1)),
+            Punkt::aktion("Kapitel nach unten schieben", k("kapitel_runter"), Message::KapitelVerschieben(1)),
+            Punkt::aktion("Teil umbenennen …", "", Message::TeilUmbenennenDialog),
+            Punkt::Trenner,
+            Punkt::gefahr("Kapitel löschen …", "", Message::KapitelLoeschenFrage),
+            Punkt::gefahr("Teil entfernen …", "", Message::TeilEntfernenFrage),
+        ],
+        Menue::Ansicht => vec![
+            Punkt::schalter("Bibliothek und Blattliste", k("seitenleiste"), state.seitenleiste_sichtbar && !state.fokus_modus, Message::SeitenleisteToggle),
+            Punkt::schalter("Live-Vorschau", k("vorschau"), state.vorschau_sichtbar, Message::VorschauToggle),
+            Punkt::schalter("Details (Inspektor)", k("inspektor"), state.inspektor_sichtbar && !state.fokus_modus, Message::InspektorToggle),
+            Punkt::Trenner,
+            Punkt::schalter("Fokus-Modus", k("fokus"), state.fokus_modus, Message::FokusToggle),
+            Punkt::schalter("Schreibmaschinen-Modus", k("schreibmaschine"), state.einstellungen.schreibmaschine, Message::SchreibmaschineToggle(!state.einstellungen.schreibmaschine)),
+            Punkt::Trenner,
+            bereich(Arbeitsbereich::Schreiben, "bereich1"),
+            bereich(Arbeitsbereich::Bauen, "bereich2"),
+            bereich(Arbeitsbereich::Pruefen, "bereich3"),
+            bereich(Arbeitsbereich::Zahlen, "bereich4"),
+            bereich(Arbeitsbereich::Cover, "bereich5"),
+            Punkt::Trenner,
+            Punkt::aktion("Nächstes Kapitel", k("kapitel_weiter"), Message::KapitelNachbar(1)),
+            Punkt::aktion("Vorheriges Kapitel", k("kapitel_zurueck"), Message::KapitelNachbar(-1)),
+        ],
+        Menue::Buch => vec![
+            Punkt::aktion("Zeitleiste: frühere Stände …", k("verlauf"), Message::VerlaufOeffnen),
+            Punkt::aktion("Papierkorb …", "", Message::PapierkorbOeffnen),
+            Punkt::Trenner,
+            Punkt::aktion("Buchdaten bearbeiten (Titel, Autor, ISBN) …", "", Message::MetaOeffnen),
+            Punkt::Trenner,
+            Punkt::aktion("Befehle und Kapitel suchen …", k("palette"), Message::PaletteToggle),
+        ],
+        Menue::Hilfe => vec![
+            Punkt::aktion("Handbuch", k("handbuch"), Message::HandbuchOeffnen),
+            Punkt::aktion("Homepage besuchen", "", Message::LinkOeffnen(HOMEPAGE.to_string())),
+            Punkt::aktion("Kontakt per E-Mail …", "", Message::LinkOeffnen(KONTAKT.to_string())),
+            Punkt::Trenner,
+            Punkt::aktion("Lizenzschlüssel kaufen …", "", Message::KaufenOeffnen),
+            Punkt::aktion("Lizenz eingeben …", "", Message::EinstellungenSeite(0)),
+            Punkt::Trenner,
+            Punkt::aktion("Über die Werkbank", "", Message::UeberOeffnen),
+        ],
+    }
+}
+
 fn view(state: &AppState) -> Element<'_, Message> {
     let kopf = ui::navigation::kopfleiste(
         state.aktiver_bereich,
         dateien::hat_ungespeichertes(state),
-        ui::navigation::Ansicht {
-            seitenleiste: state.seitenleiste_sichtbar && !state.fokus_modus,
-            vorschau: state.vorschau_sichtbar,
-            inspektor: state.inspektor_sichtbar && !state.fokus_modus,
-            fokus: state.fokus_modus,
-        },
-        &state.speicher_zeitstempel,
         state.baende.clone(),
         state.band.clone(),
         Message::ProjektWechseln,
         Message::BereichWechseln,
         ui::navigation::Aktionen {
             speichern: Message::Speichern,
-            oeffnen: Message::OrdnerDialog,
             palette: Message::PaletteToggle,
-            seitenleiste: Message::SeitenleisteToggle,
-            vorschau: Message::VorschauToggle,
-            inspektor: Message::InspektorToggle,
-            fokus: Message::FokusToggle,
-            einstellungen: Message::EinstellungenOeffnen,
         },
         match &state.lizenz_status {
             LizenzStatus::Test { tage_uebrig } => Some((
@@ -3725,13 +4176,19 @@ fn view(state: &AppState) -> Element<'_, Message> {
         Arbeitsbereich::Cover => ui::cover::ansicht(state),
     };
 
-    let basis: Element<'_, Message> = iced::widget::column![kopf, inhalt]
-        .width(Fill)
-        .height(Fill)
-        .into();
+    let basis: Element<'_, Message> = if state.fokus_modus {
+        iced::widget::column![kopf, inhalt].width(Fill).height(Fill).into()
+    } else {
+        iced::widget::column![ui::menue::leiste(state.menue), kopf, inhalt, ui::statusleiste::leiste(&statusdaten(state))]
+            .width(Fill)
+            .height(Fill)
+            .into()
+    };
 
     let overlay: Option<Element<'_, Message>> = if gesperrt(state) {
         Some(ui::hilfe::gesperrt(&state.lizenz_email, &state.lizenz_schluessel, state.lizenz_meldung.as_deref(), dateien::hat_ungespeichertes(state)))
+    } else if let Some(m) = state.menue.filter(|_| !state.fokus_modus) {
+        Some(ui::menue::auswahl(m, menue_punkte(state, m)))
     } else if let Some(k) = &state.kontext {
         Some(ui::kontext::menue(k, &state.projekt.teile, state.fenster_groesse))
     } else if state.handbuch_offen {
@@ -3746,11 +4203,7 @@ fn view(state: &AppState) -> Element<'_, Message> {
     } else if let Some(e) = &state.eingabe {
         Some(ui::dialog::eingabe_ansicht(e))
     } else if let Some(v) = &state.verlauf {
-        let titel = state
-            .projekt
-            .kapitel_finden(&state.aktives_kapitel_id)
-            .map_or("diesem Kapitel", |k| k.titel.as_str());
-        Some(ui::dialog::verlauf_ansicht(titel, v))
+        Some(ui::zeitleiste::ansicht(v, state.fenster_groesse))
     } else if state.suche_offen && state.suche.is_some() {
         state.suche.as_ref().map(ui::suche::ansicht)
     } else if let Some(fenster) = state.einstellungen_fenster {

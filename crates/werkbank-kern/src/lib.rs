@@ -17,6 +17,8 @@ pub mod cover;
 pub mod io;
 pub mod markdown;
 pub mod speicher;
+pub mod verlauf;
+pub mod diff;
 pub mod statistik;
 pub mod stil;
 pub mod suche;

@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Werkbank</title>
+<meta name="description" content="Schreibwerkzeug für Fachbuchautoren: Markdown, Code-Prüfung mit dem echten Compiler, Satz zu PDF/X-3 und EPUB 3, Cover und Barcode für Tolino und KDP, Zeitleiste für alle Fassungen. Einmalig 49 €, kein Abo.">
 <link rel="stylesheet" href="schriften/schriften.css">
 <style>
 /* Layout: eine ruhige Werkstatt-Seite. Links gesetzter Text, rechts das Produkt, dazwischen Schnittzeichnungen
@@ -95,6 +96,9 @@ p { margin: 0; }
   --a-bib: #ecebe6; --a-akzentflaeche: #dee6f0; --a-erhaben: #e5e4df; --a-linie-weich: rgba(214, 212, 206, .55);
   --a-rot: #b4322a; --a-orange: #a06014; --a-gruen: #28764c; --a-code-text: #875414;
 }
+.app-menue { display: flex; gap: 2px; padding: 3px 8px; background: var(--a-panel); border-bottom: 1px solid var(--a-linie); font-size: 12px; color: var(--a-leise); }
+.app-menue span { padding: 2px 10px; border-radius: 6px; }
+.app-menue span:first-child { background: var(--a-akzentflaeche); color: var(--a-akzent); }
 .app-leiste { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 7px 12px; background: var(--a-panel); border-bottom: 1px solid var(--a-linie); font-size: 12px; }
 .app-leiste .rechts { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .app-symbol { padding: 1px 7px; border-radius: 6px; color: var(--a-leise); font-size: 14px; }
@@ -112,7 +116,11 @@ p { margin: 0; }
 .app-suche small { font-size: 10px; }
 .app-symbole { display: flex; gap: 4px; color: var(--a-leise); font-size: 14px; }
 .app-symbole span { padding: 1px 6px; border-radius: 6px; }
-.app-status { font-size: 11px; color: var(--a-leise); }
+.app-statusleiste { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 5px 12px; background: var(--a-panel); border-top: 1px solid var(--a-linie); font-size: 11px; color: var(--a-leise); }
+.app-statusleiste .rechts { margin-left: auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.app-statusleiste i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; background: #74b088; }
+.app-statusleiste i.warn { background: #d9a562; }
+@media (max-width: 640px) { .app-statusleiste .rechts { display: none; } }
 .suchbuehne { padding: 26px 18px; display: grid; place-items: start center; }
 .suchdialog { width: min(100%, 640px); background: var(--a-panel); border: 1px solid var(--a-linie); border-radius: 14px; padding: 16px; display: grid; gap: 9px; box-shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.6); }
 .suchdialog h4 { margin: 0; font: 600 16px var(--font-text); }
@@ -231,13 +239,29 @@ section { padding-block: 84px 0; }
 .kette span.ziel { background: var(--akzent); color: var(--bg); border-color: var(--akzent); }
 .kette i { font-style: normal; color: var(--text-leise); }
 
-/* Sicherungen */
-.sicherung { font-family: var(--font-daten); font-size: 0.85rem; background: var(--flaeche); border: 1px solid var(--linie); border-radius: 10px; overflow: hidden; }
-.sicherung header { padding: 12px 18px; background: var(--flaeche-2); display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.sicherung ol { list-style: none; margin: 0; padding: 0; }
-.sicherung li { padding: 10px 18px; border-top: 1px solid var(--linie); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.sicherung li span:last-child { color: var(--text-leise); }
-.sicherung li.neu { color: var(--akzent); }
+/* Zeitleiste */
+.zeit { font-size: 0.85rem; background: var(--flaeche); border: 1px solid var(--linie); border-radius: 10px; overflow: hidden; }
+.zeit header { padding: 11px 16px; background: var(--flaeche-2); display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-weight: 600; }
+.zeit header span:last-child { color: var(--text-leise); font-weight: 400; }
+.zeit-koerper { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); }
+.zeit-liste { margin: 0; padding: 10px 8px; list-style: none; border-right: 1px solid var(--linie); display: grid; gap: 2px; align-content: start; }
+.zeit-liste .tag { padding: 10px 8px 3px; font: 600 0.66rem/1 var(--font-text); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-leise); }
+.zeit-liste li.st { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px; border: 1px solid transparent; }
+.zeit-liste li.st small { display: block; color: var(--text-leise); font-size: 0.74rem; }
+.zeit-liste li.auf { background: var(--akzent-flaeche); border-color: var(--akzent); }
+.zeit-liste li.kind { margin-left: 18px; }
+.zeit-liste .plus { color: #2f7a4f; font-weight: 600; text-align: right; }
+.zeit-liste .minus { color: #b4382f; font-weight: 600; text-align: right; }
+.zeit-liste .plus::after, .zeit-liste .minus::after { content: ""; display: block; height: 3px; margin-top: 3px; border-radius: 2px; background: currentColor; width: var(--b, 20px); margin-left: auto; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .zeit-liste .plus { color: #74b088; } :root:not([data-theme="light"]) .zeit-liste .minus { color: #e07068; } }
+:root[data-theme="dark"] .zeit-liste .plus { color: #74b088; } :root[data-theme="dark"] .zeit-liste .minus { color: #e07068; }
+.zeit-vorschau { padding: 14px 16px; font-family: var(--font-anzeige); font-size: 0.98rem; line-height: 1.55; display: grid; gap: 10px; align-content: start; }
+.zeit-vorschau .kopfzeile { font: 600 0.9rem/1.3 var(--font-text); }
+.zeit-vorschau .kopfzeile small { display: block; font-weight: 400; color: var(--text-leise); font-size: 0.76rem; }
+.zeit-vorschau ins { text-decoration: underline; background: rgba(47,122,79,.2); }
+.zeit-vorschau del { text-decoration: line-through; background: rgba(180,56,47,.18); color: var(--text-leise); }
+.zeit-vorschau .knopf-demo { justify-self: start; font: 600 0.78rem/1 var(--font-text); padding: 8px 12px; border-radius: 6px; background: var(--akzent); color: var(--bg); }
+@media (max-width: 640px) { .zeit-koerper { grid-template-columns: 1fr; } .zeit-liste { border-right: 0; border-bottom: 1px solid var(--linie); } }
 
 /* Funktionsraster */
 .raster { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0; border-top: 1px solid var(--linie); }
@@ -311,6 +335,7 @@ section { padding-block: 84px 0; }
       Werkbank
     </a>
     <nav aria-label="Abschnitte">
+      <a href="#vorteile">Vorteile</a>
       <a href="#stil">Stilprofil</a>
       <a href="#satz">Satz</a>
       <a href="#sicher">Sicherungen</a>
@@ -329,10 +354,10 @@ section { padding-block: 84px 0; }
     <div class="held">
       <p class="marke">Schreibwerkzeug für technische Bücher</p>
       <h1>Du schreibst das Buch. <em>Die Werkbank</em> macht es druckfertig.</h1>
-      <p class="lead">Markdown-Dateien, ein Editor ohne Ablenkung und ein Satz, der aus deinem Text ein PDF/X-3 und ein EPUB 3 macht. Dazu ein Stilprofil, das zeigt, ob ein Kapitel nach dir klingt oder nach Schablone.</p>
+      <p class="lead">Markdown-Dateien in einem Ordner, ein Editor ohne Ablenkung und alles, was ein Fachbuch braucht: Code, den der echte Compiler prüft, ein druckfertiges PDF/X-3, ein EPUB 3 und die Umschläge für Tolino und KDP. Kein Abo, keine Cloud, deine Dateien bleiben deine.</p>
       <div class="held-zeile">
-        <a class="knopf" href="#schreiben">Funktionen ansehen</a>
-        <a class="knopf leise" href="#stil">Was sie einmalig macht</a>
+        <a class="knopf" href="#download">28 Tage testen</a>
+        <a class="knopf leise" href="#vorteile">Was sie einmalig macht</a>
       </div>
     </div>
 
@@ -345,16 +370,13 @@ section { padding-block: 84px 0; }
         </div>
       </div>
       <div class="app" id="app" data-app="dunkel" role="img" aria-label="Nachgezeichnete Oberfläche der Werkbank mit Bibliothek, Kapitelliste, Editor und Kapitel-Details">
+        <div class="app-menue" aria-hidden="true"><span>Datei</span><span>Bearbeiten</span><span>Ansicht</span><span>Buch</span><span>Hilfe</span></div>
         <div class="app-leiste">
-          <span class="app-symbol an" aria-hidden="true">◧</span>
           <span class="app-wahl">Rust-Werkstatt · Band 1 ▾</span>
-          <span class="app-leise">Öffnen …</span>
           <span class="app-segmente"><span class="an">Schreiben</span><span>Bauen</span><span>Prüfen</span><span>Zahlen</span><span>Cover</span></span>
           <span class="rechts">
             <span class="app-test">Testversion · noch 24 Tage</span>
-            <span class="app-status">Gespeichert</span>
             <span class="app-suche"><span>⌕ Suchen</span><small>Strg+K</small></span>
-            <span class="app-symbole" aria-hidden="true"><span>◫</span><span class="an">◨</span><span>◎</span><span>⚙</span></span>
           </span>
         </div>
         <div class="app-rumpf">
@@ -399,10 +421,31 @@ section { padding-block: 84px 0; }
             <div class="urteil"><strong>Menschlich, rund und flüssig</strong><br><span style="color:var(--a-leise)">Wert 84 von 100 · Beispielkapitel</span></div>
           </div>
         </div>
+        <div class="app-statusleiste" aria-hidden="true">
+          <span><i></i>Gespeichert</span><span>Gespeichert um 14:03:12 · alter Stand gesichert</span>
+          <span class="rechts"><span>Zeile 12, Spalte 48</span><span>2 180 / 2 500 Wörter</span><span><i></i>Sprachprüfung bereit</span><span class="warn">Testversion · noch 24 Tage</span></span>
+        </div>
       </div>
       <p class="bildnotiz">Nachgezeichnet in HTML nach der Oberfläche der Werkbank. Kapitelnamen und Messwerte sind Beispiele.</p>
     </div>
   </main>
+
+  <section id="vorteile">
+    <div class="kopf-abschnitt">
+      <p class="marke">Was die Werkbank von Textverarbeitung und Satzprogrammen unterscheidet</p>
+      <h2>Gebaut für Autoren, die Fachbücher schreiben und selbst veröffentlichen</h2>
+      <p class="lead">Ein Buch mit Code, Abbildungen und Verweisen scheitert selten am Schreiben, sondern am Drumherum: Beispiele, die nicht mehr laufen, Satz, der nicht zum Verlag oder zu KDP passt, Fassungen, die verloren gehen. Dafür gibt es hier jeweils eine Antwort.</p>
+    </div>
+    <div class="raster">
+      <div><h3>Code, der kompiliert</h3><p>Jedes Rust-Beispiel prüft der echte Compiler, Dart und Flutter prüft <span class="tastatur">dart analyze</span>. Im Buch steht nur, was läuft, und nach dem nächsten Compiler-Update weißt du, welche Listings brechen.</p></div>
+      <div><h3>Vom Markdown zum fertigen Buch</h3><p>Eigener Satz mit Typst: Druck-PDF (PDF/X-3), Lese-PDF und EPUB 3 aus denselben Dateien, mit den Seitenzahlen, die das Buch wirklich hat. Ohne Pandoc-Skripte, ohne Word.</p></div>
+      <div><h3>Tolino und KDP in einem Zug</h3><p>Der Cover-Designer setzt Vorderseite, Rücken (nach Seitenzahl) und Rückseite, rechnet die Maße der Portale und setzt den Barcode aus der ISBN. Vorschau in Farbe und in Graustufen für E-Reader.</p></div>
+      <div><h3>Nichts geht verloren</h3><p>Jedes Speichern sichert die alte Fassung. Die Zeitleiste zeigt sie nach Tagen und Schreibsitzungen, vergleicht wortgenau mit dem aktuellen Text und holt ein Kapitel oder nur eine Passage zurück.</p></div>
+      <div><h3>Dein Buch bleibt ein Ordner</h3><p>Gewöhnliche Markdown-Dateien, Git-tauglich, ohne Datenbank, ohne Konto, ohne Cloud. Die Werkbank liest und schreibt sie so, wie du sie ablegst. Linux ist kein Nachgedanke: .deb, .rpm, Flatpak und Snap.</p></div>
+      <div><h3>Ein Stilprofil für den eigenen Ton</h3><p>Neun Merkmale zeigen pro Kapitel, ob der Text lebendig gebaut ist oder nach Schablone klingt. Lokal berechnet, nichts wird hochgeladen, und es behauptet nichts über die Herkunft.</p></div>
+    </div>
+    <p class="bildnotiz">49 € einmalig, kein Abo. 28 Tage mit vollem Funktionsumfang testen, ohne Anmeldung.</p>
+  </section>
 
   <section id="stil">
     <div class="kopf-abschnitt">
@@ -482,25 +525,34 @@ section { padding-block: 84px 0; }
   <section id="sicher">
     <div class="kopf-abschnitt">
       <p class="marke">Sicherheit beim Schreiben</p>
-      <h2>Ein Knopf zum Speichern. Jede alte Fassung bleibt.</h2>
-      <p class="lead">Speichern ist ein sichtbarer Knopf in der Kopfleiste, auch als Strg+S. Bei jedem Speichern legt die Werkbank die vorherige Fassung als nummerierte Datei ab. Nichts wird überschrieben, nichts gelöscht.</p>
+      <h2>Jede alte Fassung bleibt. Und du findest sie wieder.</h2>
+      <p class="lead">Bei jedem Speichern legt die Werkbank die vorherige Fassung als nummerierte Datei ab. Nichts wird überschrieben, nichts gelöscht. Die Zeitleiste macht diese Stände zu etwas, mit dem du arbeiten kannst: ansehen, vergleichen, zurückholen.</p>
     </div>
     <div class="zwei">
       <ul class="liste" style="margin:0">
-        <li><div><b>Fortlaufend nummeriert.</b> <span>Die Sicherungen liegen in <span class="tastatur">.werkbank/backups/</span> neben deinem Buch, als normale Markdown-Dateien.</span></div></li>
-        <li><div><b>Schreiben wie mit Netz.</b> <span>Autosave und Gerüst-Snapshots laufen zusätzlich im Hintergrund.</span></div></li>
-        <li><div><b>Verlauf mit Strg+H.</b> <span>Jede Sicherung erscheint dort mit Nummer und Zeitstempel.</span></div></li>
-        <li><div><b>Keine unnötigen Kopien.</b> <span>Wenn sich nichts geändert hat, meldet die Werkbank „Keine Änderungen“ und legt nichts an.</span></div></li>
+        <li><div><b>Nach Tagen und Schreibsitzungen geordnet.</b> <span>Statt einer endlosen Liste siehst du „heute“, „gestern“ und zusammengefasste Sitzungen, jeweils mit dem Wortzuwachs.</span></div></li>
+        <li><div><b>Vergleich auf Wortebene.</b> <span>Der gewählte Stand erscheint neben deinem aktuellen Text. Grün unterstrichen kommt zurück, rot durchgestrichen ginge verloren.</span></div></li>
+        <li><div><b>Zurückholen, wie du es brauchst.</b> <span>Das ganze Kapitel, nur eine einzelne Passage, als Kopie neben das Kapitel oder als Datei. Vorher sichert die Werkbank den aktuellen Text selbst.</span></div></li>
+        <li><div><b>Benennen und aufräumen.</b> <span>„Vor Lektorat“ bleibt für immer. Alte Zwischenstände räumst du auf Wunsch weg, nachdem die Werkbank gezeigt hat, was gelöscht würde.</span></div></li>
+        <li><div><b>Papierkorb mit Vorschau.</b> <span>Entfernte Buchteile holst du mit einem Klick zurück. Zu finden mit <span class="tastatur">Strg+H</span> oder per Klick auf den Speicherstand.</span></div></li>
       </ul>
-      <div class="sicherung" aria-label="Beispiel einer Sicherungsliste">
-        <header><span>.werkbank/backups/teil-3/</span><span>Beispiel</span></header>
-        <ol>
-          <li class="neu"><span>teil-3-0005.md</span><span>Sicherung Nr. 5 · heute 14:03:12</span></li>
-          <li><span>teil-3-0004.md</span><span>Sicherung Nr. 4 · heute 11:47:30</span></li>
-          <li><span>teil-3-0003.md</span><span>Sicherung Nr. 3 · gestern 21:15:02</span></li>
-          <li><span>teil-3-0002.md</span><span>Sicherung Nr. 2 · gestern 18:40:19</span></li>
-          <li><span>teil-3-0001.md</span><span>Sicherung Nr. 1 · vorgestern 09:12:44</span></li>
-        </ol>
+      <div class="zeit" role="img" aria-label="Beispiel der Zeitleiste: links Stände nach Tagen, rechts der gewählte Stand mit Änderungen">
+        <header><span>Zeitleiste · Kapitel „Der Aufbruch“</span><span>Beispiel</span></header>
+        <div class="zeit-koerper">
+          <ul class="zeit-liste">
+            <li class="tag">Heute</li>
+            <li class="st"><span>Schreibsitzung 14:02–15:40<small>12 Stände</small></span><span class="plus" style="--b:32px">+840</span></li>
+            <li class="st kind auf"><span>★ Vor Lektorat<small>13:10 · Sicherung Nr. 41</small></span><span class="plus" style="--b:12px">+120</span></li>
+            <li class="st kind"><span>11:47<small>Sicherung Nr. 40</small></span><span class="minus" style="--b:8px">−40</span></li>
+            <li class="tag">Gestern</li>
+            <li class="st"><span>21:15<small>Sicherung Nr. 38</small></span><span class="plus" style="--b:18px">+312</span></li>
+          </ul>
+          <div class="zeit-vorschau">
+            <div class="kopfzeile">Stand von heute, 13:10<small>Gegenüber jetzt: 2 Änderungen</small></div>
+            <p style="margin:0">Sie stand lange am Fenster, ehe sie <del>einen</del> <ins>den</ins> Entschluss fasste. Draußen fiel der erste Schnee.</p>
+            <span class="knopf-demo">Diesen Stand wiederherstellen</span>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -632,15 +684,19 @@ section { padding-block: 84px 0; }
       <p class="lead">Lade die Werkbank herunter und teste sie vier Wochen mit vollem Funktionsumfang. Danach trägst du den Lizenzschlüssel aus deinem Kauf ein.</p>
     </div>
     <div class="neu14" style="max-width:760px;margin:0 0 22px">
-      <p class="marke">Neu in Version 1.4</p>
+      <p class="marke">Neu in Version 1.5</p>
       <ul class="liste">
-        <li><div><b>Ein Umschlag für alles.</b> <span>Vorschau, Export und die Umschläge in <code>tolino/</code> und <code>kdp/</code> werden gleich gesetzt, mit Vorderseite aus deinem Cover-Bild und Rückseite aus <code>klappentext.md</code>.</span></div></li>
-        <li><div><b>Barcode und ISBN.</b> <span>EAN-13 für Tolino aus der ISBN, Freifläche für KDP, ISBN-Feld mit Prüfung im Cover-Bereich, Hinweis beim Bauen, wenn eine gültige ISBN fehlt.</span></div></li>
-        <li><div><b>Farben zum Bild.</b> <span>Hintergrund, Akzent, Text und Rücken passend zum Cover vorschlagen lassen.</span></div></li>
-        <li><div><b>Neu: Flatpak.</b> <span>Die Werkbank gibt es jetzt auch als Flatpak für alle Linux-Distributionen.</span></div></li>
+        <li><div><b>Zeitleiste statt Sicherungsliste.</b> <span>Frühere Stände nach Tagen und Schreibsitzungen, mit Wortzuwachs und wortgenauem Vergleich zum aktuellen Text. <span class="tastatur">Strg+H</span> oder ein Klick auf den Speicherstand öffnet sie.</span></div></li>
+        <li><div><b>Zurückholen nach Maß.</b> <span>Ganzes Kapitel, einzelne Passage, Kopie als neues Kapitel oder Export als Datei. Der aktuelle Text wird vorher selbst gesichert.</span></div></li>
+        <li><div><b>Benennen und aufräumen.</b> <span>Stände mit Namen bleiben immer erhalten; das Aufräumen alter Stände ist freiwillig und zeigt vorher, was gelöscht würde.</span></div></li>
+        <li><div><b>Statusleiste.</b> <span>Am unteren Rand: Speicherstand mit der letzten Meldung, Cursorstelle, Wörter mit Wortziel, Zustand der Sprachprüfung und Lizenz. Ein Klick auf den Speicherstand öffnet die Zeitleiste.</span></div></li>
+        <li><div><b>Menüleiste.</b> <span>Datei, Bearbeiten, Ansicht, Buch und Hilfe bündeln, was bisher in der Kopfleiste lag: Ordner öffnen, Ansichten, Einstellungen, Kapitel- und Buchbefehle, jeweils mit ihren Tastenkürzeln. Die Kopfleiste bleibt ruhig.</span></div></li>
+        <li><div><b>Hilfe und Über-Bildschirm.</b> <span>Handbuch, Homepage, Kontakt und Lizenzkauf im Hilfe-Menü; „Über die Werkbank“ nennt Version, Urheberrecht, Lizenzstatus und die Lizenzen aller Open-Source-Bausteine.</span></div></li>
+        <li><div><b>Papierkorb zum Anklicken.</b> <span>Entfernte Buchteile liegen als Reiter in der Zeitleiste, mit Vorschau und Zurückholen.</span></div></li>
+        <li><div><b>Korrigiert.</b> <span>Die Zeit einer Sicherung nennt jetzt, wann der Text entstand, nicht wann er ersetzt wurde.</span></div></li>
       </ul>
     </div>
-    <p class="hinweis-version" style="max-width:760px;margin:0 0 18px;padding:12px 16px;border:1px solid var(--linie);border-left:3px solid var(--akzent);border-radius:8px;background:var(--flaeche)"><b>Windows und macOS sind noch bei Version 1.3.0.</b> Die Pakete für 1.4 folgen. Alle Neuerungen von 1.4 stecken erst in den Linux-Paketen (.deb, .rpm, Flatpak).</p>
+    <p class="hinweis-version" style="max-width:760px;margin:0 0 18px;padding:12px 16px;border:1px solid var(--linie);border-left:3px solid var(--akzent);border-radius:8px;background:var(--flaeche)"><b>Windows und macOS sind noch bei Version 1.3.0.</b> Die Pakete für 1.5 folgen. Alle Neuerungen von 1.4 und 1.5 stecken erst in den Linux-Paketen (.deb, .rpm, Flatpak).</p>
     <div class="downloads">
       <div class="download">
         <span class="marke">Windows 10 und 11 · 64 Bit · Version 1.3.0</span>
@@ -657,29 +713,29 @@ section { padding-block: 84px 0; }
         <code>SHA-256: 8572097f6c04ebc99d5843ffb653d0949e3197efe88103ae842b814bbc67cb6d</code>
       </div>
       <div class="download">
-        <span class="marke">Linux · Debian, Ubuntu, Mint · Version 1.4.0</span>
+        <span class="marke">Linux · Debian, Ubuntu, Mint · Version 1.5.0</span>
         <h3>.deb-Paket</h3>
-        <a class="knopf" href="downloads/werkbank_1.4.0-1_amd64.deb" download>Herunterladen</a>
-        <p>Installieren mit <code>sudo apt install ./werkbank_1.4.0-1_amd64.deb</code></p>
+        <a class="knopf" href="downloads/werkbank_1.5.0-1_amd64.deb" download>Herunterladen</a>
+        <p>Installieren mit <code>sudo apt install ./werkbank_1.5.0-1_amd64.deb</code></p>
         <code>SHA-256: 5654623f9dff661f8a8d2575de1371006ffa5d0ecf893e2a7c59c7dcbd0780eb</code>
       </div>
       <div class="download">
-        <span class="marke">Linux · Fedora, openSUSE · Version 1.4.0</span>
+        <span class="marke">Linux · Fedora, openSUSE · Version 1.5.0</span>
         <h3>.rpm-Paket</h3>
-        <a class="knopf" href="downloads/werkbank-1.4.0-1.x86_64.rpm" download>Herunterladen</a>
-        <p>Installieren mit <code>sudo dnf install ./werkbank-1.4.0-1.x86_64.rpm</code></p>
-        <p>Das Paket ist <b>signiert</b> (Schlüssel <a href="downloads/werkbank-rpm-signatur.asc" download>werkbank-rpm-signatur.asc</a>, Fingerabdruck <code>B5F7 C6A0 B91A FFB2 6559 0479 7D42 1D3F 8ED0 EDD7</code>). Prüfen mit <code>sudo rpm --import werkbank-rpm-signatur.asc</code> und <code>rpm --checksig werkbank-1.4.0-1.x86_64.rpm</code>.</p>
+        <a class="knopf" href="downloads/werkbank-1.5.0-1.x86_64.rpm" download>Herunterladen</a>
+        <p>Installieren mit <code>sudo dnf install ./werkbank-1.5.0-1.x86_64.rpm</code></p>
+        <p>Das Paket ist <b>signiert</b> (Schlüssel <a href="downloads/werkbank-rpm-signatur.asc" download>werkbank-rpm-signatur.asc</a>, Fingerabdruck <code>B5F7 C6A0 B91A FFB2 6559 0479 7D42 1D3F 8ED0 EDD7</code>). Prüfen mit <code>sudo rpm --import werkbank-rpm-signatur.asc</code> und <code>rpm --checksig werkbank-1.5.0-1.x86_64.rpm</code>.</p>
         <code>SHA-256: 219a97df007960d113cbdfab2fbf152b2f8dc0d5c200667e455fc9b660c00e7c</code>
       </div>
       <div class="download">
-        <span class="marke">Linux · alle Distributionen · Version 1.4.0</span>
+        <span class="marke">Linux · alle Distributionen · Version 1.5.0</span>
         <h3>Flatpak</h3>
-        <a class="knopf" href="downloads/werkbank-1.4.0.flatpak" download>Herunterladen</a>
-        <p>Installieren mit <code>flatpak install ./werkbank-1.4.0.flatpak</code>, starten mit <code>flatpak run de.daehn.Werkbank</code>. In der Flatpak-Sandbox fehlen die Programme deines Systems (Java, Rust, Pandoc): Schreiben, Satz, EPUB und Cover laufen vollständig, die Sprachprüfung braucht dann einen LanguageTool-Server außerhalb.</p>
+        <a class="knopf" href="downloads/werkbank-1.5.0.flatpak" download>Herunterladen</a>
+        <p>Installieren mit <code>flatpak install ./werkbank-1.5.0.flatpak</code>, starten mit <code>flatpak run de.daehn.Werkbank</code>. In der Flatpak-Sandbox fehlen die Programme deines Systems (Java, Rust, Pandoc): Schreiben, Satz, EPUB und Cover laufen vollständig, die Sprachprüfung braucht dann einen LanguageTool-Server außerhalb.</p>
         <code>SHA-256: 31d464b501fb7c495a27b432f573d844e3b5b922b8c56e3be28cfae2aeb83605</code>
       </div>
     </div>
-    <p class="bildnotiz">Version 1.4.0 für Linux (64 Bit); für Windows und macOS (Apple Silicon) ist es noch Version 1.3.0. Nach der Installation startest du die Werkbank aus dem Startmenü bzw. Anwendungsmenü. Die Prüfsummen kannst du unter Linux mit <span class="tastatur">sha256sum</span>, unter macOS mit <span class="tastatur">shasum -a 256</span>, unter Windows in PowerShell mit <span class="tastatur">Get-FileHash</span> vergleichen.</p>
+    <p class="bildnotiz">Version 1.5.0 für Linux (64 Bit); für Windows und macOS (Apple Silicon) ist es noch Version 1.3.0. Nach der Installation startest du die Werkbank aus dem Startmenü bzw. Anwendungsmenü. Die Prüfsummen kannst du unter Linux mit <span class="tastatur">sha256sum</span>, unter macOS mit <span class="tastatur">shasum -a 256</span>, unter Windows in PowerShell mit <span class="tastatur">Get-FileHash</span> vergleichen.</p>
 
     <div class="brauchst" id="werkzeuge">
       <h3>Was du dazu brauchst</h3>
@@ -730,7 +786,7 @@ section { padding-block: 84px 0; }
       <a class="knopf leise" href="#schreiben">Funktionen ansehen</a>
     </div>
   </div>
-  <footer class="fuss"><span><a href="impressum.html">Impressum</a> · <a href="datenschutz.html">Datenschutz</a></span><span>Werkbank 1.4.0 (Windows und macOS: 1.3.0) · <a href="mailto:kontakt@jurzel.de">kontakt@jurzel.de</a></span><span>Geschrieben in Rust mit Iced und Typst</span></footer>
+  <footer class="fuss"><span><a href="impressum.html">Impressum</a> · <a href="datenschutz.html">Datenschutz</a></span><span>Werkbank 1.5.0 (Windows und macOS: 1.3.0) · <a href="mailto:kontakt@jurzel.de">kontakt@jurzel.de</a></span><span>Geschrieben in Rust mit Iced und Typst</span></footer>
 </div>
 
 <script>

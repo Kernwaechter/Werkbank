@@ -62,7 +62,7 @@ pub fn kennung_aus_titel(titel: &str) -> String {
 }
 
 impl Projekt {
-    fn werkbank_ordner(&self) -> PathBuf {
+    pub(crate) fn werkbank_ordner(&self) -> PathBuf {
         self.wurzelverzeichnis.join(".werkbank")
     }
 
@@ -185,7 +185,7 @@ impl Projekt {
     }
 
     /// Ordner der durchnummerierten Sicherungen eines Teils: `.werkbank/backups/<Dateiname>/`.
-    fn backup_ordner(&self, teil: &Teil) -> PathBuf {
+    pub(crate) fn backup_ordner(&self, teil: &Teil) -> PathBuf {
         self.werkbank_ordner()
             .join("backups")
             .join(teil.dateipfad.file_stem().unwrap_or_default())
@@ -216,7 +216,12 @@ impl Projekt {
             let stem = teil.dateipfad.file_stem().unwrap_or_default().to_string_lossy().into_owned();
             nummer = naechste_backup_nummer(&ordner, &stem);
             // Erst sichern, dann überschreiben: schlägt die Sicherung fehl, bleibt die Datei unberührt
-            fs::write(ordner.join(format!("{stem}-{nummer:04}.md")), alt)?;
+            let name = format!("{stem}-{nummer:04}.md");
+            fs::write(ordner.join(&name), alt)?;
+            // Wann der gesicherte Stand entstand: Er wurde zuletzt geschrieben, als die Datei ihre jetzige Änderungszeit bekam
+            if let Ok(zeit) = fs::metadata(&pfad).and_then(|m| m.modified()) {
+                crate::verlauf::zeit_merken(&ordner, &name, chrono::DateTime::<Local>::from(zeit));
+            }
         }
         atomar_schreiben(&pfad, &neu)?;
         Ok(Some(nummer))
@@ -236,7 +241,7 @@ impl Projekt {
         if fehler.is_empty() { Ok(geschrieben) } else { Err(fehler.join("; ")) }
     }
 
-    fn snapshot_ordner(&self, teil: &Teil) -> PathBuf {
+    pub(crate) fn snapshot_ordner(&self, teil: &Teil) -> PathBuf {
         self.werkbank_ordner()
             .join("snapshots")
             .join(teil.dateipfad.file_stem().unwrap_or_default())
@@ -514,7 +519,7 @@ fn io_fehler_von(e: impl std::fmt::Display) -> Error {
 }
 
 /// Schreibt über eine Temp-Datei und benennt um, damit nie eine halbe Datei entsteht.
-fn atomar_schreiben(pfad: &Path, inhalt: &str) -> io::Result<()> {
+pub(crate) fn atomar_schreiben(pfad: &Path, inhalt: &str) -> io::Result<()> {
     if let Some(eltern) = pfad.parent() {
         fs::create_dir_all(eltern)?;
     }
@@ -524,7 +529,7 @@ fn atomar_schreiben(pfad: &Path, inhalt: &str) -> io::Result<()> {
     fs::rename(&temp, pfad)
 }
 
-fn dateien_mit_endung(ordner: &Path, endung: &str) -> Vec<PathBuf> {
+pub(crate) fn dateien_mit_endung(ordner: &Path, endung: &str) -> Vec<PathBuf> {
     fs::read_dir(ordner)
         .into_iter()
         .flatten()
@@ -648,7 +653,7 @@ mod tests {
             let datei = ordner.join(format!("teil-1-{:04}.md", i + 1));
             assert_eq!(&fs::read_to_string(&datei).unwrap(), alt, "Sicherung {} enthält den Stand davor", i + 1);
         }
-        assert_eq!(fs::read_dir(&ordner).unwrap().count(), 3);
+        assert_eq!(dateien_mit_endung(&ordner, "md").len(), 3);
         // Der Verlauf zeigt sie, neueste zuerst
         let verlauf = p.snapshots_fuer_teil("teil-1");
         assert_eq!(verlauf.len(), 3);

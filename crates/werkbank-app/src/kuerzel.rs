@@ -14,7 +14,7 @@ pub const BEFEHLE: &[(&str, &str, &str)] = &[
     ("speichern", "Speichern", "Strg+S"),
     ("ordner", "Ordner mit Buchprojekt öffnen", "Strg+O"),
     ("pruefen", "Kapitel auf Sprache prüfen", "Strg+L"),
-    ("verlauf", "Verlauf des Kapitels", "Strg+H"),
+    ("verlauf", "Zeitleiste: frühere Stände", "Strg+H"),
     ("suche", "Im Kapitel suchen und ersetzen", "Strg+F"),
     ("suche_buch", "In allen Bänden suchen und ersetzen", "Strg+Umschalt+F"),
     ("suche_weiter", "Nächster Suchtreffer", "F3"),

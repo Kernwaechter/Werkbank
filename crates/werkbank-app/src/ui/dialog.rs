@@ -1,14 +1,13 @@
 //! # Dialoge
 //!
 //! Kleine schwebende Fenster: Texteingabe (neues Kapitel, Umbenennen),
-//! Bestätigung (Löschen, Beenden) und der Verlauf mit früheren Ständen.
+//! Bestätigung (Löschen, Beenden) (Der Verlauf lebt als Zeitleiste in `zeitleiste.rs`.)
 
 use crate::Message;
 use crate::thema;
-use iced::widget::{Id, column, container, mouse_area, opaque, row, scrollable, space, text, text_input};
+use iced::widget::{Id, column, container, mouse_area, opaque, row, space, text, text_input};
 use crate::ui::fokus::{button};
-use iced::{Alignment, Element, Fill, Length, Padding};
-use werkbank_kern::speicher::Snapshot;
+use iced::{Alignment, Element, Fill, Padding};
 
 /// Wofür der Eingabedialog gerade dient.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,7 +59,7 @@ pub fn fenster<'a>(inhalt: impl Into<Element<'a, Message>>, breite: f32, oben: f
 }
 
 /// Abgedunkelter Hintergrund mit dem Dialog oben mittig; Klick daneben schließt.
-fn abdunkeln<'a>(box_: Element<'a, Message>, oben: f32) -> Element<'a, Message> {
+pub(crate) fn abdunkeln<'a>(box_: Element<'a, Message>, oben: f32) -> Element<'a, Message> {
     mouse_area(
         container(opaque(box_))
             .width(Fill)
@@ -166,46 +165,6 @@ pub fn dialog_ansicht<'a>(d: &'a Dialog) -> Element<'a, Message> {
         .collect();
     let hinweis = if d.knoepfe.len() <= 1 { "Esc schließt" } else { "Esc bricht ab" };
     rahmen(&d.titel, Some(d.text.clone()), None, hinweis, knoepfe, 480.0, 130.0)
-}
-
-/// Verlauf: frühere Stände der Datei, aus der das Kapitel stammt.
-pub fn verlauf_ansicht<'a>(kapitel: &'a str, liste: &'a [Snapshot]) -> Element<'a, Message> {
-    let mut zeilen = column![].spacing(2);
-    if liste.is_empty() {
-        zeilen = zeilen.push(
-            text("Noch keine früheren Stände. Sie entstehen beim Speichern, sobald sich die Datei ändert.")
-                .size(12)
-                .color(thema::text_gedimmt()),
-        );
-    }
-    for (i, s) in liste.iter().enumerate() {
-        zeilen = zeilen.push(
-            button(
-                row![
-                    text(&s.zeit).size(13),
-                    space::horizontal(),
-                    text(format!("{:.0} KB", s.groesse as f32 / 1024.0)).size(11).color(thema::text_gedimmt()),
-                ]
-                .align_y(Alignment::Center),
-            )
-            .width(Fill)
-            .padding([6, 10])
-            .style(thema::palette_eintrag_stil(false))
-            .on_press(Message::VerlaufWiederherstellen(i)),
-        );
-    }
-    rahmen(
-        "Verlauf",
-        Some(format!(
-            "Ein Klick holt den Text von „{kapitel}“ aus dem gewählten Stand zurück. \
-             Er wird erst beim Speichern übernommen; der aktuelle Stand bleibt als Snapshot erhalten."
-        )),
-        Some(container(scrollable(zeilen).height(Length::Shrink)).max_height(420).into()),
-        "Esc schließt",
-        vec![neben_knopf("Schließen", Message::DialogSchliessen)],
-        560.0,
-        80.0,
-    )
 }
 
 /// Feld des Buchdaten-Dialogs.

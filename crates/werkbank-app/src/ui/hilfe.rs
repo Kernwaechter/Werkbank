@@ -57,6 +57,9 @@ pub fn status_text(status: &LizenzStatus) -> (String, iced::Color) {
     }
 }
 
+/// Das Programmzeichen für „Über die Werkbank“.
+const LOGO: &[u8] = include_bytes!("../../../../assets/icons/256.png");
+
 pub fn ueber<'a>(status: &'a LizenzStatus, email: &'a str, schluessel: &'a str, meldung: Option<&'a str>) -> Element<'a, Message> {
     let (text_status, farbe) = status_text(status);
     let anzahl = LIZENZEN.lines().count();
@@ -68,13 +71,35 @@ pub fn ueber<'a>(status: &'a LizenzStatus, email: &'a str, schluessel: &'a str, 
                 .spacing(8),
         );
     }
-    fenster(
+    let link = |name: &'a str, adresse: &str| -> Element<'a, Message> {
+        button(text(name).size(12))
+            .padding([5, 12])
+            .style(thema::sekundaer_knopf_stil)
+            .on_press(Message::LinkOeffnen(adresse.to_string()))
+            .into()
+    };
+    let kopf = row![
+        iced::widget::image(iced::widget::image::Handle::from_bytes(LOGO)).width(76).height(76),
         column![
-            text("Über die Werkbank").size(18).color(thema::text_hell()),
-            text(format!("Version {} · Schreibwerkzeug für technische Bücher · Einzelplatzlizenz (LIZENZVEREINBARUNG.md)", env!("CARGO_PKG_VERSION"))).size(12).color(thema::text_gedimmt()),
+            text("Werkbank").size(30).font(thema::fett()).color(thema::text_hell()),
+            text(format!("Version {}", env!("CARGO_PKG_VERSION"))).size(13).color(thema::text_gedimmt()),
+            text("Schreibwerkzeug für technische Bücher").size(13).color(thema::text_hell()),
+        ]
+        .spacing(3),
+    ]
+    .spacing(20)
+    .align_y(Alignment::Center);
+    let verweise = row![
+        link("Homepage", crate::HOMEPAGE),
+        button(text("Handbuch").size(12)).padding([5, 12]).style(thema::sekundaer_knopf_stil).on_press(Message::HandbuchOeffnen),
+        link("Kontakt", crate::KONTAKT),
+    ]
+    .spacing(8);
+    let lizenz_block = container(
+        column![
             row![
                 text(text_status).size(12).color(farbe).width(Fill),
-                button(text("Kaufen").size(11))
+                button(text("Lizenzschlüssel kaufen").size(11))
                     .padding([4, 10])
                     .style(thema::primaer_knopf_stil)
                     .on_press(Message::KaufenOeffnen),
@@ -85,31 +110,46 @@ pub fn ueber<'a>(status: &'a LizenzStatus, email: &'a str, schluessel: &'a str, 
             ]
             .spacing(10)
             .align_y(Alignment::Center),
-            column![
-                text("Lizenz aktivieren").size(12).color(thema::text_hell()),
-                text_input("E-Mail-Adresse des Kaufs", email).on_input(Message::LizenzEmail).size(13).padding(6),
-                text_input("Lizenzschlüssel (WB1-…)", schluessel)
-                    .on_input(Message::LizenzSchluessel)
-                    .on_submit(Message::LizenzAktivieren)
-                    .size(13)
-                    .padding(6),
-                row![
-                    button(text("Aktivieren").size(11)).padding([4, 12]).style(thema::primaer_knopf_stil).on_press(Message::LizenzAktivieren),
-                    text(meldung.unwrap_or("")).size(11).color(thema::text_gedimmt()),
-                ]
-                .spacing(10)
-                .align_y(Alignment::Center),
+            text_input("E-Mail-Adresse des Kaufs", email).on_input(Message::LizenzEmail).size(13).padding(6),
+            text_input("Lizenzschlüssel (WB1-…)", schluessel)
+                .on_input(Message::LizenzSchluessel)
+                .on_submit(Message::LizenzAktivieren)
+                .size(13)
+                .padding(6),
+            row![
+                button(text("Aktivieren").size(11)).padding([4, 12]).style(thema::primaer_knopf_stil).on_press(Message::LizenzAktivieren),
+                text(meldung.unwrap_or("")).size(11).color(thema::text_gedimmt()),
             ]
-            .spacing(6),
-            text(format!("Verwendete Bausteine von Dritten ({anzahl}), jeweils unter ihrer eigenen Lizenz:")).size(12).color(thema::text_hell()),
-            container(scrollable(liste).height(Length::Fixed(320.0))).padding(8).style(thema::codeblock_container_stil),
-            text("Die Schriften des Systems werden verwendet, nicht mitgeliefert. LanguageTool und Hunspell-Wörterbücher gehören nicht zur Werkbank und stehen unter eigenen Lizenzen.")
+            .spacing(10)
+            .align_y(Alignment::Center),
+        ]
+        .spacing(7),
+    )
+    .padding(14)
+    .width(Fill)
+    .style(thema::gruppe_stil);
+    fenster(
+        column![
+            kopf,
+            verweise,
+            thema::trennlinie(),
+            column![
+                text("© 2026 Volker Dähn. Alle Rechte vorbehalten.").size(12).color(thema::text_hell()),
+                text("Einzelplatzlizenz. Die Lizenzvereinbarung liegt dem Programm bei (LIZENZVEREINBARUNG.md). Geschrieben in Rust mit Iced und Typst.")
+                    .size(11)
+                    .color(thema::text_gedimmt()),
+            ]
+            .spacing(3),
+            lizenz_block,
+            text(format!("Open-Source-Bausteine ({anzahl}), jeweils unter ihrer eigenen Lizenz")).size(12).font(thema::fett()).color(thema::text_hell()),
+            container(scrollable(liste).height(Length::Fixed(190.0))).padding(8).style(thema::codeblock_container_stil),
+            text("Die Schriften des Systems werden verwendet, nicht mitgeliefert. LanguageTool und die Hunspell-Wörterbücher gehören nicht zur Werkbank und stehen unter eigenen Lizenzen.")
                 .size(10)
                 .color(thema::text_gedimmt()),
         ]
-        .spacing(10),
-        760.0,
-        50.0,
+        .spacing(12),
+        720.0,
+        40.0,
     )
 }
 

@@ -17,7 +17,7 @@ rm -rf "$arbeit"; mkdir -p "$arbeit"
 # Der Arbeitsordner und der Build-Container enthalten den privaten Schlüssel: beides am Ende löschen
 trap '(cd "$arbeit" && snapcraft clean >/dev/null 2>&1); rm -rf "$arbeit"' EXIT
 # Nur versionierte Dateien (kein target/); der Schlüssel liegt nur im Arbeitsordner
-git ls-files -z --cached --others --exclude-standard | grep -zv -e "my-key" -e "^snap/" | xargs -0 cp -P --parents -t "$arbeit"
+git ls-files -z --cached --others --exclude-standard | grep -zv -e "my-key" -e "^snap/" -e "^werkstatt-web/" | while IFS= read -r -d "" f; do if [ -e "$f" ]; then printf "%s\0" "$f"; fi; done | xargs -0 cp -P --parents -t "$arbeit"
 install -d -m700 "$arbeit/schluessel" "$arbeit/snap/gui"
 install -m600 "$quelle/privat.key" "$quelle/oeffentlich.key" "$arbeit/schluessel/"
 install -m644 packaging/snap/lizenzgeber/snapcraft.yaml "$arbeit/snap/snapcraft.yaml"

@@ -13,7 +13,7 @@
     <p>Funktionen:</p>
     <ul>
       <li>Editor mit Gliederung, Notizen, Suchen und Ersetzen, Schreibmaschinen-Modus und Fokus-Modus</li>
-      <li>Verlustfreies Speichern mit automatischen Sicherungen und Verlauf</li>
+      <li>Verlustfreies Speichern mit Zeitleiste: frühere Stände vergleichen, einzelne Passagen zurückholen, benennen und aufräumen; Papierkorb</li>
       <li>Rechtschreibung offline (Hunspell) und Grammatik mit LanguageTool</li>
       <li>Prüfung aller Rust-Beispiele des Buches mit rustc</li>
       <li>Statistik: Netto-Wörter, Tempo, Serie, Prognose, Lesbarkeit</li>
@@ -43,6 +43,11 @@
     <control>pointing</control>
   </supports>
   <releases>
+    <release version="1.5.0" date="2026-11-07">
+      <description>
+        <p>Neue Zeitleiste statt der Sicherungsliste (Strg+H oder Klick auf den Speicherstand): Stände nach Tagen und Schreibsitzungen gegliedert, mit Wortzuwachs, wortgenauem Vergleich zum aktuellen Text (Änderungen, ganzer Text, nebeneinander), Wiederherstellen des Kapitels oder einzelner Passagen, Einfügen als Kopie, Kopieren und Export. Stände lassen sich benennen, das Aufräumen alter Stände ist freiwillig und zeigt vorher, was gelöscht würde. Der Papierkorb für entfernte Teile ist ein Reiter mit Vorschau und Zurückholen. Neue Menüleiste (Datei, Bearbeiten, Ansicht, Buch, Hilfe) entlastet die Kopfleiste, eine Statusleiste am unteren Rand zeigt Speicherstand, Cursorstelle, Wörter mit Ziel, Sprachprüfung und Lizenz; im Hilfe-Menü stehen Handbuch, Homepage, Kontakt und Lizenzkauf, der Bildschirm „Über die Werkbank“ nennt Version, Urheberrecht und die Lizenzen der Open-Source-Bausteine. Korrigiert: Die Zeit einer Sicherung nennt jetzt, wann der Text entstand, nicht wann er ersetzt wurde.</p>
+      </description>
+    </release>
     <release version="1.4.0" date="2026-11-07">
       <description>
         <p>Der Umschlag wird überall gleich gesetzt (Vorschau, Export, Bauen für Tolino und KDP): Vorderseite aus cover.png oder Cover-Designer, Rückseite aus klappentext.md mit Typst-Satz und passender Schriftgröße, Farben aus dem Cover-Bereich. Barcode nach den Vorgaben von Tolino (EAN-13 aus der ISBN) und KDP (Freifläche); ISBN-Feld mit Prüfung im Cover-Bereich. Neu: Farben passend zum Bild vorschlagen. Außerdem als Snap und mit Flatpak ausgelieferte Version.</p>
