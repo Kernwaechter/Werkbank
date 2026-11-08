@@ -25,11 +25,20 @@ pub struct WerkzeugStatus {
     pub dart: Option<String>,
     /// Version von Flutter (Code-Prüfer für Flutter-Beispiele).
     pub flutter: Option<String>,
+    /// Version von Java (für den LanguageTool-Server), `None` = nicht gefunden.
+    pub java: Option<String>,
+    /// Gefundene Shells für den Skript-Prüfer mit Version (z. B. `Bash 5.2.21`), leer = keine.
+    pub skript: Vec<String>,
     /// Wurde schon geprüft?
     pub geprueft: bool,
 }
 
 impl WerkzeugStatus {
+    /// LanguageTool braucht Java ab Version 17.
+    pub fn java_brauchbar(&self) -> bool {
+        self.java.as_deref().and_then(java_hauptversion).is_some_and(|v| v >= 17)
+    }
+
     /// Pandoc ab Version 3 kann `-t typst`.
     pub fn pandoc_brauchbar(&self) -> bool {
         self.pandoc.as_deref().and_then(werkbank_satz::hauptversion).is_some_and(|v| v >= 3)
@@ -58,8 +67,32 @@ pub fn pruefen() -> WerkzeugStatus {
         rustc: werkbank_kern::codepruefung::rustc_version(),
         dart,
         flutter,
+        java: java_version(),
+        skript: werkbank_kern::skriptpruefung::gefunden(),
         geprueft: true,
     }
+}
+
+/// Hauptversion aus einer Java-Version: `21.0.4` → 21, `1.8.0_392` → 8.
+pub fn java_hauptversion(version: &str) -> Option<u32> {
+    let mut teile = version.split(['.', '_', '-', '+']);
+    let erste: u32 = teile.next()?.parse().ok()?;
+    if erste == 1 { teile.next()?.parse().ok() } else { Some(erste) }
+}
+
+/// Version von Java: `java` im Suchpfad oder unter `JAVA_HOME`. `java -version` schreibt nach stderr
+/// (`openjdk version "21.0.4" …`).
+fn java_version() -> Option<String> {
+    let exe = if cfg!(windows) { "java.exe" } else { "java" };
+    let mut kandidaten: Vec<PathBuf> = std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()).map(|d| d.join(exe)).collect();
+    if let Some(h) = std::env::var_os("JAVA_HOME") {
+        kandidaten.push(PathBuf::from(h).join("bin").join(exe));
+    }
+    let java = kandidaten.into_iter().find(|p| p.is_file())?;
+    let aus = werkbank_kern::prozess::ohne_fenster(Command::new(java).arg("-version")).output().ok()?;
+    let text = String::from_utf8_lossy(&aus.stderr).into_owned() + &String::from_utf8_lossy(&aus.stdout);
+    let nach = text.split("version \"").nth(1)?;
+    Some(nach.split('"').next()?.to_string())
 }
 
 /// Heimatordner (`HOME`, unter Windows `USERPROFILE`).
@@ -269,5 +302,18 @@ mod tests {
         let x = std::fs::read(o.join("x.pdf")).unwrap();
         assert!(x.starts_with(b"%PDF"));
         assert!(x.windows(15).any(|w| w == b"GTS_PDFXVersion"));
+    }
+}
+
+#[cfg(test)]
+mod java_tests {
+    use super::java_hauptversion;
+
+    #[test]
+    fn hauptversion_neu_und_alt() {
+        assert_eq!(java_hauptversion("21.0.4"), Some(21));
+        assert_eq!(java_hauptversion("17"), Some(17));
+        assert_eq!(java_hauptversion("1.8.0_392"), Some(8));
+        assert_eq!(java_hauptversion("x"), None);
     }
 }

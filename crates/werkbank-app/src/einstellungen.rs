@@ -108,6 +108,12 @@ impl Default for Einstellungen {
     }
 }
 
+/// Läuft die Werkbank als Snap? Dann kann sie Programme des Systems (Java, Pandoc, Typst, Ghostscript) nicht
+/// starten, nur Server auf `localhost` erreichen. Snap setzt `SNAP_NAME` für jede App im Paket.
+pub fn im_snap() -> bool {
+    std::env::var_os("SNAP_NAME").is_some()
+}
+
 /// Konfigurationsordner der Werkbank (`~/.config/werkbank` bzw. `%APPDATA%\werkbank`).
 pub fn konfig_ordner() -> Option<PathBuf> {
     let basis = std::env::var_os("XDG_CONFIG_HOME")

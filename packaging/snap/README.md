@@ -10,7 +10,7 @@ Zwei Snaps, bewusst getrennt:
 | Ziel | Snap Store | **nur lokal**, enthält den privaten Schlüssel |
 | Ergebnis | `target/snap/jz-werkbank_1.5.0_amd64.snap` | `~/Lizenzgeber-Pakete/werkbank-lizenzgeber_1.5.0_amd64.snap` (Rechte 600) |
 
-Stand 7.11.2026: Beide Snaps **gebaut** (App 666 MB, Lizenzgeber 17 MB) und der Inhalt mit `unsquashfs -l` geprüft. **Installiert und gestartet wurde noch keiner**: die Prüfliste in Abschnitt 2 steht aus.
+Stand 7.11.2026: Beide Snaps **gebaut** (App 666 MB (alte Fassung; nach der Verschlankung am 8.11.2026 rund 50 MB), Lizenzgeber 17 MB) und der Inhalt mit `unsquashfs -l` geprüft. **Installiert und gestartet wurde noch keiner**: die Prüfliste in Abschnitt 2 steht aus.
 
 ## 1. Einmal vorbereiten
 
@@ -23,7 +23,7 @@ sudo lxd init --auto
 sudo usermod -aG lxd "$USER"            # danach neu anmelden
 ```
 
-Der erste Build lädt das Container-Image, Rust 1.99.1, LanguageTool (250 MB), Typst und die Ubuntu-Pakete. Das dauert 15 bis 30 Minuten und braucht Netz. Folgebuilds sind schneller.
+Der erste Build lädt das Container-Image, Rust 1.99.1 und die Ubuntu-Pakete. Das dauert 15 bis 30 Minuten und braucht Netz. Folgebuilds sind schneller.
 
 ## 2. JZ Werkbank bauen und testen
 
@@ -41,11 +41,11 @@ Die Skripte müssen in einem **Terminal** laufen: ohne Terminal bricht snapcraft
 
 1. Das Fenster öffnet sich (Wayland und X11), Dateidialoge funktionieren.
 2. Einen Buchordner im Home öffnen und speichern. Einstellungen liegen unter `~/snap/jz-werkbank/current/.config/werkbank/`.
-3. Sprachprüfung: Der LanguageTool-Server startet von selbst (Einstellungen: Ordner `/snap/jz-werkbank/current/opt/languagetool`, Java `java`). Der erste Start braucht einige Sekunden.
+3. Sprachprüfung: Der Snap enthält LanguageTool nicht. Java und LanguageTool auf dem Rechner installieren und den Server im Terminal starten (`java -cp languagetool-server.jar org.languagetool.server.HTTPServer --port 8081`). In den Einstellungen (Seite „Prüfung“) steht die Anleitung unter ⓘ; „Verbindung testen“ muss auf `http://localhost:8081` „Erreichbar“ zeigen.
 4. Rechtschreibung: Hunspell-Wörterbuch `de-DE` wird gefunden.
-5. Einstellungen → Externe Werkzeuge → „Erneut prüfen“: Pandoc, Typst und rustc erscheinen mit Version, Ghostscript, Dart und Flutter fehlen (gewollt).
+5. Einstellungen → Werkzeuge → „Erneut prüfen“: Pandoc, Typst-Programm, Ghostscript, Rust, Dart und Flutter fehlen (gewollt), bei „Skripte“ stehen Bash und sh; oben steht der Snap-Hinweis.
 6. Buch setzen: Druck-PDF, Lese-PDF, EPUB, Cover.
-7. Code-Prüfer mit einem Rust-Beispiel.
+7. Skript-Prüfer mit einem Bash-Beispiel (der Rust- und Dart-Prüfer gehen im Snap nicht).
 8. Eine erzeugte Datei „im Programm öffnen“ (`xdg-open` über das Portal). Das ist der unsicherste Punkt.
 9. Lizenzschlüssel einlösen.
 
@@ -81,7 +81,7 @@ Gemeint ist der **Snap Store** von Canonical (snapcraft.io), der Software-Laden 
 ### Vorher
 
 1. **Testen:** Den Snap lokal installieren und die Prüfliste aus Abschnitt 2 durcharbeiten (`sudo snap install --dangerous …`).
-2. **Rechtliches klären:** Die Lizenzvereinbarung (`LIZENZVEREINBARUNG.md`, trägt noch den Vermerk „Entwurf, vor dem Verkauf rechtlich prüfen lassen“) liegt im Snap. Dazu die Quellcode-Zusage in `DRITTANBIETER.md` (Java, Pandoc, Wörterbücher), die du hier verbindlich eingehst.
+2. **Rechtliches klären:** Die Lizenzvereinbarung (`LIZENZVEREINBARUNG.md`) liegt im Snap. Dazu die Quellcode-Zusage in `DRITTANBIETER.md` (Hunspell-Wörterbücher und Abhängigkeiten), die du hier verbindlich eingehst.
 3. **Kauf und Testzeit:** Der Store verkauft keine Programme für dich. Der Snap ist kostenlos installierbar, die Werkbank läuft 28 Tage zur Probe, danach trägst du den Lizenzschlüssel aus deinem Kauf (Stripe, Webseite) ein. Das gehört in die Beschreibung im Store, damit niemand überrascht wird.
 
 ### Einmalig einrichten
@@ -106,7 +106,7 @@ Gemeint ist der **Snap Store** von Canonical (snapcraft.io), der Software-Laden 
    ```
    Der Store prüft den Snap automatisch (Struktur, Schnittstellen, Sicherheitsregeln). Das Ergebnis steht im Terminal und im Dashboard. Zwei Ausgänge:
    - *bestanden*: der Snap ist auf `edge` verfügbar.
-   - *manuelle Prüfung nötig*: Bei Schnittstellen wie `removable-media` oder `network-bind` und bei neuen Namen kann das Review-Team Fragen stellen. Antworte im Dashboard bzw. im Forum (https://forum.snapcraft.io, Kategorie „store-requests“). Im Zweifel die Schnittstelle in `snap/snapcraft.yaml` weglassen und neu hochladen.
+   - *manuelle Prüfung nötig*: Bei Schnittstellen und bei neuen Namen kann das Review-Team Fragen stellen. Antworte im Dashboard bzw. im Forum (https://forum.snapcraft.io, Kategorie „store-requests“). Im Zweifel die Schnittstelle in `snap/snapcraft.yaml` weglassen und neu hochladen.
 9. **Aus dem Store testen** (am besten auf einem frischen Rechner oder einer sauberen Sitzung):
    ```bash
    sudo snap install jz-werkbank --edge
@@ -145,14 +145,15 @@ Siehe Abschnitt 5. Kurz: Version erhöhen, bauen, mit `snapcraft upload --releas
 
 ## 5. Neue Version veröffentlichen
 
+0. Bei geänderten Abhängigkeiten: `python3 packaging/lizenzen.py`, `python3 packaging/lizenztexte.py` und `cargo deny check licenses` ausführen.
 1. Version in `Cargo.toml` (`[workspace.package]`) und in beiden `snapcraft.yaml` (`version:`) erhöhen.
 2. `packaging/snap/bauen.sh`, testen, hochladen.
-3. LanguageTool oder Typst aktualisieren: In `snap/snapcraft.yaml` die Version und die SHA-256-Summe im jeweiligen Teil ändern (`sha256sum datei`). Die Summe sorgt dafür, dass ein veränderter Download den Build abbricht.
+3. Rust-Version für den Bau ändern: In `snap/snapcraft.yaml` die Version bei `RUST=` ändern.
 
 ## 6. Was im Snap steckt
 
-- **Dabei:** LanguageTool 6.6, OpenJDK 21, Pandoc, Typst 0.15.1, Python 3, rustc 1.99.1, xdg-utils, Hunspell (de, en-US, en-GB, fr, es). Lizenzen: `DRITTANBIETER.md`.
-- **Nicht dabei:** Ghostscript, Dart, Flutter, Pandoc-Filter, Python-Module (außer der Standardbibliothek). Eigene Bauskripte, die weitere Module oder Programme brauchen, laufen im Snap nicht.
-- **Größe:** Erwartet werden 400 bis 600 MB. Wer sie senken will, kann in `languagetool` ungenutzte Sprachen löschen oder `rustc` weglassen.
-- **Sandbox:** `strict` mit `home`, `network`, `network-bind` (lokaler LanguageTool-Server), `removable-media` und der GNOME-Erweiterung (liefert Grafik, GTK-Dialoge, Portale). Nicht lesbar sind versteckte Ordner im Home (`~/.cargo`, `~/.config` …). Programme, die dort liegen (zum Beispiel ein eigenes Rust oder Flutter), sieht die Werkbank im Snap nicht.
+- **Dabei:** xdg-utils und Hunspell (de, en-US, en-GB, fr, es). Lizenzen: `DRITTANBIETER.md`.
+- **Nicht dabei, weil man sie selbst installieren kann:** LanguageTool und Java, Pandoc, das Typst-Programm, Python, Ghostscript, Rust, Dart und Flutter. Ein strikter Snap kann Programme des Systems nicht starten. Deshalb funktionieren diese im Snap auch nach eigener Installation nicht; nur LanguageTool geht, weil es als Server auf `localhost` läuft (Anleitung in der App). Der Buchsatz ist eingebaut. Wer den Rust-/Dart-Code-Prüfer, PDF/X-3, die Pandoc-Vorschau oder eigene Bauskripte braucht, nimmt DEB, RPM oder Flatpak. Der Skript-Prüfer funktioniert im Snap für Bash und sh (beide stammen aus der Snap-Basis); zsh, fish und PowerShell des Systems sieht der Snap nicht.
+- **Größe:** Ohne LanguageTool, Java, Pandoc und rustc ist der Snap nur noch rund 50 MB groß (die erste Fassung hatte 666 MB).
+- **Sandbox:** `strict` mit `home`, `network` und der GNOME-Erweiterung (liefert Grafik, GTK-Dialoge, Portale). Nicht lesbar sind versteckte Ordner im Home (`~/.cargo`, `~/.config` …) und Wechseldatenträger (`/media`, `/mnt`): `removable-media` ist bewusst nicht eingetragen. Bücher auf einem USB-Stick oder externen Laufwerk öffnet man über den Ordner-Dialog; die Portale geben der App dann Zugriff auf genau diesen Ordner. **Das muss vor der Veröffentlichung mit einem echten Stick getestet werden** (Ordner öffnen, bearbeiten, speichern, neu starten). Klappt es nicht, `- removable-media` unter `plugs:` wieder eintragen und im Forum um Auto-Verbindung bitten.
 - **Name in der Oberfläche:** Der Snap, die Desktop-Datei und der Store-Eintrag heißen „JZ Werkbank“. Fenstertitel, Handbuch, Deb/RPM/Flatpak und der Lizenzgeber heißen weiter „Werkbank“.

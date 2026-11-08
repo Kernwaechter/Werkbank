@@ -6,13 +6,43 @@ all-features = false
 confidence-threshold = 0.9
 allow = [
     "MIT", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "BSD-2-Clause", "BSD-3-Clause", "ISC",
-    "Zlib", "Unlicense", "CC0-1.0", "BSL-1.0", "0BSD", "NCSA", "Unicode-3.0", "Unicode-DFS-2016", "MPL-2.0",
+    "Zlib", "Unlicense", "CC0-1.0", "BSL-1.0", "0BSD", "NCSA", "Unicode-3.0", "Unicode-DFS-2016", "MPL-2.0", "CDLA-Permissive-2.0",
 ]
+
+# Eigene Crates (proprietär, publish = false) nicht gegen die Liste prüfen
+[licenses.private]
+ignore = true
 
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
+allow-wildcard-paths = true
 
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+
+[advisories]
+# Jede Ausnahme ist begründet. Neu prüfen bei jedem Update von typst, iced und epub-builder.
+ignore = [
+    # zip 6 steckt in epub-builder (neueste Version 0.8.3). Die Werkbank schreibt EPUBs nur (ZipWriter),
+    # `extract` und das Lesen fremder ZIP-Dateien werden nirgends aufgerufen. Eigenes zip ist auf 9 aktualisiert.
+    { id = "RUSTSEC-2026-0367", reason = "nur in ZipArchive::extract, wird nicht verwendet (epub-builder schreibt nur)" },
+    { id = "RUSTSEC-2026-0368", reason = "nur in ZipArchive::extract, wird nicht verwendet" },
+    { id = "RUSTSEC-2026-0369", reason = "nur in extract, wird nicht verwendet" },
+    { id = "RUSTSEC-2026-0429", reason = "nur in extract, wird nicht verwendet" },
+    # quick-xml 0.36 steckt in typst 0.13 (citationberg/hayagriva, Literaturverzeichnisse). Behebung mit dem Wechsel auf Typst 0.15.
+    { id = "RUSTSEC-2026-0194", reason = "über typst/hayagriva; nur Laufzeit-DoS bei eigenen Literaturdateien; Typst-Update vormerken" },
+    { id = "RUSTSEC-2026-0195", reason = "über typst/hayagriva; nur DoS bei eigenen Literaturdateien; Typst-Update vormerken" },
+    # Nicht mehr gepflegte Crates ohne bekannte Sicherheitslücke, tief in iced und typst
+    { id = "RUSTSEC-2025-0141", reason = "bincode, über syntect" },
+    { id = "RUSTSEC-2024-0436", reason = "paste, über typst und wgpu; Makro zur Compile-Zeit" },
+    { id = "RUSTSEC-2026-0441", reason = "pin-utils, über iced" },
+    { id = "RUSTSEC-2026-0206", reason = "rustybuzz, über typst" },
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser, über typst und iced" },
+    { id = "RUSTSEC-2024-0449", reason = "unsafe-libyaml, über typst" },
+    { id = "RUSTSEC-2024-0320", reason = "yaml-rust, über syntect/typst" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names, über iced/winit" },
+    { id = "RUSTSEC-2026-0370", reason = "zvariant, über iced/winit" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive, über iced/winit" },
+]

@@ -66,7 +66,7 @@ pub const SEITEN: [(&str, &str); 5] = [
     ("Allgemein", "Lizenz, automatisch speichern, Tagespensum"),
     ("Editor", "Design, Schrift, Zeilenabstand, Spaltenbreite"),
     ("Prüfung", "Rechtschreibung, LanguageTool, Ausnahmen"),
-    ("Werkzeuge", "Pandoc, Typst, Ghostscript, Rust, Dart/Flutter"),
+    ("Werkzeuge", "Pandoc, Typst, Ghostscript, Java, Rust, Dart/Flutter, Skripte"),
     ("Tastenkürzel", "Kürzel ändern und zurücksetzen"),
 ];
 
@@ -90,11 +90,21 @@ struct Schritt {
 const ZIP_URL: &str = "https://languagetool.org/download/LanguageTool-stable.zip";
 
 fn anleitung(system: Betriebssystem) -> Vec<Schritt> {
-    let verbinden = Schritt {
-        titel: "In der Werkbank unter „Lokaler Server“ den entpackten Ordner wählen (darin liegt \
-                languagetool-server.jar) und „Server starten“ klicken. Nach etwa 10–30 Sekunden \
-                steht die Verbindung auf „Erreichbar“.",
-        befehle: &[],
+    let verbinden = if crate::einstellungen::im_snap() {
+        Schritt {
+            titel: "Snap-Version: Die Werkbank kann Java nicht selbst starten. Im Terminal in den entpackten \
+                    Ordner wechseln (zum Beispiel cd ~/LanguageTool-6.6) und den Server starten. Das Fenster \
+                    offen lassen, solange du schreibst. Danach bei „Server“ die Adresse http://localhost:8081 \
+                    eintragen und „Verbindung testen“ wählen.",
+            befehle: &["java -cp languagetool-server.jar org.languagetool.server.HTTPServer --port 8081"],
+        }
+    } else {
+        Schritt {
+            titel: "In der Werkbank unter „Lokaler Server“ den entpackten Ordner wählen (darin liegt \
+                    languagetool-server.jar) und „Server starten“ klicken. Nach etwa 10–30 Sekunden \
+                    steht die Verbindung auf „Erreichbar“.",
+            befehle: &[],
+        }
     };
     let docker = Schritt {
         titel: "Alternative ohne Java: Server als Docker-Container betreiben. Dann bei der \
@@ -204,6 +214,8 @@ pub struct LizenzFelder<'a> {
     pub email: &'a str,
     pub schluessel: &'a str,
     pub meldung: Option<&'a str>,
+    /// Rückfrage „Lizenz deaktivieren?“ ist offen.
+    pub frage: bool,
 }
 
 /// Abschnitt „Lizenz“: Status, Felder für E-Mail-Adresse und Schlüssel, Aktivieren und Kaufen.
@@ -214,6 +226,30 @@ fn lizenz_abschnitt<'a>(l: LizenzFelder<'a>) -> Element<'a, Message> {
     if matches!(l.status, LizenzStatus::Gueltig { .. } | LizenzStatus::NichtEingerichtet) {
         if let Some(m) = l.meldung {
             spalte = spalte.push(text(m).size(12).color(thema::text_gedimmt()));
+        }
+        if matches!(l.status, LizenzStatus::Gueltig { .. }) {
+            if l.frage {
+                spalte = spalte
+                    .push(
+                        text("Der Schlüssel wird von diesem Gerät entfernt und die Werkbank hier gesperrt. Danach öffnet sich eine E-Mail an den Anbieter, damit die neue Person einen eigenen Schlüssel bekommt (Lizenzvereinbarung, Abschnitt 4a).")
+                            .size(12)
+                            .color(thema::text_gedimmt()),
+                    )
+                    .push(
+                        row![
+                            button(text("Ja, deaktivieren").size(12)).padding([5, 12]).style(thema::primaer_knopf_stil).on_press(Message::LizenzDeaktivieren),
+                            button(text("Abbrechen").size(12)).padding([5, 12]).style(thema::sekundaer_knopf_stil).on_press(Message::LizenzDeaktivierenFrage(false)),
+                        ]
+                        .spacing(8),
+                    );
+            } else {
+                spalte = spalte.push(
+                    button(text("Lizenz weitergeben (deaktivieren) …").size(12))
+                        .padding([5, 12])
+                        .style(thema::sekundaer_knopf_stil)
+                        .on_press(Message::LizenzDeaktivierenFrage(true)),
+                );
+            }
         }
         return spalte.into();
     }
@@ -458,6 +494,16 @@ pub fn ansicht<'a>(
             button(text("Erneut prüfen").size(10)).padding([2, 8]).style(thema::sekundaer_knopf_stil).on_press(Message::WerkzeugePruefen),
         ]
         .align_y(Alignment::Center),
+    ]
+    .spacing(8);
+    if crate::einstellungen::im_snap() {
+        werkzeug_spalte = werkzeug_spalte.push(
+            text("Snap-Version: Der Snap läuft in einer abgeschirmten Umgebung und kann Programme deines Systems nicht starten. Pandoc, das Typst-Programm, Ghostscript, Rust, Dart und Flutter bleiben deshalb \"nicht gefunden\", auch wenn du sie installierst; der Rust- und Dart-Code-Prüfer ist im Snap nicht nutzbar. Bash- und sh-Beispiele prüft der Skript-Prüfer weiterhin. Der Buchsatz (Druck-PDF, Lese-PDF, EPUB, Cover) ist eingebaut und braucht sie nicht. Brauchst du den Code-Prüfer für Rust oder Dart, die PDF/X-3-Druckdatei (Ghostscript), die Pandoc-Vorschau oder eigene Bauskripte, nimm das DEB-, RPM- oder Flatpak-Paket von werkbank.jurzel-apps.de. Die Sprachprüfung läuft über einen eigenen Server, siehe Seite „Prüfung“.")
+                .size(11)
+                .color(thema::warnung_orange()),
+        );
+    }
+    werkzeug_spalte = werkzeug_spalte.push(column![
         werkzeug_zeile(
             "Pandoc",
             &werkzeuge.pandoc,
@@ -486,6 +532,29 @@ pub fn ansicht<'a>(
         ),
         abschnitt("Code-Prüfer"),
         werkzeug_zeile("Rust", &werkzeuge.rustc, 3, "rustc prüft die Rust-Beispiele des Buches auf Typfehler (Bereich Prüfen).", None),
+        if crate::einstellungen::im_snap() {
+            column![
+                row![text("Java").size(12).color(thema::text_hell()).width(110), text("läuft außerhalb des Snaps").size(12).color(thema::text_gedimmt())].spacing(8),
+                text("Java und LanguageTool installierst und startest du selbst im Terminal (siehe Seite „Prüfung“). Der Snap sieht Java nicht, deshalb gibt es hier keine Prüfung.").size(10).color(thema::text_gedimmt()),
+            ]
+            .spacing(2)
+            .into()
+        } else {
+            werkzeug_zeile(
+                "Java",
+                &werkzeuge.java,
+                7,
+                "Java 17 oder neuer lässt den LanguageTool-Server laufen (Sprachprüfung). Ohne Java läuft nur die Rechtschreibung.",
+                (werkzeuge.java.is_some() && !werkzeuge.java_brauchbar()).then_some("zu alt: ab Version 17 nötig"),
+            )
+        },
+        werkzeug_zeile(
+            "Skripte",
+            &(!werkzeuge.skript.is_empty()).then(|| werkzeuge.skript.join(" · ")),
+            6,
+            "Prüft bash-, sh-, zsh-, fish- und powershell-Beispiele auf Syntaxfehler, ohne sie auszuführen. Jede installierte Shell zählt; ShellCheck ist optional.",
+            None,
+        ),
         werkzeug_zeile(
             "Dart / Flutter",
             &dart_flutter,
@@ -494,7 +563,7 @@ pub fn ansicht<'a>(
             (werkzeuge.dart.is_some() && werkzeuge.flutter.is_none()).then_some("ohne Flutter: Flutter-Beispiele werden übersprungen"),
         ),
     ]
-    .spacing(8);
+    .spacing(8));
     if fenster.werkzeug_info != 0 {
         werkzeug_spalte = werkzeug_spalte.push(werkzeug_anleitung(fenster.werkzeug_info, fenster.system));
     }
@@ -630,6 +699,22 @@ pub fn ansicht<'a>(
     ]
     .spacing(6);
 
+    // Snap: Java und LanguageTool liegen nicht im Paket und sind aus der Sandbox nicht startbar
+    let lokal = if crate::einstellungen::im_snap() {
+        column![
+            abschnitt("LanguageTool im Snap"),
+            text("Der Snap enthält LanguageTool und Java nicht. Du installierst sie selbst und startest den Server in einem Terminal; die Werkbank verbindet sich dann über die Adresse oben (http://localhost:8081). Die Schritte stehen unter dem Info-Symbol ⓘ neben „Sprachprüfung (LanguageTool)“.")
+                .size(11)
+                .color(thema::text_gedimmt()),
+            text("Kurz: 1. Java 17 oder neuer installieren (sudo apt install default-jre). 2. LanguageTool laden und entpacken (https://languagetool.org/download/LanguageTool-stable.zip). 3. Im entpackten Ordner: java -cp languagetool-server.jar org.languagetool.server.HTTPServer --port 8081. 4. Hier „Verbindung testen“.")
+                .size(11)
+                .color(thema::text_gedimmt()),
+        ]
+        .spacing(6)
+    } else {
+        lokal
+    };
+
     let mut ausnahmen_spalte = column![abschnitt("Ausnahmen für dieses Buch")].spacing(6);
     if ausnahmen.regeln.is_empty() && ausnahmen.woerter.is_empty() {
         ausnahmen_spalte = ausnahmen_spalte.push(
@@ -761,6 +846,34 @@ fn werkzeug_anleitung<'a>(welches: u8, system: Betriebssystem) -> Element<'a, Me
             ("Oder per Git in den Home-Ordner:", "git clone https://github.com/flutter/flutter.git -b stable ~/flutter"),
             ("Flutter bringt Dart mit. Die Werkbank findet es auch unter ~/flutter oder ~/Development/flutter und über FLUTTER_ROOT.", ""),
         ]),
+        (7, Betriebssystem::Windows) => ("Java", "https://adoptium.net/", vec![
+            ("Java 17 oder neuer, mit winget (PowerShell), danach ein neues Fenster öffnen:", "winget install --id EclipseAdoptium.Temurin.21.JRE"),
+            ("Oder den Installer von adoptium.net laden und ausführen.", ""),
+        ]),
+        (7, Betriebssystem::MacOs) => ("Java", "https://adoptium.net/", vec![
+            ("Java 17 oder neuer mit Homebrew:", "brew install --cask temurin@21"),
+        ]),
+        (7, Betriebssystem::Linux) => ("Java", "https://adoptium.net/", vec![
+            ("Debian, Ubuntu, Mint (apt):", "sudo apt install default-jre"),
+            ("Fedora, RHEL (dnf):", "sudo dnf install java-latest-openjdk"),
+            ("Arch, Manjaro (pacman):", "sudo pacman -S jre-openjdk"),
+            ("Prüfen, ob die Version reicht (17 oder höher):", "java -version"),
+        ]),
+        (6, Betriebssystem::Windows) => ("Shells und ShellCheck", "https://learn.microsoft.com/powershell/", vec![
+            ("Die Skript-Prüfung ist optional. Sie nutzt, was installiert ist. Für Bash-Beispiele Git für Windows (bringt bash mit):", "winget install --id Git.Git"),
+            ("PowerShell 7 (pwsh):", "winget install --id Microsoft.PowerShell"),
+            ("ShellCheck (für zusätzliche Hinweise bei Bash/sh):", "winget install --id koalaman.shellcheck"),
+        ]),
+        (6, Betriebssystem::MacOs) => ("Shells und ShellCheck", "https://www.shellcheck.net/", vec![
+            ("Bash und Zsh sind vorhanden. ShellCheck, Fish und PowerShell mit Homebrew:", "brew install shellcheck fish"),
+            ("PowerShell:", "brew install --cask powershell"),
+        ]),
+        (6, Betriebssystem::Linux) => ("Shells und ShellCheck", "https://www.shellcheck.net/", vec![
+            ("Bash und sh sind fast überall vorhanden. Weitere Shells und ShellCheck, Debian, Ubuntu, Mint (apt):", "sudo apt install zsh fish shellcheck"),
+            ("Fedora, RHEL (dnf):", "sudo dnf install zsh fish ShellCheck"),
+            ("Arch, Manjaro (pacman):", "sudo pacman -S zsh fish shellcheck"),
+            ("PowerShell (pwsh), zum Beispiel mit Snap:", "sudo snap install powershell --classic"),
+        ]),
         (5, Betriebssystem::Windows) => ("Typst", "https://typst.app/open-source/", vec![
             ("Der Satz ist eingebaut, ein Typst-Programm brauchst du nur für die alten Bauskripte. Mit winget (PowerShell):", "winget install --id Typst.Typst"),
             ("Oder mit Scoop:", "scoop install typst"),
@@ -824,7 +937,8 @@ fn werkzeug_anleitung<'a>(welches: u8, system: Betriebssystem) -> Element<'a, Me
             1 => Some("JohnMacFarlane.Pandoc"),
             3 => Some("Rustlang.Rustup"),
             5 => Some("Typst.Typst"),
-            4 => None,
+            7 => Some("EclipseAdoptium.Temurin.21.JRE"),
+            4 | 6 => None,
             _ => None, // Ghostscript ist nicht in winget
         };
         if let Some(id) = id {

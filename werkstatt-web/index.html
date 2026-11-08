@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Werkbank</title>
-<meta name="description" content="Schreibwerkzeug für Fachbuchautoren: Markdown, Code-Prüfung mit dem echten Compiler, Satz zu PDF/X-3 und EPUB 3, Cover und Barcode für Tolino und KDP, Zeitleiste für alle Fassungen. Einmalig 49 €, kein Abo.">
+<meta name="description" content="Schreibwerkzeug für Fachbuchautoren: Markdown, Code-Prüfung mit dem echten Compiler und Skript-Prüfung, Satz zu PDF/X-3 und EPUB 3, Cover und Barcode für Tolino und KDP, Zeitleiste für alle Fassungen. Einmalig 49 €, kein Abo.">
 <link rel="stylesheet" href="schriften/schriften.css">
 <style>
 /* Layout: eine ruhige Werkstatt-Seite. Links gesetzter Text, rechts das Produkt, dazwischen Schnittzeichnungen
@@ -344,7 +344,7 @@ section { padding-block: 84px 0; }
       <a href="#cover">Cover</a>
       <a href="#daten">Daten</a>
       <a href="#download">Download</a>
-      <a href="installation.html">Installation</a>
+      <a href="installation.html">Hilfsprogramme</a>
       <a href="#kaufen">Kaufen</a>
       <a href="#kontakt">Kontakt</a>
     </nav>
@@ -437,7 +437,7 @@ section { padding-block: 84px 0; }
       <p class="lead">Ein Buch mit Code, Abbildungen und Verweisen scheitert selten am Schreiben, sondern am Drumherum: Beispiele, die nicht mehr laufen, Satz, der nicht zum Verlag oder zu KDP passt, Fassungen, die verloren gehen. Dafür gibt es hier jeweils eine Antwort.</p>
     </div>
     <div class="raster">
-      <div><h3>Code, der kompiliert</h3><p>Jedes Rust-Beispiel prüft der echte Compiler, Dart und Flutter prüft <span class="tastatur">dart analyze</span>. Im Buch steht nur, was läuft, und nach dem nächsten Compiler-Update weißt du, welche Listings brechen.</p></div>
+      <div><h3>Code, der kompiliert</h3><p>Jedes Rust-Beispiel prüft der echte Compiler, Dart und Flutter prüft <span class="tastatur">dart analyze</span>, Shell-Beispiele (Bash, Zsh, Fish, PowerShell) prüft die Werkbank auf Syntaxfehler, ohne sie auszuführen. Im Buch steht nur, was läuft, und nach dem nächsten Compiler-Update weißt du, welche Listings brechen.</p></div>
       <div><h3>Vom Markdown zum fertigen Buch</h3><p>Eigener Satz mit Typst: Druck-PDF (PDF/X-3), Lese-PDF und EPUB 3 aus denselben Dateien, mit den Seitenzahlen, die das Buch wirklich hat. Ohne Pandoc-Skripte, ohne Word.</p></div>
       <div><h3>Tolino und KDP in einem Zug</h3><p>Der Cover-Designer setzt Vorderseite, Rücken (nach Seitenzahl) und Rückseite, rechnet die Maße der Portale und setzt den Barcode aus der ISBN. Vorschau in Farbe und in Graustufen für E-Reader.</p></div>
       <div><h3>Nichts geht verloren</h3><p>Jedes Speichern sichert die alte Fassung. Die Zeitleiste zeigt sie nach Tagen und Schreibsitzungen, vergleicht wortgenau mit dem aktuellen Text und holt ein Kapitel oder nur eine Passage zurück.</p></div>
@@ -569,7 +569,7 @@ section { padding-block: 84px 0; }
       <div><h3>Befehlspalette</h3><p><span class="tastatur">Strg+K</span> öffnet jede Funktion, jedes Kapitel und jede Einstellungsseite. Ein Rechtsklick auf ein Kapitel zeigt die passenden Aktionen. Alle Kürzel lassen sich umbelegen.</p></div>
       <div><h3>Tastatur zuerst</h3><p>Knöpfe, Schalter, Regler und Listen sind mit Tab und F6 erreichbar. Enter löst aus, Pfeile stellen ein.</p></div>
       <div><h3>Querverweise</h3><p>Mit <span class="tastatur">@kap:name</span> verweist du auf ein Kapitel. Die Werkbank löst es auf und meldet kaputte Verweise.</p></div>
-      <div><h3>Code, der kompiliert</h3><p>Rust-Beispiele prüft die Werkbank mit dem echten Compiler, Dart- und Flutter-Beispiele mit <span class="tastatur">dart analyze</span>. So steht im Buch nur Code, der läuft.</p></div>
+      <div><h3>Code, der kompiliert</h3><p>Rust-Beispiele prüft die Werkbank mit dem echten Compiler, Dart- und Flutter-Beispiele mit <span class="tastatur">dart analyze</span>. Shell-Skripte (Bash, sh, Zsh, Fish, PowerShell) prüft sie auf Syntaxfehler, ohne etwas auszuführen, mit ShellCheck zusätzlich auf echte Fehler. Was auf deinem Rechner nicht installiert ist, wird übersprungen. So steht im Buch nur Code, der läuft.</p></div>
       <div><h3>Mehrere Bände</h3><p>Öffne einen Ordner mit einem Buchprojekt und wechsle zwischen den Bänden, ohne die App zu schließen. Suchen und Ersetzen geht über alle Bände.</p></div>
       <div><h3>Statistik</h3><p>Wörter pro Tag, Schreibzeit, Wortziele und Status pro Kapitel.</p></div>
     </div>
@@ -672,7 +672,7 @@ section { padding-block: 84px 0; }
       <p class="lead">Dein Buch besteht aus Markdown-Dateien in einem Ordner. Die Werkbank liest und schreibt sie Byte für Byte so, wie du sie ablegst, und braucht kein Konto und keinen Server.</p>
     </div>
     <ul class="liste" style="max-width:760px">
-      <li><div><b>Hilfsmittel im Blick.</b> <span>Die Einstellungen zeigen, ob Ghostscript, Pandoc, Rust und Flutter/Dart installiert sind und in welcher Version, dazu Wörterbuch und LanguageTool. Wenn etwas fehlt, erklärt ein Info-Symbol die Installation für Windows, macOS, Debian, Fedora und Arch. Alles auf einer Seite: <a href="installation.html">Hilfsprogramme installieren</a>.</span></div></li>
+      <li><div><b>Hilfsmittel im Blick.</b> <span>Die Einstellungen zeigen, ob Ghostscript, Pandoc, Java, Rust, Flutter/Dart und die Shells des Skript-Prüfers installiert sind und in welcher Version, dazu Wörterbuch und LanguageTool. Wenn etwas fehlt, erklärt ein Info-Symbol die Installation für Windows, macOS, Debian, Fedora und Arch. Alles auf einer Seite: <a href="installation.html">Hilfsprogramme installieren</a>.</span></div></li>
       <li><div><b>Deutsch zuerst.</b> <span>Oberfläche, Handbuch und Sprachprüfung sind auf deutsche Fachbücher zugeschnitten.</span></div></li>
     </ul>
   </section>
@@ -686,6 +686,9 @@ section { padding-block: 84px 0; }
     <div class="neu14" style="max-width:760px;margin:0 0 22px">
       <p class="marke">Neu in Version 1.5</p>
       <ul class="liste">
+        <li><div><b>Skript-Prüfer.</b> <span>Bash-, sh-, Zsh-, Fish- und PowerShell-Beispiele im Buch werden auf Syntaxfehler geprüft, ohne ausgeführt zu werden. Welche Shells laufen, hängt von deinem Rechner ab; ShellCheck ist optional.</span></div></li>
+        <li><div><b>Java im Blick.</b> <span>Die Einstellungen prüfen, ob Java 17 oder neuer für LanguageTool installiert ist, und erklären die Installation für Linux, macOS und Windows.</span></div></li>
+        <li><div><b>Lizenz weitergeben.</b> <span>Du kannst deine Lizenz dauerhaft an eine andere Person übergeben: in den Einstellungen deaktivieren, mir kurz Bescheid geben, die neue Person bekommt einen eigenen Schlüssel.</span></div></li>
         <li><div><b>Zeitleiste statt Sicherungsliste.</b> <span>Frühere Stände nach Tagen und Schreibsitzungen, mit Wortzuwachs und wortgenauem Vergleich zum aktuellen Text. <span class="tastatur">Strg+H</span> oder ein Klick auf den Speicherstand öffnet sie.</span></div></li>
         <li><div><b>Zurückholen nach Maß.</b> <span>Ganzes Kapitel, einzelne Passage, Kopie als neues Kapitel oder Export als Datei. Der aktuelle Text wird vorher selbst gesichert.</span></div></li>
         <li><div><b>Benennen und aufräumen.</b> <span>Stände mit Namen bleiben immer erhalten; das Aufräumen alter Stände ist freiwillig und zeigt vorher, was gelöscht würde.</span></div></li>
@@ -696,28 +699,14 @@ section { padding-block: 84px 0; }
         <li><div><b>Korrigiert.</b> <span>Die Zeit einer Sicherung nennt jetzt, wann der Text entstand, nicht wann er ersetzt wurde.</span></div></li>
       </ul>
     </div>
-    <p class="hinweis-version" style="max-width:760px;margin:0 0 18px;padding:12px 16px;border:1px solid var(--linie);border-left:3px solid var(--akzent);border-radius:8px;background:var(--flaeche)"><b>Windows und macOS sind noch bei Version 1.3.0.</b> Die Pakete für 1.5 folgen. Alle Neuerungen von 1.4 und 1.5 stecken erst in den Linux-Paketen (.deb, .rpm, Flatpak).</p>
+    <p class="hinweis-version" style="max-width:760px;margin:0 0 18px;padding:12px 16px;border:1px solid var(--linie);border-left:3px solid var(--akzent);border-radius:8px;background:var(--flaeche)"><b>Zurzeit nur für Linux.</b> Pakete für Windows und macOS sind in Vorbereitung und erscheinen hier, sobald sie fertig sind.</p>
     <div class="downloads">
-      <div class="download">
-        <span class="marke">Windows 10 und 11 · 64 Bit · Version 1.3.0</span>
-        <h3>Installationsprogramm</h3>
-        <a class="knopf" href="downloads/Werkbank-1.3.0-Setup.exe" download>Herunterladen</a>
-        <p>Doppelklick auf die Datei startet die Installation. Windows warnt beim ersten Start eventuell vor einem unbekannten Herausgeber: „Weitere Informationen“, dann „Trotzdem ausführen“.</p>
-        <code>SHA-256: 0b1dab1c33ec0210d47b3c095947c051f44936ba0bb75668744a4cf8b6d510dd</code>
-      </div>
-      <div class="download">
-        <span class="marke">macOS 12 oder neuer · Apple Silicon · Version 1.3.0</span>
-        <h3>Disk-Image (.dmg)</h3>
-        <a class="knopf" href="downloads/Werkbank-1.3.0-macOS-arm64.dmg" download>Herunterladen</a>
-        <p>DMG öffnen und die Werkbank in „Programme“ ziehen. Beim ersten Start meldet macOS einen nicht verifizierten Entwickler: Rechtsklick auf die App, „Öffnen“, dann „Öffnen“ bestätigen (oder unter Systemeinstellungen → Datenschutz &amp; Sicherheit „Trotzdem öffnen“).</p>
-        <code>SHA-256: 8572097f6c04ebc99d5843ffb653d0949e3197efe88103ae842b814bbc67cb6d</code>
-      </div>
       <div class="download">
         <span class="marke">Linux · Debian, Ubuntu, Mint · Version 1.5.0</span>
         <h3>.deb-Paket</h3>
         <a class="knopf" href="downloads/werkbank_1.5.0-1_amd64.deb" download>Herunterladen</a>
         <p>Installieren mit <code>sudo apt install ./werkbank_1.5.0-1_amd64.deb</code></p>
-        <code>SHA-256: 5654623f9dff661f8a8d2575de1371006ffa5d0ecf893e2a7c59c7dcbd0780eb</code>
+        <code>SHA-256: 0853291d2b0da0b05a105e22b86825bfc0f941c8dbf6fecf3ffbf74783b93f44</code>
       </div>
       <div class="download">
         <span class="marke">Linux · Fedora, openSUSE · Version 1.5.0</span>
@@ -725,17 +714,23 @@ section { padding-block: 84px 0; }
         <a class="knopf" href="downloads/werkbank-1.5.0-1.x86_64.rpm" download>Herunterladen</a>
         <p>Installieren mit <code>sudo dnf install ./werkbank-1.5.0-1.x86_64.rpm</code></p>
         <p>Das Paket ist <b>signiert</b> (Schlüssel <a href="downloads/werkbank-rpm-signatur.asc" download>werkbank-rpm-signatur.asc</a>, Fingerabdruck <code>B5F7 C6A0 B91A FFB2 6559 0479 7D42 1D3F 8ED0 EDD7</code>). Prüfen mit <code>sudo rpm --import werkbank-rpm-signatur.asc</code> und <code>rpm --checksig werkbank-1.5.0-1.x86_64.rpm</code>.</p>
-        <code>SHA-256: 219a97df007960d113cbdfab2fbf152b2f8dc0d5c200667e455fc9b660c00e7c</code>
+        <code>SHA-256: 21e20e40e8a3e20f540ec579fcfa70c594f57685cad33978eecb4c4f9dbffdc5</code>
       </div>
       <div class="download">
         <span class="marke">Linux · alle Distributionen · Version 1.5.0</span>
         <h3>Flatpak</h3>
         <a class="knopf" href="downloads/werkbank-1.5.0.flatpak" download>Herunterladen</a>
         <p>Installieren mit <code>flatpak install ./werkbank-1.5.0.flatpak</code>, starten mit <code>flatpak run de.daehn.Werkbank</code>. In der Flatpak-Sandbox fehlen die Programme deines Systems (Java, Rust, Pandoc): Schreiben, Satz, EPUB und Cover laufen vollständig, die Sprachprüfung braucht dann einen LanguageTool-Server außerhalb.</p>
-        <code>SHA-256: 31d464b501fb7c495a27b432f573d844e3b5b922b8c56e3be28cfae2aeb83605</code>
+        <code>SHA-256: d30e68b4a1230ce7b5de2ecc20ab285a4985a8bc10dfccfb2b324e786f180205</code>
+      </div>
+      <div class="download" id="vormerken">
+        <span class="marke">Windows und macOS · in Vorbereitung</span>
+        <h3>Bescheid bekommen</h3>
+        <p>Die Pakete für Windows und macOS (Apple Silicon) sind noch nicht fertig. Lass dich vormerken, dann schreibe ich dir einmal, sobald sie erscheinen. Mehr passiert mit deiner Adresse nicht (<a href="datenschutz.html#vormerken">Datenschutz</a>).</p>
+        <a class="knopf leise" href="mailto:kontakt@jurzel.de?subject=Werkbank%20vormerken&amp;body=Bitte%20informiert%20mich%2C%20wenn%20die%20Werkbank%20f%C3%BCr%20Windows%20bzw.%20macOS%20erscheint.%0D%0A%0D%0ASystem%20(Windows%20oder%20macOS)%3A%20">Per E-Mail vormerken lassen</a>
       </div>
     </div>
-    <p class="bildnotiz">Version 1.5.0 für Linux (64 Bit); für Windows und macOS (Apple Silicon) ist es noch Version 1.3.0. Nach der Installation startest du die Werkbank aus dem Startmenü bzw. Anwendungsmenü. Die Prüfsummen kannst du unter Linux mit <span class="tastatur">sha256sum</span>, unter macOS mit <span class="tastatur">shasum -a 256</span>, unter Windows in PowerShell mit <span class="tastatur">Get-FileHash</span> vergleichen.</p>
+    <p class="bildnotiz">Version 1.5.0 für Linux (64 Bit). Nach der Installation startest du die Werkbank aus dem Anwendungsmenü. Die Prüfsummen vergleichst du mit <span class="tastatur">sha256sum</span>.</p>
 
     <div class="brauchst" id="werkzeuge">
       <h3>Was du dazu brauchst</h3>
@@ -745,13 +740,15 @@ section { padding-block: 84px 0; }
         <tbody>
           <tr><td>Hunspell-Wörterbuch Deutsch</td><td>Rechtschreibung im Editor, offline</td><td><span class="stufe ja">empfohlen</span></td></tr>
           <tr><td>Ghostscript</td><td>PDF/X-3 für den Druck und CMYK-Umschläge</td><td><span class="stufe druck">für den Druck</span></td></tr>
-          <tr><td>LanguageTool und Java 17+</td><td>Grammatik, Stil, Zeichensetzung</td><td><span class="stufe">optional</span></td></tr>
+          <tr><td>Java 17 oder neuer</td><td>Lässt den LanguageTool-Server laufen</td><td><span class="stufe">optional</span></td></tr>
+          <tr><td>LanguageTool</td><td>Grammatik, Stil, Zeichensetzung (braucht Java)</td><td><span class="stufe">optional</span></td></tr>
           <tr><td>Pandoc 3+</td><td>Nur für Bände, die noch eine eigene Pandoc-Kopfdatei (pdf-header.typ) nutzen</td><td><span class="stufe">optional</span></td></tr>
           <tr><td>Typst (Kommandozeile), Python 3</td><td>Nur für eigene Bauskripte, die diese Programme aufrufen</td><td><span class="stufe">optional</span></td></tr>
           <tr><td>Rust, Flutter oder Dart</td><td>Code-Prüfer für die Beispiele im Buch</td><td><span class="stufe">optional</span></td></tr>
+          <tr><td>Zsh, Fish, PowerShell, ShellCheck</td><td>Skript-Prüfer für die Shell-Beispiele (Bash und sh sind meist da)</td><td><span class="stufe">optional</span></td></tr>
         </tbody>
       </table>
-      <a class="knopf leise" href="installation.html">Installation für Linux, macOS und Windows</a>
+      <a class="knopf leise" href="installation.html">Hilfsprogramme installieren</a>
     </div>
   </section>
 
@@ -759,21 +756,26 @@ section { padding-block: 84px 0; }
     <div class="kopf-abschnitt">
       <p class="marke">Kaufen</p>
       <h2>Einmal bezahlen, dauerhaft nutzen</h2>
+      <p class="lead">Erst 28 Tage testen, dann entscheiden. Der Kauf lohnt sich, wenn dir die Werkbank beim Schreiben hilft.</p>
     </div>
     <div class="kauf">
       <div>
-        <p class="preis">49 €<small>einmalig, kein Abo</small></p>
+        <p class="preis">49 €<small>einmalig, inkl. Umsatzsteuer, kein Abo</small></p>
         <p class="marke" style="margin-top:14px">Einführungspreis</p>
       </div>
       <div>
         <ul class="liste" style="margin:0 0 24px">
-          <li><div><b>Lizenzschlüssel zu deiner E-Mail-Adresse.</b> <span>Du trägst Adresse und Schlüssel einmal in der Werkbank ein. Die Prüfung läuft offline.</span></div></li>
+          <li><div><b>Lizenzschlüssel zu deiner E-Mail-Adresse.</b> <span>Du bekommst ihn nach dem Kauf per E-Mail und trägst Adresse und Schlüssel einmal in der Werkbank ein. Die Prüfung läuft offline.</span></div></li>
+          <li><div><b>Unbefristet, für dich.</b> <span>Du nutzt die Werkbank auf deinen eigenen Geräten für deine Bücher, auch beruflich. Alles, was du schreibst, gehört dir.</span></div></li>
+          <li><div><b>Weitergeben erlaubt.</b> <span>Du kannst deine Lizenz dauerhaft an eine andere Person übergeben: in den Einstellungen deaktivieren, mir kurz Bescheid geben, die neue Person bekommt einen eigenen Schlüssel.</span></div></li>
           <li><div><b>Geht nicht verloren.</b> <span>Zu jeder Adresse gehört immer derselbe Schlüssel. Hast du ihn verlegt, schicke ich ihn dir erneut.</span></div></li>
         </ul>
         <div class="held-zeile">
-          <a class="knopf" id="kauf-knopf" data-checkout="https://buy.stripe.com/bJeeVd7Mn7HS52z3WR8so00" href="mailto:kontakt@jurzel.de?subject=Werkbank%20kaufen&body=Bitte%20schickt%20mir%20ein%20Angebot%20f%C3%BCr%20die%20Werkbank%20(49%20EUR).%0D%0A%0D%0AMeine%20E-Mail-Adresse%20f%C3%BCr%20die%20Lizenz%3A%20">Per E-Mail bestellen</a>
+          <a class="knopf" href="https://buy.stripe.com/bJeeVd7Mn7HS52z3WR8so00">Jetzt kaufen</a>
         </div>
-        <p class="bildnotiz" id="kauf-notiz">Die Online-Bezahlung wird noch angebunden. Bis dahin läuft die Bestellung per E-Mail. Die Werkbank lässt sich 28 Tage lang mit vollem Funktionsumfang testen.</p>
+        <p class="bildnotiz">Du wirst zur sicheren Kasse von Stripe weitergeleitet. Dort siehst du Preis, Umsatzsteuer und die Bedingungen, bevor du verbindlich bestellst. Zahlung, Rechnung und Steuer wickelt Stripe (Managed Payments) ab.</p>
+        <p class="bildnotiz"><b>Widerruf.</b> Als Verbraucher hast du bei Verträgen im Internet grundsätzlich ein Widerrufsrecht von 14 Tagen. Bei digitalen Inhalten kann es erlöschen, wenn du vor der Lieferung ausdrücklich zustimmst, dass die Lieferung sofort beginnt. Was für deinen Kauf gilt, zeigt dir der Bestellvorgang vor der Zahlung. Zum Ausprobieren dient die 28-tägige Testzeit.</p>
+        <p class="bildnotiz">Es gilt die <a href="lizenzvereinbarung.html">Lizenzvereinbarung</a>. Die Werkbank richtet sich an Privatpersonen (Endkunden); für Firmenlizenzen schreib mir bitte vorher.</p>
       </div>
     </div>
   </section>
@@ -786,20 +788,10 @@ section { padding-block: 84px 0; }
       <a class="knopf leise" href="#schreiben">Funktionen ansehen</a>
     </div>
   </div>
-  <footer class="fuss"><span><a href="impressum.html">Impressum</a> · <a href="datenschutz.html">Datenschutz</a></span><span>Werkbank 1.5.0 (Windows und macOS: 1.3.0) · <a href="mailto:kontakt@jurzel.de">kontakt@jurzel.de</a></span><span>Geschrieben in Rust mit Iced und Typst</span></footer>
+  <footer class="fuss"><span><a href="impressum.html">Impressum</a> · <a href="datenschutz.html">Datenschutz</a> · <a href="lizenzvereinbarung.html">Lizenzvereinbarung</a></span><span>Werkbank 1.5.0 (Linux) · <a href="mailto:kontakt@jurzel.de">kontakt@jurzel.de</a></span><span>Geschrieben in Rust mit Iced und Typst</span></footer>
 </div>
 
 <script>
-/* Kaufknopf: Sobald in data-checkout der Stripe-Zahlungslink steht (https://buy.stripe.com/…), führt er zur Kasse. */
-(function () {
-  var k = document.getElementById('kauf-knopf');
-  var url = k && k.getAttribute('data-checkout');
-  if (url && url.indexOf('https://') === 0) {
-    k.href = url;
-    k.textContent = 'Jetzt kaufen';
-    document.getElementById('kauf-notiz').textContent = 'Sichere Zahlung über Stripe. Den Lizenzschlüssel bekommst du per E-Mail. Die Werkbank lässt sich 28 Tage lang mit vollem Funktionsumfang testen.';
-  }
-})();
 (function () {
   var app = document.getElementById('app');
   var dunkel = document.getElementById('app-dunkel');

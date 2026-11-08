@@ -1,6 +1,6 @@
 //! # Prüfen
 //!
-//! Code-Prüfer für die Rust- und Dart/Flutter-Beispiele, Sprachprüfung über das ganze Buch
+//! Code-Prüfer für die Rust-, Dart/Flutter- und Shell-Skript-Beispiele, Sprachprüfung über das ganze Buch
 //! und Druckregeln (Länge der Codezeilen).
 
 use crate::thema;
@@ -47,7 +47,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
 
     let kopf = column![
         text("Prüfstand").size(22).font(thema::fett()).color(thema::text_hell()),
-        text("Codebeispiele werden geprüft (Rust mit rustc, Dart/Flutter mit dart analyze), Texte mit LanguageTool, Druckregeln gegen die Portalwerte.")
+        text("Codebeispiele werden geprüft (Rust mit rustc, Dart/Flutter mit dart analyze, Shell-Skripte auf Syntax), Texte mit LanguageTool, Druckregeln gegen die Portalwerte.")
             .size(13)
             .color(thema::text_gedimmt()),
     ]
@@ -68,6 +68,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
     let alle_kapitel = || projekt.teile.iter().flat_map(|t| t.kapitel.iter());
     let rust_bloecke: usize = alle_kapitel().map(|k| k.rust_codebloecke_anzahl()).sum();
     let dart_bloecke: usize = alle_kapitel().map(|k| k.dart_codebloecke_anzahl()).sum();
+    let skript_bloecke: usize = alle_kapitel().map(|k| k.skript_codebloecke_anzahl()).sum();
     let fortschritt = if code.beispiele.is_empty() { 0.0 } else { fertig as f32 / code.beispiele.len() as f32 * 100.0 };
 
     let mut code_spalte = column![
@@ -82,7 +83,7 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
         .align_y(Alignment::Center),
         text(if code.beispiele.is_empty() {
             let mut teile = Vec::new();
-            if rust_bloecke > 0 || dart_bloecke == 0 {
+            if rust_bloecke > 0 || (dart_bloecke == 0 && skript_bloecke == 0) {
                 teile.push(format!(
                     "{rust_bloecke} Rust-Codeblöcke: rustc (Edition {}) prüft Typen, ohne zu linken; Beispiele mit externen Crates werden übersprungen.",
                     state.portale.edition
@@ -91,6 +92,11 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
             if dart_bloecke > 0 {
                 teile.push(format!(
                     "{dart_bloecke} Dart-/Flutter-Codeblöcke: dart analyze prüft alle in einem Durchgang. Ausschnitte werden passend eingebettet; Blöcke ohne Importe bekommen die ihres Kapitels; Pakete aus den Importen holt pub get."
+                ));
+            }
+            if skript_bloecke > 0 {
+                teile.push(format!(
+                    "{skript_bloecke} Skript-Codeblöcke (bash, sh, zsh, fish, powershell): Die Shell prüft die Syntax, ohne etwas auszuführen. Was nicht installiert ist, wird übersprungen; mit ShellCheck gibt es zusätzlich Fehlerhinweise. Beispiele mit $-Eingabeaufforderung und Ausgabe darunter werden übersprungen."
                 ));
             }
             teile.join("  ")
@@ -115,7 +121,13 @@ pub fn ansicht(state: &AppState) -> Element<'_, Message> {
         code_spalte = code_spalte.push(
             column![
                 link(
-                    format!("✗ {} · {} · Zeile {}", if b.sprache == "rust" { "Rust" } else { "Dart" }, b.kapitel_titel, b.zeile),
+                    format!("✗ {} · {} · Zeile {}", if b.sprache == "rust" {
+                            "Rust"
+                        } else if werkbank_kern::skriptpruefung::ist_skript(&b.sprache) {
+                            "Skript"
+                        } else {
+                            "Dart"
+                        }, b.kapitel_titel, b.zeile),
                     Message::KapitelZeileOeffnen { kapitel_id: b.kapitel_id.clone(), zeile: b.zeile.saturating_sub(1) },
                 ),
                 container(text(meldung).size(10).font(Font::MONOSPACE).color(thema::fehler_rot()))

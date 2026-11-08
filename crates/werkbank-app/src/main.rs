@@ -336,6 +336,8 @@ pub struct AppState {
     pub lizenz_email: String,
     pub lizenz_schluessel: String,
     pub lizenz_meldung: Option<String>,
+    /// Wird gerade gefragt, ob die Lizenz deaktiviert werden soll?
+    pub lizenz_deaktivieren_frage: bool,
     /// Ist das Handbuch geöffnet?
     pub handbuch_offen: bool,
     /// Befehl, für den gerade ein neues Kürzel aufgenommen wird.
@@ -600,6 +602,10 @@ pub enum Message {
     KaufenOeffnen,
     /// Lizenzdatei gewählt.
     LizenzGewaehlt(Option<PathBuf>),
+    /// Zeigt oder verbirgt die Rückfrage zum Deaktivieren der Lizenz.
+    LizenzDeaktivierenFrage(bool),
+    /// Entfernt den Schlüssel von diesem Gerät und öffnet die Mitteilung an den Anbieter.
+    LizenzDeaktivieren,
     /// Tut nichts (für Bedienelemente ohne Wirkung).
     Nichts,
     /// Schriftart des Editors (`serif`, `sans`, `mono`).
@@ -856,6 +862,7 @@ fn new() -> (AppState, Task<Message>) {
         lizenz_email: String::new(),
         lizenz_schluessel: String::new(),
         lizenz_meldung: None,
+        lizenz_deaktivieren_frage: false,
         handbuch_offen: false,
         kuerzel_aufnahme: None,
         einstellungen,
@@ -2712,6 +2719,40 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
             }
         }
 
+        Message::LizenzDeaktivierenFrage(auf) => state.lizenz_deaktivieren_frage = auf,
+        Message::LizenzDeaktivieren => {
+            state.lizenz_deaktivieren_frage = false;
+            let ordner = einstellungen::konfig_ordner();
+            let gespeichert = ordner
+                .as_ref()
+                .and_then(|k| std::fs::read_to_string(k.join("lizenz-schluessel.json")).ok())
+                .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
+            let feld = |k: &str| {
+                gespeichert.as_ref().and_then(|v| v.get(k)).and_then(|x| x.as_str()).unwrap_or("").to_string()
+            };
+            let (email, schluessel) = (feld("email"), feld("schluessel"));
+            let mut fehler = None;
+            if let Some(k) = &ordner {
+                for datei in ["lizenz-schluessel.json", "lizenz.json"] {
+                    if let Err(e) = std::fs::remove_file(k.join(datei))
+                        && e.kind() != std::io::ErrorKind::NotFound
+                    {
+                        fehler = Some(format!("{datei} nicht löschbar: {e}"));
+                    }
+                }
+            }
+            state.lizenz_status = lizenz_pruefen();
+            state.lizenz_email.clear();
+            state.lizenz_schluessel.clear();
+            state.lizenz_meldung = Some(match fehler {
+                Some(ref f) => format!("Die Lizenz konnte nicht vollständig entfernt werden ({f})."),
+                None => "Die Lizenz ist auf diesem Gerät deaktiviert. Bitte schick die geöffnete E-Mail ab, damit die neue Person ihren Schlüssel bekommt.".to_string(),
+            });
+            if fehler.is_none() {
+                bau::oeffnen(Path::new(&weitergabe_mail(&email, &schluessel)));
+            }
+        }
+
         Message::HandbuchOeffnen => {
             state.palette = None;
             state.handbuch_offen = true;
@@ -3700,16 +3741,29 @@ pub const KONTAKT: &str = "mailto:kontakt@jurzel.de?subject=Werkbank";
 /// Zahlungslink bei Stripe (`assets/kauf-url.txt`); solange sie fehlt, öffnet „Kaufen“ eine E-Mail.
 const KAUF_URL: &str = include_str!("../../../assets/kauf-url.txt");
 
+/// Kodiert Text für eine Adresse (Prozent-Schreibweise).
+fn url_kodieren(text: &str) -> String {
+    text.bytes()
+        .map(|b| if b.is_ascii_alphanumeric() || b"-._".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") })
+        .collect()
+}
+
+/// E-Mail an den Anbieter nach dem Deaktivieren: Die Lizenz wurde weitergegeben, für die neue Adresse
+/// wird ein neuer Schlüssel gebraucht (Lizenzvereinbarung, Abschnitt 4a).
+fn weitergabe_mail(email: &str, schluessel: &str) -> String {
+    let text = format!(
+        "Hallo,\r\n\r\nich habe meine Werkbank-Lizenz deaktiviert, alle Kopien gelöscht und gebe die Lizenz an eine andere Person weiter (Lizenzvereinbarung, Abschnitt 4a).\r\n\r\nBisherige E-Mail-Adresse: {email}\r\nBisheriger Schlüssel: {schluessel}\r\n\r\nE-Mail-Adresse der neuen Person: \r\nName der neuen Person (optional): \r\n\r\nBitte stellt dafür einen neuen Schlüssel aus.\r\n"
+    );
+    format!("mailto:kontakt@jurzel.de?subject={}&body={}", url_kodieren("Werkbank: Lizenz weitergegeben"), url_kodieren(&text))
+}
+
 /// Adresse, die „Kaufen“ öffnet. Die E-Mail-Adresse wird für die Kasse vorbelegt.
 fn kauf_adresse(email: &str) -> String {
     let url = KAUF_URL.trim();
     let email = email.trim();
     if url.starts_with("https://") {
         if email.contains('@') {
-            let kodiert: String = email
-                .bytes()
-                .map(|b| if b.is_ascii_alphanumeric() || b"-._".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") })
-                .collect();
+            let kodiert = url_kodieren(email);
             let trenner = if url.contains('?') { '&' } else { '?' };
             // Stripe-Zahlungslinks heißen den Parameter prefilled_email
             return format!("{url}{trenner}prefilled_email={kodiert}");
@@ -4221,6 +4275,7 @@ fn view(state: &AppState) -> Element<'_, Message> {
                 email: &state.lizenz_email,
                 schluessel: &state.lizenz_schluessel,
                 meldung: state.lizenz_meldung.as_deref(),
+                frage: state.lizenz_deaktivieren_frage,
             },
         ))
     } else if let Some(palette) = &state.palette {
@@ -4489,6 +4544,14 @@ fn theme(state: &AppState) -> Theme {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn weitergabe_mail_enthaelt_alte_daten_und_ist_kodiert() {
+        let m = weitergabe_mail("a@b.de", "WB1-XYZ");
+        assert!(m.starts_with("mailto:kontakt@jurzel.de?subject="));
+        assert!(m.contains("a%40b.de") && m.contains("WB1-XYZ"));
+        assert!(!m.contains(' ') && !m.contains('\n'));
+    }
 
     #[test]
     fn testzeit_ueberlebt_geloeschte_datei_und_zurueckgestellte_uhr() {

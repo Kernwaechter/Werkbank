@@ -9,7 +9,7 @@ Das **Symbol** (`assets/icons/werkbank.svg`: aufgeschlagenes Buch auf einer Werk
 | Debian/Ubuntu (.deb) | `packaging/pakete-bauen.sh` (cargo-deb), Metadaten in `crates/werkbank-app/Cargo.toml` | **gebaut** (20 MB), Inhalt mit `dpkg-deb` geprüft, nicht installiert |
 | Fedora/openSUSE (.rpm) | `packaging/pakete-bauen.sh` (cargo-generate-rpm) | **gebaut** (22 MB), Dateiliste und Abhängigkeiten gelesen, nicht installiert |
 | Flatpak | `packaging/flatpak/bauen.sh`, Manifest `packaging/de.daehn.Werkbank.yaml` | Manifest geprüft, **nicht gebaut** (flatpak-builder fehlt) |
-| Snap (Store, „JZ Werkbank“, Snap-Name `jz-werkbank`) | `packaging/snap/bauen.sh`, Manifest `snap/snapcraft.yaml` (strict, mit LanguageTool, Java, Pandoc, Typst, Python, rustc, Hunspell; ohne Ghostscript/Dart/Flutter, siehe `packaging/snap/DRITTANBIETER.md`) | **nicht gebaut** (snapcraft fehlt) |
+| Snap (Store, „JZ Werkbank“, Snap-Name `jz-werkbank`) | `packaging/snap/bauen.sh`, Manifest `snap/snapcraft.yaml` (strict, nur rustc, xdg-utils und Hunspell; LanguageTool/Java, Pandoc, Typst-Programm, Python, Ghostscript, Dart und Flutter muss der Nutzer selbst installieren bzw. sind im Snap nicht nutzbar, siehe `packaging/snap/DRITTANBIETER.md`) | **nicht gebaut** (snapcraft fehlt) |
 | Snap Lizenzgeber (nur lokal, mit privatem Schlüssel) | `packaging/snap/lizenzgeber-bauen.sh` | **nicht gebaut** |
 | macOS | `.app` von Hand gebaut (Info.plist + icns, ad-hoc signiert), DMG mit `hdiutil` | **DMG gebaut (arm64)**, nicht notarisiert |
 | Windows | `packaging\windows\windows-bauen.ps1` (unter Windows, MSVC) oder `windows-bauen.sh` (Cross-Build unter Linux) liefert `werkbank-app.exe` mit Symbol und ein ZIP; `werkbank.iss` (Inno Setup) den Installer | Release-Build läuft unter Windows 11; Installer und Signatur **nicht geprüft** |
@@ -21,3 +21,13 @@ Das **Symbol** (`assets/icons/werkbank.svg`: aufgeschlagenes Buch auf einer Werk
 Zur Laufzeit gebraucht (je nach Funktion): Java 17+ und LanguageTool (Sprachprüfung), Hunspell-Wörterbücher (Rechtschreibung), `rustc` (Code-Prüfer), Python, Typst und Pandoc (Bauskripte). Die Pakete empfehlen/schlagen sie vor, erzwingen sie nicht.
 
 **Hinweis zur Verträglichkeit:** Die Binärdatei hängt von der glibc des Rechners ab, auf dem sie gebaut wurde (hier Ubuntu 26.04, glibc 2.43). Für ältere Systeme (Debian stable, Fedora, LTS-Versionen) in einem Container mit älterer glibc bauen; das Flatpak ist davon unabhängig.
+
+## Offen: Windows und macOS lizenzkonform verpacken
+
+Stand 8.11.2026. Linux (DEB, RPM, Flatpak, Snap) legt `lizenzen.txt`, `lizenztexte.txt` und `schriften-lizenzen.txt` nach `share/doc/werkbank/`. Windows und macOS sind **noch nicht** so weit, vor dem Verkauf nachholen:
+
+- [ ] Dieselben drei Dateien plus `LIZENZVEREINBARUNG.md` in Installer (`werkbank.iss`, nur `lizenzen.txt` ist drin) und `.app`/DMG legen. `lizenztexte.py` filtert auf Linux; für Windows/macOS mit `--filter-platform x86_64-pc-windows-msvc` bzw. `aarch64-apple-darwin` erzeugen (Plattformparameter einbauen).
+- [ ] Mitgelieferte Hunspell-Wörterbücher (`packaging\windows\woerterbuecher`) mit ihren Lizenztexten (GPL, LGPL, MPL …) und Quellenhinweis ausliefern; bei GPL-Wörterbüchern das Quellangebot aus `packaging/snap/DRITTANBIETER.md` übernehmen.
+- [ ] Nichts GPL-Lizenziertes (Pandoc, Java) einpacken, solange es nicht in `DRITTANBIETER.md` steht; Ghostscript (AGPL) bleibt draußen.
+- [ ] Lizenzvereinbarung beim Installer anzeigen und bestätigen lassen (Inno Setup: `LicenseFile=`).
+- [ ] Der Knopf „Lizenz weitergeben“ (Einstellungen) gilt für alle Systeme; im Windows-/macOS-Build testen (Konfigurationsordner, `mailto:`).

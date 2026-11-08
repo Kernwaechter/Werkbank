@@ -9,6 +9,9 @@ if grep -q '/test_' assets/kauf-url.txt && [ "${ALLOW_TESTLINK:-}" != "1" ]; the
   echo "assets/kauf-url.txt enthält noch den Stripe-Testlink. Live-Link eintragen oder ALLOW_TESTLINK=1 setzen." >&2
   exit 1
 fi
+# Lizenzlisten und -texte der Fremdbausteine neu erzeugen (lizenzen.txt steckt im Programm, beide kommen ins Paket)
+python3 packaging/lizenzen.py
+python3 packaging/lizenztexte.py
 cargo build --release -p werkbank-app
 cargo deb -p werkbank-app --no-build
 cargo generate-rpm -p crates/werkbank-app

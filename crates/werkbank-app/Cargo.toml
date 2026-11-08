@@ -49,6 +49,9 @@ assets = [
     ["../../assets/icons/hicolor/scalable/apps/de.daehn.Werkbank.svg", "usr/share/icons/hicolor/scalable/apps/", "644"],
     ["../../README.md", "usr/share/doc/werkbank/README.md", "644"],
     ["../../LIZENZVEREINBARUNG.md", "usr/share/doc/werkbank/LIZENZVEREINBARUNG.md", "644"],
+    ["../../assets/lizenzen.txt", "usr/share/doc/werkbank/lizenzen.txt", "644"],
+    ["../../assets/lizenztexte.txt", "usr/share/doc/werkbank/lizenztexte.txt", "644"],
+    ["../../assets/schriften-lizenzen.txt", "usr/share/doc/werkbank/schriften-lizenzen.txt", "644"],
 ]
 
 [package.metadata.generate-rpm]
@@ -73,6 +76,9 @@ assets = [
     { source = "../../assets/icons/hicolor/scalable/apps/de.daehn.Werkbank.svg", dest = "/usr/share/icons/hicolor/scalable/apps/de.daehn.Werkbank.svg", mode = "644" },
     { source = "../../README.md", dest = "/usr/share/doc/werkbank/README.md", mode = "644", doc = true },
     { source = "../../LIZENZVEREINBARUNG.md", dest = "/usr/share/doc/werkbank/LIZENZVEREINBARUNG.md", mode = "644", doc = true },
+    { source = "../../assets/lizenzen.txt", dest = "/usr/share/doc/werkbank/lizenzen.txt", mode = "644", doc = true },
+    { source = "../../assets/lizenztexte.txt", dest = "/usr/share/doc/werkbank/lizenztexte.txt", mode = "644", doc = true },
+    { source = "../../assets/schriften-lizenzen.txt", dest = "/usr/share/doc/werkbank/schriften-lizenzen.txt", mode = "644", doc = true },
 ]
 post_install_script = "gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor 2>/dev/null || :"
 post_uninstall_script = "gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor 2>/dev/null || :"

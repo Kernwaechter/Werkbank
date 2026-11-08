@@ -1,6 +1,6 @@
 //! # Code-Prüfer für die Buchbeispiele
 //!
-//! Rust und Dart/Flutter. Dart-Blöcke prüft [`crate::dartpruefung`] in einem
+//! Rust, Dart/Flutter und Shell-Skripte ([`crate::skriptpruefung`]). Dart-Blöcke prüft [`crate::dartpruefung`] in einem
 //! gemeinsamen Analyzer-Durchgang; dieses Modul kümmert sich um Rust:
 //!
 //! Zieht alle Rust-Codeblöcke aus dem Buch und lässt `rustc` sie typprüfen
@@ -25,7 +25,7 @@ pub struct Beispiel {
     pub kapitel_titel: String,
     /// Zeile (ab 1) des öffnenden Zauns im Kapiteltext.
     pub zeile: usize,
-    /// Sprache des Blocks (`rust` oder `dart`).
+    /// Sprache des Blocks (`rust`, `dart`, `bash`, `powershell` …).
     pub sprache: String,
     /// Infozeile hinter dem Zaun.
     pub info: String,
@@ -51,7 +51,7 @@ pub fn ist_rust(sprache: &str) -> bool {
     sprache.eq_ignore_ascii_case("rust")
 }
 
-/// Sammelt alle prüfbaren Beispiele des Buches (Rust und Dart/Flutter).
+/// Sammelt alle prüfbaren Beispiele des Buches (Rust, Dart/Flutter und Shell-Skripte).
 pub fn beispiele(projekt: &Projekt) -> Vec<Beispiel> {
     projekt
         .teile
@@ -60,7 +60,7 @@ pub fn beispiele(projekt: &Projekt) -> Vec<Beispiel> {
         .flat_map(|k| {
             markdown::codebloecke(&k.inhalt)
                 .into_iter()
-                .filter(|b| ist_rust(&b.sprache) || crate::dartpruefung::ist_dart(&b.sprache))
+                .filter(|b| ist_rust(&b.sprache) || crate::dartpruefung::ist_dart(&b.sprache) || crate::skriptpruefung::ist_skript(&b.sprache))
                 .map(|b| Beispiel {
                     kapitel_id: k.id.clone(),
                     kapitel_titel: k.titel.clone(),
@@ -219,7 +219,7 @@ fn erste_fehler(meldung: &str) -> String {
     text.chars().take(700).collect()
 }
 
-/// Prüft alle Beispiele: Rust auf mehreren Threads, Dart parallel dazu in einem Analyzer-Durchgang.
+/// Prüft alle Beispiele: Rust und Skripte auf mehreren Threads, Dart parallel dazu in einem Analyzer-Durchgang.
 /// `melden(index, ergebnis)` wird je Block aufgerufen.
 pub fn alle_pruefen(
     beispiele: &[Beispiel],
@@ -248,7 +248,13 @@ pub fn alle_pruefen(
                         i
                     };
                     let Some(&i) = rust.get(n) else { break };
-                    melden(i, pruefen(&beispiele[i], edition, arbeitsordner, Duration::from_secs(60)));
+                    let b = &beispiele[i];
+                    let e = if crate::skriptpruefung::ist_skript(&b.sprache) {
+                        crate::skriptpruefung::pruefen(b, arbeitsordner, Duration::from_secs(20))
+                    } else {
+                        pruefen(b, edition, arbeitsordner, Duration::from_secs(60))
+                    };
+                    melden(i, e);
                 }
             });
         }

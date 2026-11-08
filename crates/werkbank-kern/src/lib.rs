@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 pub mod codepruefung;
+pub mod skriptpruefung;
 pub mod prozess;
 pub mod dartpruefung;
 pub mod cover;
@@ -182,6 +183,17 @@ impl Kapitel {
     /// Zählt alle Rust-Codeblöcke (```rust).
     pub fn rust_codebloecke_anzahl(&self) -> usize {
         self.inhalt.lines().filter(|l| l.trim().starts_with("```rust")).count()
+    }
+
+    /// Anzahl der Shell-Skript-Codeblöcke (bash, sh, zsh, fish, powershell).
+    pub fn skript_codebloecke_anzahl(&self) -> usize {
+        self.inhalt
+            .lines()
+            .filter(|l| {
+                let t = l.trim().trim_start_matches('`');
+                l.trim().starts_with("```") && crate::skriptpruefung::ist_skript(t.split([',', ' ', '{']).next().unwrap_or(""))
+            })
+            .count()
     }
 
     /// Anzahl der Dart-/Flutter-Codeblöcke.

@@ -61,6 +61,10 @@ Für Grammatik und Stil nutzt die Werkbank **LanguageTool**, das du selbst betre
 
 Der Bereich **Prüfen** übersetzt jedes Rust-Beispiel deines Buches mit `rustc` und prüft Dart- und Flutter-Beispiele mit `dart analyze` (dafür muss Flutter oder Dart installiert sein). Außerdem prüft er das ganze Buch auf Sprache und zeigt Codezeilen, die für den Druck zu lang sind. Dart-Ausschnitte bettet die Werkbank passend ein; Blöcke ohne eigene Importe bekommen die Importe ihres Kapitels. Verweist ein Ausschnitt nur auf Code, der woanders steht, zählt er als Ausschnitt statt als Fehler. Absichtlich fehlerhafte Beispiele kennzeichnest du mit ` ```rust,compile_fail ` bzw. ` ```dart,compile_fail `, nicht prüfbare mit `ignore`.
 
+Rust, Dart und Flutter sind **optional**: Die Prüfer arbeiten nur, wenn du die Programme installiert hast (Einstellungen → Werkzeuge zeigt, was gefunden wird, und wie du sie installierst). Ohne sie werden die Beispiele übersprungen.
+
+**Skript-Prüfer.** Codeblöcke mit ` ```bash `, ` ```sh `, ` ```zsh `, ` ```fish ` oder ` ```powershell ` (auch `pwsh`, `ps1`) prüft die Werkbank auf **Syntaxfehler**, ohne etwas auszuführen: mit `bash -n`, `sh -n`, `zsh -n`, `fish --no-execute` und dem PowerShell-Parser. Welche Shells geprüft werden, hängt davon ab, was auf deinem Rechner installiert ist; fehlt eine, wird das Beispiel übersprungen. Ist ShellCheck installiert, prüft es Bash- und sh-Beispiele zusätzlich auf echte Fehler (keine Stilhinweise). Beispiele mit `$ `-Eingabeaufforderung vor jedem Befehl werden ohne die Eingabeaufforderung geprüft; Blöcke, die Befehle und deren Ausgabe mischen, werden übersprungen. Für Konsolen-Mitschnitte nimm ` ```console ` oder ` ```text `. Absichtliche Fehler kennzeichnest du mit ` ```bash,compile_fail `, nicht prüfbare mit `ignore`.
+
 ## Zahlen
 
 Netto-Wörter (neu geschrieben minus gestrichen), Schreibzeit, Tempo, Tagespensum, Serie aufeinanderfolgender Schreibtage, Aktivität der letzten Wochen, Prognose bis zu den Wortzielen, Fortschritt je Teil und Textqualität (Lesbarkeit, Satzlängen, Floskeln).
@@ -127,6 +131,8 @@ Alles außer der Schlagzeile ist freiwillig. Ist der Text zu lang, wird die Schr
 ## Lizenz
 
 Die Werkbank läuft 28 Tage lang mit vollem Funktionsumfang. Danach trägst du unter Datei → Einstellungen (`Strg+,`) auf der Seite „Allgemein“ die E-Mail-Adresse deines Kaufs und den Lizenzschlüssel ein (oder wählst eine Lizenzdatei). Ohne Schlüssel bleibt nur „Speichern und beenden“, deine Dateien bleiben unverändert. Unter Hilfe → „Über die Werkbank“ siehst du Version und Urheberrecht, den Lizenzstatus (mit Kauf und Aktivierung) und die Lizenzen der verwendeten Open-Source-Bausteine; Hilfe → „Lizenzschlüssel kaufen“ führt direkt zum Kauf.
+
+**Lizenz weitergeben:** Gibst du die Werkbank an eine andere Person weiter, klicke in den Einstellungen auf „Allgemein“ bei der aktivierten Lizenz auf „Lizenz weitergeben (deaktivieren) …“. Die Werkbank entfernt den Schlüssel von diesem Gerät und öffnet eine E-Mail an kontakt@jurzel.de. Trage dort die E-Mail-Adresse der neuen Person ein und schick sie ab; die neue Person bekommt einen eigenen Schlüssel. Lösche danach alle Kopien der Werkbank (Lizenzvereinbarung, Abschnitt 4a).
 
 ## Hilfe bei Problemen
 

@@ -39,6 +39,7 @@ modules:
             -t /app/share/icons/hicolor/${g}x${g}/apps
         done
       - install -Dm644 assets/icons/hicolor/scalable/apps/de.daehn.Werkbank.svg -t /app/share/icons/hicolor/scalable/apps
+      - install -Dm644 LIZENZVEREINBARUNG.md assets/lizenzen.txt assets/lizenztexte.txt assets/schriften-lizenzen.txt -t /app/share/doc/werkbank
     sources:
       - type: dir
         path: ..

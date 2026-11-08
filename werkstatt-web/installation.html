@@ -56,13 +56,15 @@ body[data-os="windows"] .os:not([data-os="windows"]){display:none}
   <thead><tr><th>Programm</th><th class="wofuer">Wofür</th><th>Brauchst du es?</th></tr></thead>
   <tbody>
     <tr><td><a href="#hunspell">Hunspell-Wörterbuch (Deutsch)</a></td><td class="wofuer">Rote Markierung unbekannter Wörter, offline</td><td><span class="noetig ja">empfohlen</span></td></tr>
-    <tr><td><a href="#languagetool">LanguageTool und Java 17+</a></td><td class="wofuer">Grammatik, Stil und Zeichensetzung</td><td><span class="noetig opt">optional</span></td></tr>
+    <tr><td><a href="#java">Java 17 oder neuer</a></td><td class="wofuer">Lässt den LanguageTool-Server laufen</td><td><span class="noetig opt">optional</span></td></tr>
+    <tr><td><a href="#languagetool">LanguageTool</a></td><td class="wofuer">Grammatik, Stil und Zeichensetzung</td><td><span class="noetig opt">optional</span></td></tr>
     <tr><td><a href="#ghostscript">Ghostscript</a></td><td class="wofuer">PDF/X-3 für Druckdienstleister und CMYK-Umschläge</td><td><span class="noetig druck">für den Druck</span></td></tr>
     <tr><td><a href="#pandoc">Pandoc 3 oder neuer</a></td><td class="wofuer">Nur für Bände mit eigener Pandoc-Kopfdatei (<code>pdf-header.typ</code>)</td><td><span class="noetig opt">optional</span></td></tr>
     <tr><td><a href="#typst">Typst (Kommandozeile)</a></td><td class="wofuer">Nur für eigene Bauskripte, die <code>typst</code> aufrufen</td><td><span class="noetig opt">optional</span></td></tr>
     <tr><td><a href="#python">Python 3</a></td><td class="wofuer">Nur für eigene Bauskripte</td><td><span class="noetig opt">optional</span></td></tr>
     <tr><td><a href="#rust">Rust (rustc)</a></td><td class="wofuer">Code-Prüfer für Rust-Beispiele</td><td><span class="noetig opt">optional</span></td></tr>
     <tr><td><a href="#flutter">Flutter oder Dart</a></td><td class="wofuer">Code-Prüfer für Dart- und Flutter-Beispiele</td><td><span class="noetig opt">optional</span></td></tr>
+    <tr><td><a href="#skripte">Shells und ShellCheck</a></td><td class="wofuer">Skript-Prüfer für Bash-, Zsh-, Fish- und PowerShell-Beispiele</td><td><span class="noetig opt">optional</span></td></tr>
   </tbody>
 </table>
 <p class="pruefen">Ob ein Programm gefunden wird, zeigt die Werkbank unter <b>Einstellungen → Werkzeuge</b> (Pandoc, Ghostscript, Rust, Dart/Flutter) bzw. <b>Einstellungen → Prüfung</b> (Wörterbuch, LanguageTool). Nach einer Installation dort „Erneut prüfen“ wählen.</p>
@@ -94,29 +96,46 @@ body[data-os="windows"] .os:not([data-os="windows"]){display:none}
   </div>
 </section>
 
-<section class="werkzeug" id="languagetool">
-  <div class="werkzeug-kopf"><h2>LanguageTool und Java</h2><span class="noetig opt">optional</span></div>
-  <p>LanguageTool prüft Grammatik, Stil und Zeichensetzung. Du betreibst es selbst auf deinem Rechner, dein Text verlässt ihn nicht. Es braucht Java 17 oder neuer.</p>
+<section class="werkzeug" id="java">
+  <div class="werkzeug-kopf"><h2>Java</h2><span class="noetig opt">optional</span></div>
+  <p>Java 17 oder neuer lässt den LanguageTool-Server laufen, der Grammatik, Stil und Zeichensetzung prüft. Ohne Java läuft in der Werkbank nur die Rechtschreibprüfung. Die Werkbank zeigt unter <b>Einstellungen → Werkzeuge</b>, ob Java gefunden wird und in welcher Version.</p>
   <div class="os" data-os="linux"><h3>Linux</h3>
-    <p class="distro">1. Java – Debian, Ubuntu, Mint</p><span class="befehl">sudo apt install default-jre</span>
+    <p class="distro">Debian, Ubuntu, Mint</p><span class="befehl">sudo apt install default-jre</span>
     <p class="distro">Fedora</p><span class="befehl">sudo dnf install java-latest-openjdk</span>
     <p class="distro">Arch, Manjaro</p><span class="befehl">sudo pacman -S jre-openjdk</span>
+  </div>
+  <div class="os" data-os="mac"><h3>macOS</h3>
+    <p class="distro">Homebrew</p><span class="befehl">brew install --cask temurin@21</span>
+  </div>
+  <div class="os" data-os="windows"><h3>Windows (PowerShell)</h3>
+    <p class="distro">winget, danach ein neues Fenster öffnen</p><span class="befehl">winget install --id EclipseAdoptium.Temurin.21.JRE</span>
+    <p class="distro">Oder den Installer von <a href="https://adoptium.net/">adoptium.net</a> laden und ausführen.</p>
+  </div>
+  <p class="pruefen">Prüfen: <code>java -version</code> (muss 17 oder höher zeigen)</p>
+</section>
+
+<section class="werkzeug" id="languagetool">
+  <div class="werkzeug-kopf"><h2>LanguageTool</h2><span class="noetig opt">optional</span></div>
+  <p>LanguageTool prüft Grammatik, Stil und Zeichensetzung. Du betreibst es selbst auf deinem Rechner, dein Text verlässt ihn nicht. Es braucht <a href="#java">Java 17 oder neuer</a>.</p>
+  <div class="os" data-os="linux"><h3>Linux</h3>
+    <p class="distro">1. <a href="#java">Java installieren</a> (siehe oben)</p>
     <p class="distro">2. LanguageTool laden und entpacken</p>
     <span class="befehl">curl -LO https://languagetool.org/download/LanguageTool-stable.zip
 unzip LanguageTool-stable.zip -d ~/</span>
   </div>
   <div class="os" data-os="mac"><h3>macOS</h3>
-    <p class="distro">1. Java (Homebrew)</p><span class="befehl">brew install openjdk</span>
+    <p class="distro">1. <a href="#java">Java installieren</a> (siehe oben)</p>
     <p class="distro">2. LanguageTool laden und entpacken</p>
     <span class="befehl">curl -LO https://languagetool.org/download/LanguageTool-stable.zip
 unzip LanguageTool-stable.zip -d ~/</span>
   </div>
   <div class="os" data-os="windows"><h3>Windows (PowerShell)</h3>
-    <p class="distro">1. Java</p><span class="befehl">winget install --id EclipseAdoptium.Temurin.21.JRE</span>
+    <p class="distro">1. <a href="#java">Java installieren</a> (siehe oben)</p>
     <p class="distro">2. LanguageTool laden und entpacken</p>
     <span class="befehl">Invoke-WebRequest -Uri https://languagetool.org/download/LanguageTool-stable.zip -OutFile LanguageTool.zip
 Expand-Archive LanguageTool.zip -DestinationPath C:\LanguageTool</span>
   </div>
+  <p class="hinweis-box"><b>Snap-Version:</b> Der Snap kann Java nicht selbst starten. Starte den Server im Terminal (im entpackten Ordner: <code>java -cp languagetool-server.jar org.languagetool.server.HTTPServer --port 8081</code>), lass das Fenster offen und trage in der Werkbank unter <b>Einstellungen → Prüfung → Server</b> die Adresse <code>http://localhost:8081</code> ein.</p>
   <p class="hinweis-box">Danach in der Werkbank: <b>Einstellungen → Prüfung → Lokaler Server</b>, den entpackten Ordner wählen und „Server starten“. Nach 10 bis 30 Sekunden steht die Verbindung auf „Erreichbar“. Ohne Java geht es auch mit Docker: <code>docker run -d -p 8081:8010 erikvl87/languagetool</code>, dann als Adresse <code>http://localhost:8081</code> eintragen.</p>
 </section>
 
@@ -188,6 +207,27 @@ Expand-Archive LanguageTool.zip -DestinationPath C:\LanguageTool</span>
   <div class="os" data-os="windows"><h3>Windows</h3><span class="befehl">winget install --id Rustlang.Rustup</span>
     <p class="distro">Danach ein neues Terminal öffnen.</p></div>
   <p class="pruefen">Prüfen: <code>rustc --version</code>. Die Werkbank findet rustc auch unter <code>~/.cargo/bin</code>, wenn es nicht im Suchpfad steht.</p>
+</section>
+
+<section class="werkzeug" id="skripte">
+  <div class="werkzeug-kopf"><h2>Shells und ShellCheck</h2><span class="noetig opt">optional</span></div>
+  <p>Der Skript-Prüfer testet Codeblöcke mit <code>bash</code>, <code>sh</code>, <code>zsh</code>, <code>fish</code> oder <code>powershell</code> auf Syntaxfehler, ohne sie auszuführen. Er nutzt, was installiert ist; fehlt eine Shell, wird das Beispiel übersprungen. Bash und sh sind unter Linux und macOS fast immer da. ShellCheck prüft Bash- und sh-Beispiele zusätzlich auf echte Fehler.</p>
+  <div class="os" data-os="linux"><h3>Linux</h3>
+    <p class="distro">Debian, Ubuntu, Mint</p><span class="befehl">sudo apt install zsh fish shellcheck</span>
+    <p class="distro">Fedora</p><span class="befehl">sudo dnf install zsh fish ShellCheck</span>
+    <p class="distro">Arch, Manjaro</p><span class="befehl">sudo pacman -S zsh fish shellcheck</span>
+    <p class="distro">PowerShell (pwsh)</p><span class="befehl">sudo snap install powershell --classic</span>
+  </div>
+  <div class="os" data-os="mac"><h3>macOS</h3>
+    <p class="distro">Bash und Zsh sind vorhanden. Homebrew</p><span class="befehl">brew install shellcheck fish
+brew install --cask powershell</span>
+  </div>
+  <div class="os" data-os="windows"><h3>Windows (PowerShell)</h3>
+    <p class="distro">Bash über Git für Windows</p><span class="befehl">winget install --id Git.Git</span>
+    <p class="distro">PowerShell 7</p><span class="befehl">winget install --id Microsoft.PowerShell</span>
+    <p class="distro">ShellCheck</p><span class="befehl">winget install --id koalaman.shellcheck</span>
+  </div>
+  <p class="hinweis-box"><b>Snap-Version:</b> Der Snap kann nur Bash und sh nutzen (sie stecken in seiner Basis). Zsh, Fish, PowerShell und ShellCheck deines Systems sieht er nicht.</p>
 </section>
 
 <section class="werkzeug" id="flutter">
