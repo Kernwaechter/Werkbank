@@ -8,3 +8,12 @@ packaging/flatpak/.flatpak-builder/
 /Transfer/
 packaging/flatpak/repo/
 packaging/flatpak/*.flatpak
+
+PLAN-umsetzung.md
+KONZEPT-werkbank.md
+
+/werkstatt-web/
+
+/packaging/
+
+/snap/

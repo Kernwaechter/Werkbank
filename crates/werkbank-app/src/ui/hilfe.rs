@@ -70,7 +70,7 @@ pub fn ueber<'a>() -> Element<'a, Message> {
     .spacing(8);
     let spenden_block = container(
         column![
-            text("Die Werkbank ist freie Software und kostenlos. Wenn sie dir beim Schreiben hilft, freue ich mich über einen Kaffee. Damit unterstützt du die Weiterentwicklung.")
+            text("Die Werkbank ist für die nicht-kommerzielle Nutzung kostenlos. Wenn sie dir beim Schreiben hilft, freue ich mich über einen Kaffee. Damit unterstützt du die Weiterentwicklung.")
                 .size(12)
                 .color(thema::text_hell()),
             row![button(text("☕ Buy me a coffee").size(14).font(thema::fett())).padding([7, 18]).style(thema::kaffee_knopf_stil).on_press(Message::SpendenOeffnen)],
@@ -86,8 +86,8 @@ pub fn ueber<'a>() -> Element<'a, Message> {
             verweise,
             thema::trennlinie(),
             column![
-                text("© 2026 Volker Dähn. Freie Software unter der MIT-Lizenz.").size(12).color(thema::text_hell()),
-                text("Der Lizenztext liegt dem Programm bei (LICENSE). Geschrieben in Rust mit Iced und Typst.")
+                text("© 2026 Volker Dähn. Lizenz: CC BY-NC-SA 4.0.").size(12).color(thema::text_hell()),
+                text("Der Lizenztext liegt dem Programm bei (LICENSE.de.md, LICENSE.en.md). Geschrieben in Rust mit Iced und Typst.")
                     .size(11)
                     .color(thema::text_gedimmt()),
             ]

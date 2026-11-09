@@ -48,7 +48,8 @@ assets = [
     ["../../assets/icons/hicolor/512x512/apps/de.daehn.Werkbank.png", "usr/share/icons/hicolor/512x512/apps/", "644"],
     ["../../assets/icons/hicolor/scalable/apps/de.daehn.Werkbank.svg", "usr/share/icons/hicolor/scalable/apps/", "644"],
     ["../../README.md", "usr/share/doc/werkbank/README.md", "644"],
-    ["../../LICENSE", "usr/share/doc/werkbank/LICENSE", "644"],
+    ["../../LICENSE.de.md", "usr/share/doc/werkbank/LICENSE.de.md", "644"],
+    ["../../LICENSE.en.md", "usr/share/doc/werkbank/LICENSE.en.md", "644"],
     ["../../assets/lizenzen.txt", "usr/share/doc/werkbank/lizenzen.txt", "644"],
     ["../../assets/lizenztexte.txt", "usr/share/doc/werkbank/lizenztexte.txt", "644"],
     ["../../assets/schriften-lizenzen.txt", "usr/share/doc/werkbank/schriften-lizenzen.txt", "644"],
@@ -58,7 +59,7 @@ assets = [
 name = "werkbank"
 summary = "Schreibwerkzeug für technische Bücher"
 description = "Schreibwerkzeug für technische Bücher: Markdown-Editor, Sprach- und Code-Prüfung, Statistik, nativer Buchsatz (Typst, EPUB) und Cover-Designer."
-license = "MIT"
+license = "CC-BY-NC-SA-4.0"
 group = "Applications/Publishing"
 assets = [
     { source = "../../target/release/werkbank-app", dest = "/usr/bin/werkbank-app", mode = "755" },
@@ -75,7 +76,8 @@ assets = [
     { source = "../../assets/icons/hicolor/512x512/apps/de.daehn.Werkbank.png", dest = "/usr/share/icons/hicolor/512x512/apps/de.daehn.Werkbank.png", mode = "644" },
     { source = "../../assets/icons/hicolor/scalable/apps/de.daehn.Werkbank.svg", dest = "/usr/share/icons/hicolor/scalable/apps/de.daehn.Werkbank.svg", mode = "644" },
     { source = "../../README.md", dest = "/usr/share/doc/werkbank/README.md", mode = "644", doc = true },
-    { source = "../../LICENSE", dest = "/usr/share/doc/werkbank/LICENSE", mode = "644", doc = true },
+    { source = "../../LICENSE.de.md", dest = "/usr/share/doc/werkbank/LICENSE.de.md", mode = "644", doc = true },
+    { source = "../../LICENSE.en.md", dest = "/usr/share/doc/werkbank/LICENSE.en.md", mode = "644", doc = true },
     { source = "../../assets/lizenzen.txt", dest = "/usr/share/doc/werkbank/lizenzen.txt", mode = "644", doc = true },
     { source = "../../assets/lizenztexte.txt", dest = "/usr/share/doc/werkbank/lizenztexte.txt", mode = "644", doc = true },
     { source = "../../assets/schriften-lizenzen.txt", dest = "/usr/share/doc/werkbank/schriften-lizenzen.txt", mode = "644", doc = true },

@@ -208,11 +208,11 @@ fn beschriftet<'a>(
         .into()
 }
 
-/// Abschnitt „Unterstützen“: Hinweis auf freie Software und der Spendenlink.
+/// Abschnitt „Unterstützen“: Hinweis auf die Lizenz und der Spendenlink.
 fn spenden_abschnitt<'a>() -> Element<'a, Message> {
     column![
         abschnitt("Werkbank unterstützen"),
-        text("Die Werkbank ist freie Software (MIT-Lizenz) und kostenlos. Wenn sie dir hilft, freue ich mich über einen Kaffee. Das fördert die Weiterentwicklung.")
+        text("Die Werkbank ist unter der Lizenz CC BY-NC-SA 4.0 veröffentlicht und für die nicht-kommerzielle Nutzung kostenlos. Wenn sie dir hilft, freue ich mich über einen Kaffee. Das fördert die Weiterentwicklung.")
             .size(13)
             .color(thema::text_gedimmt()),
         button(text("☕ Buy me a coffee").size(14).font(thema::fett())).padding([7, 18]).style(thema::kaffee_knopf_stil).on_press(Message::SpendenOeffnen),

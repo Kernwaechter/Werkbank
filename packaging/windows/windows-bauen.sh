@@ -13,6 +13,6 @@ EXE=target/x86_64-pc-windows-msvc/release/werkbank-app.exe
 V=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
 OUT=target/windows
 rm -rf "$OUT/Werkbank" && mkdir -p "$OUT/Werkbank"
-cp "$EXE" assets/handbuch.md assets/lizenzen.txt LICENSE "$OUT/Werkbank/"
+cp "$EXE" assets/handbuch.md assets/lizenzen.txt LICENSE.de.md LICENSE.en.md "$OUT/Werkbank/"
 (cd "$OUT" && rm -f "Werkbank-$V-windows-x64.zip" && zip -qr "Werkbank-$V-windows-x64.zip" Werkbank)
 ls -lh "$OUT"/*.zip

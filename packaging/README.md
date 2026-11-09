@@ -25,7 +25,7 @@ Zur Laufzeit gebraucht (je nach Funktion): Java 17+ und LanguageTool (Sprachprü
 
 Stand 8.11.2026. Linux (DEB, RPM, Flatpak, Snap) legt `lizenzen.txt`, `lizenztexte.txt` und `schriften-lizenzen.txt` nach `share/doc/werkbank/`. Windows und macOS sind **noch nicht** so weit, vor der Veröffentlichung nachholen:
 
-- [ ] Dieselben drei Dateien plus `LICENSE` in Installer (`werkbank.iss`, nur `lizenzen.txt` ist drin) und `.app`/DMG legen. `lizenztexte.py` filtert auf Linux; für Windows/macOS mit `--filter-platform x86_64-pc-windows-msvc` bzw. `aarch64-apple-darwin` erzeugen (Plattformparameter einbauen).
+- [ ] Dieselben drei Dateien plus `LICENSE.de.md`/`LICENSE.en.md` in Installer (`werkbank.iss`, nur `lizenzen.txt` ist drin) und `.app`/DMG legen. `lizenztexte.py` filtert auf Linux; für Windows/macOS mit `--filter-platform x86_64-pc-windows-msvc` bzw. `aarch64-apple-darwin` erzeugen (Plattformparameter einbauen).
 - [ ] Mitgelieferte Hunspell-Wörterbücher (`packaging\windows\woerterbuecher`) mit ihren Lizenztexten (GPL, LGPL, MPL …) und Quellenhinweis ausliefern; bei GPL-Wörterbüchern das Quellangebot aus `packaging/snap/DRITTANBIETER.md` übernehmen.
 - [ ] Nichts GPL-Lizenziertes (Pandoc, Java) einpacken, solange es nicht in `DRITTANBIETER.md` steht; Ghostscript (AGPL) bleibt draußen.
-- [x] Lizenztext (MIT) im Installer anzeigen (Inno Setup: `LicenseFile=`).
+- [x] Lizenztext (CC BY-NC-SA 4.0) im Installer anzeigen (Inno Setup: `LicenseFile=`).

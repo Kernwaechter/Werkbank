@@ -64,7 +64,7 @@ Gemeint ist der **Snap Store** von Canonical (snapcraft.io), der Software-Laden 
 ### Vorher
 
 1. **Testen:** Den Snap lokal installieren und die Prüfliste aus Abschnitt 2 durcharbeiten (`sudo snap install --dangerous …`).
-2. **Rechtliches klären:** Der MIT-Lizenztext (`LICENSE`) liegt im Snap. Dazu die Quellcode-Zusage in `DRITTANBIETER.md` (Hunspell-Wörterbücher und Abhängigkeiten), die du hier verbindlich eingehst.
+2. **Rechtliches klären:** Der CC-BY-NC-SA-4.0-Lizenztext (`LICENSE.de.md`, `LICENSE.en.md`) liegt im Snap. Dazu die Quellcode-Zusage in `DRITTANBIETER.md` (Hunspell-Wörterbücher und Abhängigkeiten), die du hier verbindlich eingehst.
 3. **Spenden:** Der Snap ist kostenlos. Der Hinweis auf „Buy me a coffee“ steht in der Beschreibung im Store.
 
 ### Einmalig einrichten
@@ -99,7 +99,7 @@ Gemeint ist der **Snap Store** von Canonical (snapcraft.io), der Software-Laden 
 10. **Store-Eintrag ausfüllen** (https://snapcraft.io/jz-werkbank/listing, Menü „Listing“):
     - mindestens **ein Bildschirmfoto** (PNG oder JPG, am besten 3 bis 5: Schreiben, Prüfen, Cover, Bauen)
     - Kategorie (zum Beispiel „Productivity“ oder „Education“)
-    - Lizenz **MIT**, Webseite `https://werkbank.jurzel-apps.de`, Kontakt und Support-Adresse
+    - Lizenz **CC-BY-NC-SA-4.0**, Webseite `https://werkbank.jurzel-apps.de`, Kontakt und Support-Adresse
     - Beschreibung (steht schon im Manifest, hier kannst du sie erweitern, auch mit dem Hinweis auf die Spendenseite)
 11. **Version freigeben:** Die Revisionsnummer zeigt `snapcraft status jz-werkbank`. Dann nach oben schieben:
     ```bash

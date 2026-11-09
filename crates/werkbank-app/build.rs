@@ -7,7 +7,7 @@ fn main() {
         res.set_icon("../../assets/icons/werkbank.ico");
         res.set("ProductName", "Werkbank");
         res.set("FileDescription", "Schreibwerkzeug für technische Bücher");
-        res.set("LegalCopyright", "Volker Dähn, MIT-Lizenz");
+        res.set("LegalCopyright", "Volker Dähn, CC BY-NC-SA 4.0");
         if let Err(e) = res.compile() {
             println!("cargo:warning=Symbol konnte nicht eingebettet werden: {e}");
         }

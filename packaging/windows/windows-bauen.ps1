@@ -11,7 +11,7 @@ $out = 'target\windows'
 $ziel = Join-Path $out 'Werkbank'
 Remove-Item $ziel -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force $ziel | Out-Null
-Copy-Item target\x86_64-pc-windows-msvc\release\werkbank-app.exe, assets\handbuch.md, assets\lizenzen.txt, LICENSE $ziel
+Copy-Item target\x86_64-pc-windows-msvc\release\werkbank-app.exe, assets\handbuch.md, assets\lizenzen.txt, LICENSE.de.md, LICENSE.en.md $ziel
 if (Test-Path packaging\windows\woerterbuecher) { Copy-Item packaging\windows\woerterbuecher (Join-Path $ziel 'woerterbuecher') -Recurse }
 $zip = Join-Path $out "Werkbank-$v-windows-x64.zip"
 Remove-Item $zip -ErrorAction SilentlyContinue

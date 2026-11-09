@@ -130,7 +130,7 @@ Alles außer der Schlagzeile ist freiwillig. Ist der Text zu lang, wird die Schr
 
 ## Lizenz und Unterstützung
 
-Die Werkbank ist freie Software unter der MIT-Lizenz und kostenlos, ohne Testzeit und ohne Lizenzschlüssel. Du darfst sie für private und berufliche Buchprojekte nutzen, weitergeben und verändern. Unter Hilfe → „Über die Werkbank“ siehst du Version und Urheberrecht sowie die Lizenzen der verwendeten Open-Source-Bausteine.
+Die Werkbank steht unter der Lizenz Creative Commons Namensnennung - Nicht-kommerziell - Weitergabe unter gleichen Bedingungen 4.0 International (CC BY-NC-SA 4.0). Sie ist kostenlos, ohne Testzeit und ohne Lizenzschlüssel. Du darfst sie nicht-kommerziell nutzen, weitergeben und verändern, solange du den Urheber nennst und Bearbeitungen unter denselben Bedingungen weitergibst. Unter Hilfe → „Über die Werkbank“ siehst du Version und Urheberrecht sowie die Lizenzen der verwendeten Open-Source-Bausteine.
 
 Wenn dir die Werkbank hilft, freue ich mich über einen Kaffee: Hilfe → „Buy me a coffee“ (oder in der Statusleiste „Unterstützen“) öffnet die Spendenseite. Das fördert die Weiterentwicklung. Spenden sind freiwillig und schalten nichts frei.
 

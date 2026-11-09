@@ -23,7 +23,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequiredOverridesAllowed=dialog
 WizardStyle=modern
-LicenseFile=..\..\LICENSE
+LicenseFile=..\..\LICENSE.de.md
 
 [Languages]
 Name: "german"; MessagesFile: "compiler:Languages\German.isl"
@@ -37,7 +37,7 @@ Source: "..\..\target\x86_64-pc-windows-msvc\release\werkbank-app.exe"; DestDir:
 Source: "..\..\assets\handbuch.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\assets\lizenzen.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\assets\fonts\OFL.txt"; DestDir: "{app}"; DestName: "Fira-Sans-OFL.txt"; Flags: ignoreversion
-Source: "..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\LICENSE.de.md"; DestDir: "{app}"; Flags: ignoreversion
 ; Hunspell-Wörterbücher (de_DE.aff/.dic samt Lizenztext), falls im Ordner packaging\windows\woerterbuecher abgelegt
 Source: "woerterbuecher\*"; DestDir: "{app}\woerterbuecher"; Flags: ignoreversion recursesubdirs skipifsourcedoesntexist
 

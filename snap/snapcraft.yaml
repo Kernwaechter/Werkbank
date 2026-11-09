@@ -16,10 +16,10 @@ description: |
   eigene Bauskripte braucht, nimmt das DEB-, RPM- oder Flatpak-Paket. Der Skript-Prüfer
   für Bash-Beispiele funktioniert im Snap.
 
-  Die JZ Werkbank ist freie Software unter der MIT-Lizenz (Text im Paket unter
-  share/doc/werkbank) und kostenlos. Wer sie unterstützen möchte, kann die
+  Die JZ Werkbank steht unter der Lizenz CC BY-NC-SA 4.0 (Text im Paket unter
+  share/doc/werkbank) und ist für die nicht-kommerzielle Nutzung kostenlos. Wer sie unterstützen möchte, kann die
   Weiterentwicklung mit einem Kaffee fördern: https://buymeacoffee.com/services5
-license: MIT
+license: CC-BY-NC-SA-4.0
 website: https://werkbank.jurzel-apps.de
 contact: kontakt@jurzel.de
 icon: snap/gui/jz-werkbank.png
@@ -66,7 +66,7 @@ parts:
       install -d "$CRAFT_PART_INSTALL/share/doc/rust"
       cp -a "$tc/share/doc/rust/." "$CRAFT_PART_INSTALL/share/doc/rust/"
       test -d "$CRAFT_PART_INSTALL/share/doc/rust/licenses"
-      install -m644 README.md LICENSE packaging/snap/DRITTANBIETER.md assets/lizenzen.txt assets/lizenztexte.txt assets/schriften-lizenzen.txt "$CRAFT_PART_INSTALL/share/doc/werkbank/"
+      install -m644 README.md LICENSE.de.md LICENSE.en.md packaging/snap/DRITTANBIETER.md assets/lizenzen.txt assets/lizenztexte.txt assets/schriften-lizenzen.txt "$CRAFT_PART_INSTALL/share/doc/werkbank/"
 
   laufzeit:
     plugin: nil

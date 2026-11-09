@@ -1,6 +1,6 @@
 # Mitgelieferte Programme von Drittanbietern (Snap)
 
-Die Werkbank selbst steht unter der MIT-Lizenz (`LICENSE`). Im Snap liegen außerdem
+Die Werkbank selbst steht unter der Lizenz CC BY-NC-SA 4.0 (`LICENSE.de.md`, `LICENSE.en.md`). Im Snap liegen außerdem
 eigenständige Programme und Daten, die die Werkbank als getrennte Prozesse aufruft bzw. einliest. Sie haben ihre eigenen Lizenzen.
 
 | Programm | Lizenz | Quelle |
