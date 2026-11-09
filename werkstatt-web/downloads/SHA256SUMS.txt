@@ -1,3 +1,0 @@
-0853291d2b0da0b05a105e22b86825bfc0f941c8dbf6fecf3ffbf74783b93f44  werkbank_1.5.0-1_amd64.deb
-21e20e40e8a3e20f540ec579fcfa70c594f57685cad33978eecb4c4f9dbffdc5  werkbank-1.5.0-1.x86_64.rpm
-d30e68b4a1230ce7b5de2ecc20ab285a4985a8bc10dfccfb2b324e786f180205  werkbank-1.5.0.flatpak
