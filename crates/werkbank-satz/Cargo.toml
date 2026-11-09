@@ -3,7 +3,7 @@ name = "werkbank-satz"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
-license-file.workspace = true
+license.workspace = true
 publish.workspace = true
 description = "Nativer Buchsatz: Markdown nach Typst (PDF) und EPUB, ohne Skripte"
 

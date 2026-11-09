@@ -251,8 +251,8 @@ impl Projekt {
                 let name = datei_name(&s.pfad);
                 if plan.zu_loeschen.contains(&s.pfad) {
                     geaendert |= index.zeiten.remove(&name).is_some() | index.namen.remove(&name).is_some();
-                } else if !index.zeiten.contains_key(&name) {
-                    index.zeiten.insert(name, s.zeit.to_rfc3339());
+                } else if let std::collections::btree_map::Entry::Vacant(platz) = index.zeiten.entry(name) {
+                    platz.insert(s.zeit.to_rfc3339());
                     geaendert = true;
                 }
             }
@@ -311,7 +311,7 @@ impl Projekt {
                 })
             })
             .collect();
-        liste.sort_by(|a, b| b.zeit.cmp(&a.zeit));
+        liste.sort_by_key(|a| std::cmp::Reverse(a.zeit));
         liste
     }
 
@@ -427,7 +427,7 @@ mod tests {
     fn papierkorb_zurueckholen_traegt_in_die_reihenfolge_ein() {
         let (o, mut p) = projekt("korb");
         let neu = p.neuer_teil("Zweiter").unwrap();
-        p.teile_speichern(&[neu.clone()], Duration::ZERO).unwrap();
+        p.teile_speichern(std::slice::from_ref(&neu), Duration::ZERO).unwrap();
         p.teil_entfernen(&neu).unwrap();
         let korb = p.papierkorb_liste();
         assert_eq!(korb.len(), 1);

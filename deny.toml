@@ -9,7 +9,7 @@ allow = [
     "Zlib", "Unlicense", "CC0-1.0", "BSL-1.0", "0BSD", "NCSA", "Unicode-3.0", "Unicode-DFS-2016", "MPL-2.0", "CDLA-Permissive-2.0",
 ]
 
-# Eigene Crates (proprietär, publish = false) nicht gegen die Liste prüfen
+# Eigene Crates (publish = false) nicht gegen die Liste prüfen
 [licenses.private]
 ignore = true
 

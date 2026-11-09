@@ -452,7 +452,7 @@ pub fn typst(e: &Eingabe) -> (String, HashMap<String, Vec<u8>>) {
             format!(
                 ", align(horizon, box(fill: akzent, inset: (x: 1.5mm, y: 1mm), radius: 1mm, text(size: {:.1}pt, weight: 900, fill: grund, {})))",
                 (pt * 0.85).max(5.5),
-                markup(&e.band_ruecken.replace('*', "").replace('`', ""))
+                markup(&e.band_ruecken.replace(['*', '`'], ""))
             )
         };
         let kasten = if f.ruecken_kasten.1 > 0.0 {

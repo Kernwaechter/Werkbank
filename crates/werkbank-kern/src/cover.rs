@@ -546,7 +546,7 @@ fn klappentext_setzen(bloecke: &[Block], basis: f32, breite: f32) -> (Vec<Zeile>
                 zeile_ab(&mut aktuelle, &mut y, &mut erste);
                 laenge = 0.0;
             }
-            laenge += if aktuelle.is_empty() { 0.0 } else if w.kleben { 0.0 } else { leer } + wb;
+            laenge += if aktuelle.is_empty() || w.kleben { 0.0 } else { leer } + wb;
             aktuelle.push(w.clone());
         }
         zeile_ab(&mut aktuelle, &mut y, &mut erste);

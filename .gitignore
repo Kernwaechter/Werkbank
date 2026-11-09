@@ -4,9 +4,7 @@ packaging/flatpak/vendor/
 packaging/flatpak/build/
 packaging/flatpak/.flatpak-builder/
 
-# Geheimnisse: privater Lizenzschlüssel und Kundenregister nie einchecken
+# Geheimnisse und Übertragungsordner nie einchecken
 /Transfer/
-privat.key
-register.jsonl
 packaging/flatpak/repo/
 packaging/flatpak/*.flatpak

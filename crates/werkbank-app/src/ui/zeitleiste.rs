@@ -529,11 +529,7 @@ fn stueck_spans(stuecke: &[Stueck], seite: Seite) -> Vec<Span<'static, (), Font>
     let rot = Color { a: 0.22, ..thema::fehler_rot() };
     stuecke
         .iter()
-        .filter(|s| match (s.art, seite) {
-            (Art::Gleich, _) | (_, Seite::Beide) => true,
-            (Art::Alt, Seite::Alt) | (Art::Neu, Seite::Neu) => true,
-            _ => false,
-        })
+        .filter(|s| matches!((s.art, seite), (Art::Gleich, _) | (_, Seite::Beide) | (Art::Alt, Seite::Alt) | (Art::Neu, Seite::Neu)))
         .map(|s| {
             let basis = span(s.text.clone()).font(schrift()).size(14).color(thema::text_hell());
             match s.art {

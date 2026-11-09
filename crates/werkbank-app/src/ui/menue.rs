@@ -58,6 +58,7 @@ impl Menue {
 }
 
 /// Ein Eintrag der Menüliste.
+#[allow(clippy::large_enum_variant)]
 pub enum Punkt {
     Aktion {
         name: String,

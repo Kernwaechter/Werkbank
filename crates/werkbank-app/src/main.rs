@@ -38,7 +38,6 @@ use ui::dialog::{Dialog, Eingabe, EingabeZweck};
 use ui::suche::Suche;
 use werkbank_kern::codepruefung::{self, Ergebnis};
 use werkbank_kern::portale::Portalregeln;
-use werkbank_kern::lizenz::{self, LizenzStatus};
 use ui::zeitleiste::{self, Zeitleiste};
 use werkbank_kern::sprache::{Ausnahmen, Treffer};
 use werkbank_kern::statistik::Statistik;
@@ -329,15 +328,8 @@ pub struct AppState {
     pub letzte_sicherung: Option<u32>,
     /// Seitenzahl des letzten nativen Druck-PDFs (für den Buchrücken).
     pub satz_seiten: Option<u32>,
-    /// Ergebnis der Lizenzprüfung.
-    pub lizenz_status: LizenzStatus,
     /// Ist „Über die Werkbank“ geöffnet?
     pub ueber_offen: bool,
-    pub lizenz_email: String,
-    pub lizenz_schluessel: String,
-    pub lizenz_meldung: Option<String>,
-    /// Wird gerade gefragt, ob die Lizenz deaktiviert werden soll?
-    pub lizenz_deaktivieren_frage: bool,
     /// Ist das Handbuch geöffnet?
     pub handbuch_offen: bool,
     /// Befehl, für den gerade ein neues Kürzel aufgenommen wird.
@@ -590,22 +582,8 @@ pub enum Message {
     HandbuchOeffnen,
     /// Öffnet „Über die Werkbank“.
     UeberOeffnen,
-    /// Öffnet den Dateidialog für eine Lizenzdatei.
-    LizenzWaehlen,
-    /// Eingabe der E-Mail-Adresse im Lizenzfeld.
-    LizenzEmail(String),
-    /// Eingabe des Lizenzschlüssels.
-    LizenzSchluessel(String),
-    /// Prüft Adresse und Schlüssel und speichert sie bei Erfolg.
-    LizenzAktivieren,
-    /// Öffnet die Kaufseite im Browser (mit der eingetragenen Adresse vorbelegt).
-    KaufenOeffnen,
-    /// Lizenzdatei gewählt.
-    LizenzGewaehlt(Option<PathBuf>),
-    /// Zeigt oder verbirgt die Rückfrage zum Deaktivieren der Lizenz.
-    LizenzDeaktivierenFrage(bool),
-    /// Entfernt den Schlüssel von diesem Gerät und öffnet die Mitteilung an den Anbieter.
-    LizenzDeaktivieren,
+    /// Öffnet die Spendenseite (Buy me a coffee) im Browser.
+    SpendenOeffnen,
     /// Tut nichts (für Bedienelemente ohne Wirkung).
     Nichts,
     /// Schriftart des Editors (`serif`, `sans`, `mono`).
@@ -857,12 +835,7 @@ fn new() -> (AppState, Task<Message>) {
         wortzahl_stand: initialer_text.split_whitespace().count(),
         letzte_sicherung: None,
         satz_seiten: None,
-        lizenz_status: lizenz_pruefen(),
         ueber_offen: false,
-        lizenz_email: String::new(),
-        lizenz_schluessel: String::new(),
-        lizenz_meldung: None,
-        lizenz_deaktivieren_frage: false,
         handbuch_offen: false,
         kuerzel_aufnahme: None,
         einstellungen,
@@ -1040,7 +1013,7 @@ fn cover_vorschau(state: &mut AppState) -> Task<Message> {
             if umschlag && let Some(p) = &portal {
                 let r = cover::umschlag_setzen(&daten, p, seiten, ordner.as_deref(), isbn.as_deref(), false, Some(1100))?;
                 let b = r.bild.ok_or("kein Umschlagbild")?;
-                return Ok((((b.breite, b.hoehe, Arc::new(b.rgba))), Some(r.bericht)));
+                return Ok(((b.breite, b.hoehe, Arc::new(b.rgba)), Some(r.bericht)));
             }
             // Hat der Band ein fertiges cover.png und wurde im Cover-Designer kein Hintergrundbild gewählt, zeigt die Vorschau dieses Bild
             if !umschlag
@@ -1299,23 +1272,7 @@ fn kapitel_ids(projekt: &Projekt) -> Vec<String> {
 
 /// Behandelt Zustandsänderungen nach The Elm Architecture.
 fn update(state: &mut AppState, message: Message) -> Task<Message> {
-    // Nach der Testzeit bleibt nur Aktivieren, Kaufen und Speichern-und-Beenden möglich
-    let message = if gesperrt(state) {
         match message {
-            Message::FensterSchliessen(_) => Message::BeendenSpeichern,
-            m @ (Message::LizenzEmail(_)
-            | Message::LizenzSchluessel(_)
-            | Message::LizenzAktivieren
-            | Message::KaufenOeffnen
-            | Message::BeendenSpeichern
-            | Message::Takt(_)
-            | Message::Nichts) => m,
-            _ => return Task::none(),
-        }
-    } else {
-        message
-    };
-    match message {
         Message::BereichWechseln(bereich) => {
             state.aktiver_bereich = bereich;
             if bereich == Arbeitsbereich::Cover {
@@ -2653,104 +2610,8 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
             state.ueber_offen = true;
         }
 
-        Message::LizenzWaehlen => {
-            return Task::perform(
-                async {
-                    rfd::AsyncFileDialog::new()
-                        .set_title("Lizenzdatei wählen")
-                        .add_filter("Lizenz", &["json"])
-                        .pick_file()
-                        .await
-                        .map(|h| h.path().to_path_buf())
-                },
-                Message::LizenzGewaehlt,
-            );
-        }
-
-        Message::KaufenOeffnen => {
-            bau::oeffnen(Path::new(&kauf_adresse(&state.lizenz_email)));
-        }
-
-        Message::LizenzEmail(t) => state.lizenz_email = t,
-        Message::LizenzSchluessel(t) => state.lizenz_schluessel = t,
-        Message::LizenzAktivieren => {
-            let oeffentlich = ui::hilfe::OEFFENTLICHER_SCHLUESSEL.trim();
-            match lizenz::schluessel_pruefen(oeffentlich, &state.lizenz_email, &state.lizenz_schluessel) {
-                LizenzStatus::Gueltig { .. } => {
-                    let ziel = einstellungen::konfig_ordner().map(|k| k.join("lizenz-schluessel.json"));
-                    let inhalt = serde_json::json!({
-                        "email": lizenz::email_normalisieren(&state.lizenz_email),
-                        "schluessel": state.lizenz_schluessel.trim(),
-                    });
-                    let geschrieben = ziel.and_then(|z| {
-                        let _ = std::fs::create_dir_all(z.parent()?);
-                        std::fs::write(z, inhalt.to_string()).ok()
-                    });
-                    state.lizenz_meldung = Some(if geschrieben.is_some() {
-                        "Danke für deinen Kauf. Die Werkbank ist aktiviert.".to_string()
-                    } else {
-                        "Der Schlüssel ist gültig, konnte aber nicht gespeichert werden.".to_string()
-                    });
-                    state.lizenz_status = lizenz_pruefen();
-                }
-                LizenzStatus::NichtEingerichtet => {
-                    state.lizenz_meldung = Some("In dieser Ausgabe ist die Lizenzprüfung nicht eingerichtet.".to_string());
-                }
-                andere => {
-                    state.lizenz_meldung = Some(match andere {
-                        LizenzStatus::Ungueltig(f) => f,
-                        _ => "Schlüssel und E-Mail-Adresse passen nicht zusammen.".to_string(),
-                    });
-                }
-            }
-        }
-
-        Message::LizenzGewaehlt(pfad) => {
-            if let Some(quelle) = pfad
-                && let Some(ziel) = einstellungen::konfig_ordner().map(|k| k.join("lizenz.json"))
-            {
-                if let Some(eltern) = ziel.parent() {
-                    let _ = std::fs::create_dir_all(eltern);
-                }
-                if let Err(e) = std::fs::copy(&quelle, &ziel) {
-                    state.speicher_zeitstempel = format!("Lizenzdatei nicht kopierbar: {e}");
-                }
-                state.lizenz_status = lizenz_pruefen();
-            }
-        }
-
-        Message::LizenzDeaktivierenFrage(auf) => state.lizenz_deaktivieren_frage = auf,
-        Message::LizenzDeaktivieren => {
-            state.lizenz_deaktivieren_frage = false;
-            let ordner = einstellungen::konfig_ordner();
-            let gespeichert = ordner
-                .as_ref()
-                .and_then(|k| std::fs::read_to_string(k.join("lizenz-schluessel.json")).ok())
-                .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
-            let feld = |k: &str| {
-                gespeichert.as_ref().and_then(|v| v.get(k)).and_then(|x| x.as_str()).unwrap_or("").to_string()
-            };
-            let (email, schluessel) = (feld("email"), feld("schluessel"));
-            let mut fehler = None;
-            if let Some(k) = &ordner {
-                for datei in ["lizenz-schluessel.json", "lizenz.json"] {
-                    if let Err(e) = std::fs::remove_file(k.join(datei))
-                        && e.kind() != std::io::ErrorKind::NotFound
-                    {
-                        fehler = Some(format!("{datei} nicht löschbar: {e}"));
-                    }
-                }
-            }
-            state.lizenz_status = lizenz_pruefen();
-            state.lizenz_email.clear();
-            state.lizenz_schluessel.clear();
-            state.lizenz_meldung = Some(match fehler {
-                Some(ref f) => format!("Die Lizenz konnte nicht vollständig entfernt werden ({f})."),
-                None => "Die Lizenz ist auf diesem Gerät deaktiviert. Bitte schick die geöffnete E-Mail ab, damit die neue Person ihren Schlüssel bekommt.".to_string(),
-            });
-            if fehler.is_none() {
-                bau::oeffnen(Path::new(&weitergabe_mail(&email, &schluessel)));
-            }
+        Message::SpendenOeffnen => {
+            bau::oeffnen(Path::new(SPENDEN_URL));
         }
 
         Message::HandbuchOeffnen => {
@@ -3738,110 +3599,8 @@ pub const HOMEPAGE: &str = "https://werkbank.jurzel-apps.de";
 /// Kontaktadresse für Fragen und Fehlermeldungen.
 pub const KONTAKT: &str = "mailto:kontakt@jurzel.de?subject=Werkbank";
 
-/// Zahlungslink bei Stripe (`assets/kauf-url.txt`); solange sie fehlt, öffnet „Kaufen“ eine E-Mail.
-const KAUF_URL: &str = include_str!("../../../assets/kauf-url.txt");
-
-/// Kodiert Text für eine Adresse (Prozent-Schreibweise).
-fn url_kodieren(text: &str) -> String {
-    text.bytes()
-        .map(|b| if b.is_ascii_alphanumeric() || b"-._".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") })
-        .collect()
-}
-
-/// E-Mail an den Anbieter nach dem Deaktivieren: Die Lizenz wurde weitergegeben, für die neue Adresse
-/// wird ein neuer Schlüssel gebraucht (Lizenzvereinbarung, Abschnitt 4a).
-fn weitergabe_mail(email: &str, schluessel: &str) -> String {
-    let text = format!(
-        "Hallo,\r\n\r\nich habe meine Werkbank-Lizenz deaktiviert, alle Kopien gelöscht und gebe die Lizenz an eine andere Person weiter (Lizenzvereinbarung, Abschnitt 4a).\r\n\r\nBisherige E-Mail-Adresse: {email}\r\nBisheriger Schlüssel: {schluessel}\r\n\r\nE-Mail-Adresse der neuen Person: \r\nName der neuen Person (optional): \r\n\r\nBitte stellt dafür einen neuen Schlüssel aus.\r\n"
-    );
-    format!("mailto:kontakt@jurzel.de?subject={}&body={}", url_kodieren("Werkbank: Lizenz weitergegeben"), url_kodieren(&text))
-}
-
-/// Adresse, die „Kaufen“ öffnet. Die E-Mail-Adresse wird für die Kasse vorbelegt.
-fn kauf_adresse(email: &str) -> String {
-    let url = KAUF_URL.trim();
-    let email = email.trim();
-    if url.starts_with("https://") {
-        if email.contains('@') {
-            let kodiert = url_kodieren(email);
-            let trenner = if url.contains('?') { '&' } else { '?' };
-            // Stripe-Zahlungslinks heißen den Parameter prefilled_email
-            return format!("{url}{trenner}prefilled_email={kodiert}");
-        }
-        return url.to_string();
-    }
-    "mailto:kontakt@jurzel.de?subject=Werkbank%20kaufen".to_string()
-}
-
-/// Nach der Testzeit ist die Werkbank gesperrt, bis ein gültiger Schlüssel eingetragen ist
-/// (nicht in Debug-Builds, damit die Entwicklung nicht ausgesperrt wird).
-fn gesperrt(state: &AppState) -> bool {
-    !cfg!(debug_assertions) && state.lizenz_status == LizenzStatus::TestAbgelaufen
-}
-
-/// Orte, an denen der Testbeginn steht (zweimal, damit das Löschen einer Datei nichts zurücksetzt).
-fn testzeit_dateien() -> Vec<PathBuf> {
-    let mut v = Vec::new();
-    if let Some(k) = einstellungen::konfig_ordner() {
-        v.push(k.join("testzeit.json"));
-    }
-    let daten = std::env::var_os("XDG_DATA_HOME")
-        .or_else(|| std::env::var_os("LOCALAPPDATA"))
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")));
-    if let Some(d) = daten {
-        v.push(d.join("werkbank").join("testzeit.json"));
-    }
-    v
-}
-
-/// Liest den Testbeginn aus allen Orten (der früheste gilt), rechnet den Status und schreibt ihn zurück.
-fn testzeit_pruefen(dateien: &[PathBuf], heute: chrono::NaiveDate) -> LizenzStatus {
-    let lesen = |p: &PathBuf, feld: &str| -> Option<chrono::NaiveDate> {
-        let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(p).ok()?).ok()?;
-        chrono::NaiveDate::parse_from_str(v.get(feld)?.as_str()?, "%Y-%m-%d").ok()
-    };
-    let erststart = dateien.iter().filter_map(|p| lesen(p, "erststart")).min();
-    let zuletzt = dateien.iter().filter_map(|p| lesen(p, "zuletzt")).max();
-    let (beginn, jetzt, status) = lizenz::testzeit(erststart, zuletzt, heute);
-    let inhalt = serde_json::json!({
-        "erststart": beginn.format("%Y-%m-%d").to_string(),
-        "zuletzt": jetzt.format("%Y-%m-%d").to_string(),
-    })
-    .to_string();
-    for p in dateien {
-        if let Some(eltern) = p.parent() {
-            let _ = std::fs::create_dir_all(eltern);
-        }
-        let _ = std::fs::write(p, &inhalt);
-    }
-    status
-}
-
-/// Prüft die Lizenzdatei im Konfigurationsordner gegen den eingebauten öffentlichen Schlüssel.
-fn lizenz_pruefen() -> LizenzStatus {
-    let schluessel = ui::hilfe::OEFFENTLICHER_SCHLUESSEL.trim();
-    let heute = Local::now().date_naive();
-    let gespeichert = einstellungen::konfig_ordner()
-        .map(|k| k.join("lizenz-schluessel.json"))
-        .and_then(|p| std::fs::read_to_string(p).ok())
-        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
-    if let Some(v) = gespeichert {
-        let feld = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
-        let status = lizenz::schluessel_pruefen(schluessel, &feld("email"), &feld("schluessel"));
-        if matches!(status, LizenzStatus::Gueltig { .. }) {
-            return status;
-        }
-    }
-    match einstellungen::konfig_ordner().map(|k| k.join("lizenz.json")).and_then(|p| std::fs::read_to_string(p).ok()) {
-        None if schluessel == lizenz::NICHT_EINGERICHTET => LizenzStatus::NichtEingerichtet,
-        None => testzeit_pruefen(&testzeit_dateien(), heute),
-        Some(text) => match lizenz::aus_json(&text) {
-            Ok(l) => l.pruefen(schluessel, heute),
-            Err(f) => LizenzStatus::Ungueltig(f),
-        },
-    }
-}
+/// Spendenseite „Buy me a coffee“.
+pub const SPENDEN_URL: &str = "https://buymeacoffee.com/services5";
 
 /// Nachricht zu einer Befehl-Kennung der Kürzel-Tabelle.
 fn befehl_nachricht(id: &str, state: &AppState) -> Option<Message> {
@@ -3930,8 +3689,8 @@ fn alle_befehle(state: &AppState) -> Vec<Befehl> {
         befehl("Vorheriger Suchtreffer", "Umschalt+F3", Message::SucheNaechste(-1)),
         befehl("Kapitel umbenennen", "F2", Message::KapitelUmbenennenDialog),
         befehl("Handbuch öffnen", "", Message::HandbuchOeffnen),
-        befehl("Lizenz eingeben", "Einstellungen · Allgemein", Message::EinstellungenSeite(0)),
-        befehl("Über die Werkbank (Lizenz, Bausteine)", "", Message::UeberOeffnen),
+        befehl("Werkbank unterstützen (Buy me a coffee)", "", Message::SpendenOeffnen),
+        befehl("Über die Werkbank (Bausteine)", "", Message::UeberOeffnen),
         befehl("Kapitel löschen", "", Message::KapitelLoeschenFrage),
         befehl("Kapitel nach oben schieben", "Alt+Umschalt+↑", Message::KapitelVerschieben(-1)),
         befehl("Kapitel nach unten schieben", "Alt+Umschalt+↓", Message::KapitelVerschieben(1)),
@@ -4087,18 +3846,12 @@ fn statusdaten(state: &AppState) -> ui::statusleiste::Daten<'_> {
             _ => Pruefung::Offline,
         }
     };
-    let lizenz = match &state.lizenz_status {
-        LizenzStatus::Test { tage_uebrig } => Some((format!("Testversion · noch {tage_uebrig} {}", if *tage_uebrig == 1 { "Tag" } else { "Tage" }), true)),
-        LizenzStatus::Gueltig { .. } => Some(("Lizenziert".to_string(), false)),
-        _ => None,
-    };
     Daten {
         meldung: &state.speicher_zeitstempel,
         ungespeichert: dateien::hat_ungespeichertes(state),
         demo: state.band.ordner.is_none(),
         schreibstand,
         pruefung,
-        lizenz,
     }
 }
 
@@ -4165,8 +3918,7 @@ fn menue_punkte(state: &AppState, menue: ui::menue::Menue) -> Vec<ui::menue::Pun
             Punkt::aktion("Homepage besuchen", "", Message::LinkOeffnen(HOMEPAGE.to_string())),
             Punkt::aktion("Kontakt per E-Mail …", "", Message::LinkOeffnen(KONTAKT.to_string())),
             Punkt::Trenner,
-            Punkt::aktion("Lizenzschlüssel kaufen …", "", Message::KaufenOeffnen),
-            Punkt::aktion("Lizenz eingeben …", "", Message::EinstellungenSeite(0)),
+            Punkt::aktion("☕ Buy me a coffee …", "", Message::SpendenOeffnen),
             Punkt::Trenner,
             Punkt::aktion("Über die Werkbank", "", Message::UeberOeffnen),
         ],
@@ -4184,13 +3936,6 @@ fn view(state: &AppState) -> Element<'_, Message> {
         ui::navigation::Aktionen {
             speichern: Message::Speichern,
             palette: Message::PaletteToggle,
-        },
-        match &state.lizenz_status {
-            LizenzStatus::Test { tage_uebrig } => Some((
-                format!("Testversion · noch {tage_uebrig} {}", if *tage_uebrig == 1 { "Tag" } else { "Tage" }),
-                Message::EinstellungenOeffnen,
-            )),
-            _ => None,
         },
     );
 
@@ -4239,16 +3984,14 @@ fn view(state: &AppState) -> Element<'_, Message> {
             .into()
     };
 
-    let overlay: Option<Element<'_, Message>> = if gesperrt(state) {
-        Some(ui::hilfe::gesperrt(&state.lizenz_email, &state.lizenz_schluessel, state.lizenz_meldung.as_deref(), dateien::hat_ungespeichertes(state)))
-    } else if let Some(m) = state.menue.filter(|_| !state.fokus_modus) {
+    let overlay: Option<Element<'_, Message>> = if let Some(m) = state.menue.filter(|_| !state.fokus_modus) {
         Some(ui::menue::auswahl(m, menue_punkte(state, m)))
     } else if let Some(k) = &state.kontext {
         Some(ui::kontext::menue(k, &state.projekt.teile, state.fenster_groesse))
     } else if state.handbuch_offen {
         Some(ui::hilfe::handbuch())
     } else if state.ueber_offen {
-        Some(ui::hilfe::ueber(&state.lizenz_status, &state.lizenz_email, &state.lizenz_schluessel, state.lizenz_meldung.as_deref()))
+        Some(ui::hilfe::ueber())
     } else if let Some(d) = &state.dialog {
         Some(ui::dialog::dialog_ansicht(d))
     } else if let Some(md) = &state.meta_entwurf {
@@ -4270,13 +4013,6 @@ fn view(state: &AppState) -> Element<'_, Message> {
             &state.server_status,
             state.server.is_some(),
             &state.ausnahmen,
-            ui::einstellungen::LizenzFelder {
-                status: &state.lizenz_status,
-                email: &state.lizenz_email,
-                schluessel: &state.lizenz_schluessel,
-                meldung: state.lizenz_meldung.as_deref(),
-                frage: state.lizenz_deaktivieren_frage,
-            },
         ))
     } else if let Some(palette) = &state.palette {
         let treffer = palette_befehle(state)
@@ -4544,41 +4280,6 @@ fn theme(state: &AppState) -> Theme {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn weitergabe_mail_enthaelt_alte_daten_und_ist_kodiert() {
-        let m = weitergabe_mail("a@b.de", "WB1-XYZ");
-        assert!(m.starts_with("mailto:kontakt@jurzel.de?subject="));
-        assert!(m.contains("a%40b.de") && m.contains("WB1-XYZ"));
-        assert!(!m.contains(' ') && !m.contains('\n'));
-    }
-
-    #[test]
-    fn testzeit_ueberlebt_geloeschte_datei_und_zurueckgestellte_uhr() {
-        let ordner = std::env::temp_dir().join(format!("werkbank-testzeit-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&ordner);
-        let dateien = vec![ordner.join("a/testzeit.json"), ordner.join("b/testzeit.json")];
-        let tag = |n: i64| chrono::NaiveDate::from_ymd_opt(2026, 11, 1).unwrap() + chrono::Duration::days(n);
-        assert_eq!(testzeit_pruefen(&dateien, tag(0)), LizenzStatus::Test { tage_uebrig: 28 });
-        // eine Datei löschen: die andere trägt den Beginn weiter
-        std::fs::remove_file(&dateien[0]).unwrap();
-        assert_eq!(testzeit_pruefen(&dateien, tag(10)), LizenzStatus::Test { tage_uebrig: 18 });
-        // beide löschen und Uhr zurückstellen geht nicht: ohne Dateien beginnt die Zeit neu (bekannte Grenze)
-        assert_eq!(testzeit_pruefen(&dateien, tag(28)), LizenzStatus::TestAbgelaufen);
-        // Uhr zurückgestellt: zuletzt gesehenes Datum zählt
-        assert_eq!(testzeit_pruefen(&dateien, tag(1)), LizenzStatus::TestAbgelaufen);
-        let _ = std::fs::remove_dir_all(&ordner);
-    }
-
-    #[test]
-    fn kaufadresse_ohne_shop_ist_eine_mail() {
-        // Solange assets/kauf-url.txt nicht eingerichtet ist, öffnet „Kaufen“ eine E-Mail
-        if !KAUF_URL.trim().starts_with("https://") {
-            assert!(kauf_adresse("a@b.de").starts_with("mailto:"));
-        } else {
-            assert!(kauf_adresse("a@b.de").ends_with("prefilled_email=a%40b.de"));
-        }
-    }
 
     fn band_ordner(wurzel: &Path, name: &str) {
         let d = wurzel.join(name);

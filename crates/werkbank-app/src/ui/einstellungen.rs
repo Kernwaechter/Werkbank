@@ -1,6 +1,6 @@
 //! # Einstellungen
 //!
-//! Schwebendes Fenster (`Strg+,`) mit fünf Seiten: Allgemein (Lizenz, Speichern, Pensum),
+//! Schwebendes Fenster (`Strg+,`) mit fünf Seiten: Allgemein (Unterstützen, Speichern, Pensum),
 //! Editor (Darstellung), Prüfung (Rechtschreibung, LanguageTool, Ausnahmen – mit
 //! Installationsanleitung über das Info-Symbol), Werkzeuge und Tastenkürzel.
 
@@ -63,7 +63,7 @@ pub struct Fenster {
 
 /// Seiten des Einstellungsfensters: (Titel, Kurzbeschreibung für die Befehlssuche).
 pub const SEITEN: [(&str, &str); 5] = [
-    ("Allgemein", "Lizenz, automatisch speichern, Tagespensum"),
+    ("Allgemein", "Unterstützen, automatisch speichern, Tagespensum"),
     ("Editor", "Design, Schrift, Zeilenabstand, Spaltenbreite"),
     ("Prüfung", "Rechtschreibung, LanguageTool, Ausnahmen"),
     ("Werkzeuge", "Pandoc, Typst, Ghostscript, Java, Rust, Dart/Flutter, Skripte"),
@@ -208,75 +208,17 @@ fn beschriftet<'a>(
         .into()
 }
 
-/// Angaben für den Abschnitt „Lizenz“.
-pub struct LizenzFelder<'a> {
-    pub status: &'a werkbank_kern::lizenz::LizenzStatus,
-    pub email: &'a str,
-    pub schluessel: &'a str,
-    pub meldung: Option<&'a str>,
-    /// Rückfrage „Lizenz deaktivieren?“ ist offen.
-    pub frage: bool,
-}
-
-/// Abschnitt „Lizenz“: Status, Felder für E-Mail-Adresse und Schlüssel, Aktivieren und Kaufen.
-fn lizenz_abschnitt<'a>(l: LizenzFelder<'a>) -> Element<'a, Message> {
-    use werkbank_kern::lizenz::LizenzStatus;
-    let (status_text, farbe) = crate::ui::hilfe::status_text(l.status);
-    let mut spalte = column![abschnitt("Lizenz"), text(status_text).size(13).color(farbe)].spacing(8);
-    if matches!(l.status, LizenzStatus::Gueltig { .. } | LizenzStatus::NichtEingerichtet) {
-        if let Some(m) = l.meldung {
-            spalte = spalte.push(text(m).size(12).color(thema::text_gedimmt()));
-        }
-        if matches!(l.status, LizenzStatus::Gueltig { .. }) {
-            if l.frage {
-                spalte = spalte
-                    .push(
-                        text("Der Schlüssel wird von diesem Gerät entfernt und die Werkbank hier gesperrt. Danach öffnet sich eine E-Mail an den Anbieter, damit die neue Person einen eigenen Schlüssel bekommt (Lizenzvereinbarung, Abschnitt 4a).")
-                            .size(12)
-                            .color(thema::text_gedimmt()),
-                    )
-                    .push(
-                        row![
-                            button(text("Ja, deaktivieren").size(12)).padding([5, 12]).style(thema::primaer_knopf_stil).on_press(Message::LizenzDeaktivieren),
-                            button(text("Abbrechen").size(12)).padding([5, 12]).style(thema::sekundaer_knopf_stil).on_press(Message::LizenzDeaktivierenFrage(false)),
-                        ]
-                        .spacing(8),
-                    );
-            } else {
-                spalte = spalte.push(
-                    button(text("Lizenz weitergeben (deaktivieren) …").size(12))
-                        .padding([5, 12])
-                        .style(thema::sekundaer_knopf_stil)
-                        .on_press(Message::LizenzDeaktivierenFrage(true)),
-                );
-            }
-        }
-        return spalte.into();
-    }
-    spalte = spalte
-        .push(beschriftet(
-            "E-Mail-Adresse des Kaufs",
-            text_input("name@beispiel.de", l.email).on_input(Message::LizenzEmail).size(13).padding(6),
-        ))
-        .push(beschriftet(
-            "Lizenzschlüssel",
-            text_input("WB1-…", l.schluessel)
-                .on_input(Message::LizenzSchluessel)
-                .on_submit(Message::LizenzAktivieren)
-                .size(13)
-                .padding(6),
-        ))
-        .push(
-            row![
-                button(text("Lizenzschlüssel aktivieren").size(12)).padding([5, 12]).style(thema::primaer_knopf_stil).on_press(Message::LizenzAktivieren),
-                button(text("Kaufen").size(12)).padding([5, 12]).style(thema::sekundaer_knopf_stil).on_press(Message::KaufenOeffnen),
-                button(text("Lizenzdatei wählen …").size(12)).padding([5, 12]).style(thema::sekundaer_knopf_stil).on_press(Message::LizenzWaehlen),
-                text(l.meldung.unwrap_or("")).size(12).color(thema::warnung_orange()),
-            ]
-            .spacing(8)
-            .align_y(Alignment::Center),
-        );
-    spalte.into()
+/// Abschnitt „Unterstützen“: Hinweis auf freie Software und der Spendenlink.
+fn spenden_abschnitt<'a>() -> Element<'a, Message> {
+    column![
+        abschnitt("Werkbank unterstützen"),
+        text("Die Werkbank ist freie Software (MIT-Lizenz) und kostenlos. Wenn sie dir hilft, freue ich mich über einen Kaffee. Das fördert die Weiterentwicklung.")
+            .size(13)
+            .color(thema::text_gedimmt()),
+        button(text("☕ Buy me a coffee").size(14).font(thema::fett())).padding([7, 18]).style(thema::kaffee_knopf_stil).on_press(Message::SpendenOeffnen),
+    ]
+    .spacing(8)
+    .into()
 }
 
 /// Rendert das Einstellungsfenster als Overlay.
@@ -290,7 +232,6 @@ pub fn ansicht<'a>(
     status: &'a ServerStatus,
     server_laeuft: bool,
     ausnahmen: &'a Ausnahmen,
-    lizenz: LizenzFelder<'a>,
 ) -> Element<'a, Message> {
     let titelzeile = row![
         text("Einstellungen").size(18).font(thema::fett()).color(thema::text_hell()),
@@ -765,7 +706,7 @@ pub fn ansicht<'a>(
         }
         3 => seite = seite.push(tafel(werkzeug_spalte)),
         4 => seite = seite.push(tafel(tasten)),
-        _ => seite = seite.push(tafel(lizenz_abschnitt(lizenz))).push(tafel(editor)),
+        _ => seite = seite.push(tafel(spenden_abschnitt())).push(tafel(editor)),
     }
 
     let fuss = row![

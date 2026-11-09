@@ -3,7 +3,6 @@ resolver = "2"
 members = [
     "crates/werkbank-kern",
     "crates/werkbank-app",
-    "crates/werkbank-lizenz",
     "crates/werkbank-satz",
 ]
 
@@ -11,7 +10,7 @@ members = [
 version = "1.5.0"
 edition = "2024"
 authors = ["Volker Dähn"]
-license-file = "LIZENZVEREINBARUNG.md"
+license = "MIT"
 publish = false
 
 [profile.release]

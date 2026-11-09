@@ -56,7 +56,6 @@ pub fn kopfleiste<'a, Message: Clone + 'a, Quelle: ToString + PartialEq + Clone 
     on_buch_wechsel: impl Fn(Quelle) -> Message + 'a,
     on_bereich_wechsel: impl Fn(Arbeitsbereich) -> Message + Copy + 'a,
     aktionen: Aktionen<Message>,
-    test_hinweis: Option<(String, Message)>,
 ) -> Element<'a, Message> {
     // Links: das Band. Alles andere (Ordner öffnen, Ansichten, Einstellungen) steht in den Menüs.
     let wechsel = std::rc::Rc::new(on_buch_wechsel);
@@ -88,14 +87,6 @@ pub fn kopfleiste<'a, Message: Clone + 'a, Quelle: ToString + PartialEq + Clone 
 
     // Rechts: Hinweise, Speicherzustand, Suche, Ansichten, Einstellungen
     let mut rechts = row![].spacing(6).align_y(Alignment::Center);
-    if let Some((beschriftung, nachricht)) = test_hinweis {
-        rechts = rechts.push(
-            button(text(beschriftung).size(11).color(thema::warnung_orange()))
-                .padding([4, 8])
-                .style(thema::symbol_knopf_stil(false))
-                .on_press(nachricht),
-        );
-    }
     // Speichern: nur bei Änderungen ein deutlicher Knopf; der Speicherstand steht sonst in der Statusleiste
     if ist_geaendert {
         rechts = rechts.push(tooltip_knopf(

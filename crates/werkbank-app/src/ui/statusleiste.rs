@@ -2,7 +2,7 @@
 //!
 //! Schmale Zeile am unteren Fensterrand. Links der Speicherstand mit der letzten Meldung der
 //! Werkbank, rechts (nur beim Schreiben) Cursorstelle und Wortzahl mit Ziel, dann der Zustand der
-//! Sprachprüfung und die Lizenz. Alles Anklickbare führt dorthin, wo man es ändert.
+//! Sprachprüfung und den Spendenlink. Alles Anklickbare führt dorthin, wo man es ändert.
 
 use crate::Message;
 use crate::thema;
@@ -37,8 +37,6 @@ pub struct Daten<'a> {
     pub demo: bool,
     pub schreibstand: Option<Schreibstand>,
     pub pruefung: Pruefung,
-    /// Text und ob er hervorgehoben (Testversion) werden soll.
-    pub lizenz: Option<(String, bool)>,
 }
 
 fn trenner<'a>() -> Element<'a, Message> {
@@ -124,10 +122,7 @@ pub fn leiste<'a>(d: &Daten<'a>) -> Element<'a, Message> {
         row![punkt(pf), text(pt).size(11).color(thema::text_hell())].spacing(6).align_y(Alignment::Center),
         Message::EinstellungenOeffnen,
     ));
-    if let Some((t, hervor)) = &d.lizenz {
-        let farbe = if *hervor { thema::warnung_orange() } else { thema::text_gedimmt() };
-        rechts = rechts.push(trenner()).push(eintrag(text(t.clone()).size(11).color(farbe), Message::UeberOeffnen));
-    }
+    rechts = rechts.push(trenner()).push(eintrag(text("☕ Unterstützen").size(11).color(thema::text_gedimmt()), Message::SpendenOeffnen));
 
     iced::widget::column![
         thema::trennlinie(),

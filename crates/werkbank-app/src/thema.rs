@@ -310,6 +310,22 @@ pub fn primaer_knopf_stil(_theme: &Theme, status: button::Status) -> button::Sty
     }
 }
 
+/// Gelber Spendenknopf im Stil von „Buy me a coffee“ (#FFDD00, schwarzer Rand und Text).
+pub fn kaffee_knopf_stil(_theme: &Theme, status: button::Status) -> button::Style {
+    let gelb = Color::from_rgb8(0xFF, 0xDD, 0x00);
+    let bg = match status {
+        button::Status::Hovered => Color::from_rgb8(0xFF, 0xE8, 0x4D),
+        button::Status::Pressed => Color::from_rgb8(0xE6, 0xC6, 0x00),
+        _ => gelb,
+    };
+    button::Style {
+        background: Some(Background::Color(bg)),
+        text_color: Color::BLACK,
+        border: Border { color: Color::BLACK, width: 2.0, radius: 8.0.into() },
+        ..Default::default()
+    }
+}
+
 /// Knopf für zerstörerische Aktionen (Löschen, Verwerfen): rote Schrift auf neutraler Fläche,
 /// beim Überfahren rot gefüllt.
 pub fn gefahr_knopf_stil(_theme: &Theme, status: button::Status) -> button::Style {

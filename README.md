@@ -17,7 +17,7 @@ Stand und Umsetzungsplan: [PLAN-umsetzung.md](PLAN-umsetzung.md). Konzept: [KONZ
 
 - Dreispalter: Bibliothek, Blattliste, Editor, dazu Inspektor (Status, Wortziel, Metriken, Gliederung, Notizen, Verweise, Hinweise).
 - **Speichern ist verlustfrei**: Eine Datei wird nur geschrieben, wenn sich ihr Text ändert, atomar, und jedes Speichern legt den alten Stand als nummerierte Sicherung in `.werkbank/backups/` ab (Autosave nach 8 s Pause legt zusätzlich Stände in `.werkbank/snapshots/` ab, Warnung beim Beenden). Die **Zeitleiste** (`Strg+H`) zeigt alle Stände nach Tagen und Schreibsitzungen gegliedert, vergleicht sie wortgenau mit dem aktuellen Text und holt ein Kapitel, einzelne Passagen oder eine Kopie zurück; Stände lassen sich benennen, das Aufräumen ist freiwillig und zeigt vorher, was gelöscht würde. Ein Reiter holt entfernte Teile aus dem Papierkorb zurück.
-- **Menüleiste** (Datei, Bearbeiten, Ansicht, Buch, Hilfe) mit allen wichtigen Befehlen und ihren Kürzeln; die Kopfleiste zeigt nur Band, Bereich und Suche; eine **Statusleiste** unten zeigt Speicherstand und Meldungen, Cursorstelle, Wörter mit Wortziel, Zustand der Sprachprüfung und Lizenz. Hilfe: Handbuch, Homepage, Kontakt, Lizenzkauf und „Über die Werkbank“ (Version, Urheberrecht, Lizenzstatus, Lizenzen der Open-Source-Bausteine).
+- **Menüleiste** (Datei, Bearbeiten, Ansicht, Buch, Hilfe) mit allen wichtigen Befehlen und ihren Kürzeln; die Kopfleiste zeigt nur Band, Bereich und Suche; eine **Statusleiste** unten zeigt Speicherstand und Meldungen, Cursorstelle, Wörter mit Wortziel, Zustand der Sprachprüfung und den Spendenlink. Hilfe: Handbuch, Homepage, Kontakt, „Buy me a coffee“ und „Über die Werkbank“ (Version, Urheberrecht, Lizenzen der Open-Source-Bausteine).
 - Kapitel und Teile anlegen, umbenennen (`F2`), verschieben (`Alt+Umschalt+↑/↓`), löschen; `reihenfolge.txt` wird nachgeführt, entfernte Teile landen im Papierkorb `.werkbank/papierkorb/`.
 - **Suchen und Ersetzen** im Kapitel (`Strg+F`) und im Buch (`Strg+Umschalt+F`), `F3` weiter.
 - Markierungen im Editor: Überschriften, Code, Zitate, `@kap:`-Verweise, Fettdruck; unbekannte Wörter rot (Hunspell, offline), LanguageTool-Hinweise orange.
@@ -65,6 +65,10 @@ Hilfsprogramme im Kern: `cargo run -p werkbank-kern --example roundtrip -- <Band
 
 Pakete: siehe [packaging/README.md](packaging/README.md).
 
-## Lizenz und Vertrieb
+## Lizenz und Unterstützung
 
-Die Werkbank ist kommerzielle Software ([LIZENZVEREINBARUNG.md](LIZENZVEREINBARUNG.md)): 28 Tage Testzeit mit vollem Funktionsumfang, danach ein Lizenzschlüssel zur E-Mail-Adresse des Kaufs (Ed25519, Prüfung offline). Verkäuferseite: [LIZENZ-vertrieb.md](LIZENZ-vertrieb.md). Alle Fremdbausteine stehen unter permissiven Lizenzen (Liste im Programm unter „Über die Werkbank“, erzeugt mit `python3 packaging/lizenzen.py`, prüfbar mit `cargo deny check`). Signieren und Prüfsummen: [packaging/SIGNIEREN.md](packaging/SIGNIEREN.md).
+Quellcode: <https://github.com/Kernwaechter/Werkbank>. Die Werkbank ist freie Software unter der **MIT-Lizenz** ([LICENSE](LICENSE)): kostenlos nutzbar, auch für berufliche und gewerbliche Buchprojekte, veränderbar und weitergebbar. Es gibt keine Testzeit, keinen Lizenzschlüssel und keine Einschränkung.
+
+Wenn dir die Werkbank beim Schreiben hilft, kannst du die Weiterentwicklung mit einem Kaffee fördern: **[Buy me a coffee](https://buymeacoffee.com/services5)**. Der Link steht auch in der Werkbank (Hilfe-Menü, Statusleiste, Einstellungen, „Über die Werkbank“).
+
+Alle Fremdbausteine stehen unter permissiven Lizenzen (Liste im Programm unter „Über die Werkbank“, erzeugt mit `python3 packaging/lizenzen.py`, prüfbar mit `cargo deny check`). Signieren und Prüfsummen: [packaging/SIGNIEREN.md](packaging/SIGNIEREN.md).

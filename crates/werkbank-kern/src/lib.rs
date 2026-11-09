@@ -23,7 +23,6 @@ pub mod diff;
 pub mod statistik;
 pub mod stil;
 pub mod suche;
-pub mod lizenz;
 pub mod metriken;
 pub mod portale;
 pub mod sprache;
