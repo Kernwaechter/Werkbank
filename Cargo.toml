@@ -8,36 +8,7 @@ members = [
 
 [workspace.package]
 version = "1.5.0"
-edition = "2024"Wenn es direkt der allererste Commit (Root-Commit) deines Repositories war, greift ein normales git rebase -i HEAD~3 nicht, weil es vor dem ersten Commit kein "Eltern-Element" gibt, auf das Git aufsetzen kann.
-Am einfachsten ist es, wenn du den automatischen Befehl mit git-filter-repo aus der vorherigen Antwort nutzt – diesem Tool ist es egal, ob es der erste oder der hundertste Commit ist, es bereinigt die gesamte Historie inklusive des allerersten Commits vollautomatisch.
-Falls du es lieber manuell über ein interaktives Rebase machen möchtest, kannst du Git mit dem Flag --root dazu zwingen, die Historie ab dem allerersten Commit aufzurollen:
-
-Der manuelle Weg via Rebase
-
-1. Starte das Rebase ab der Wurzel des Repositories:bash
-git rebase -i --root
-Verwende Code mit Vorsicht.
-2. Es öffnet sich eine Liste aller Commits deines Repositories. Der allererste Commit steht ganz oben.
-3. Ändere das Wort pick in der allerersten Zeile zu reword (oder einfach nur r).
-4. Speichere und schließe den Editor.
-5. Git stoppt nun sofort beim ersten Commit und öffnet dessen Commit-Nachricht. Lösche die Zeile Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com> heraus.
-6. Speichere und schließe das Fenster erneut. Git wendet nun alle darauf folgenden Commits automatisch wieder an.
-7. Drücke die Änderungen mit Gewalt zu GitHub hoch:bash
-git push origin --force-with-lease
-Verwende Code mit Vorsicht.
-
-Alternative: Wenn das gesamte Projekt nur aus diesem einen ersten Commit besteht
-
-Falls du das Projekt gerade erst frisch angelegt hast und es bisher überhaupt nur einen einzigen Commit gibt, kannst du ihn blitzschnell so überschreiben, ohne ein Rebase zu starten:
-bash
-git commit --amend
-Verwende Code mit Vorsicht.
-(Zeile im Editor löschen, speichern, schließen) und danach:
-bash
-git push origin --force-with-lease
-Verwende Code mit Vorsicht.
-Probier einen der Wege aus. Falls beim Rebase ein Konflikt auftritt oder du dir unsicher bei der Bedienung des Text-Editors (wie Vim oder Nano) im Terminal bist, sag mir kurz Bescheid!
-
+edition = "2024"
 authors = ["Volker Dähn"]
 license = "CC-BY-NC-SA-4.0"
 publish = false
